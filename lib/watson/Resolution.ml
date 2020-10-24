@@ -95,7 +95,8 @@ module Proof = struct
         | Success | Failure -> []
         | Resolution (_, state) -> begin match State.discharge state with
             | Some (atom, state) ->
-                let resolutions = CCList.filter_map (Semantics.Rule.resolve atom) program in
+                let rules = Semantics.Program.rules program in
+                let resolutions = CCList.filter_map (Semantics.Rule.resolve atom) rules in
                 let make_node (map, obligation, atoms) =
                     let label = {
                         Label.obligation = obligation;

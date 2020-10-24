@@ -9,6 +9,7 @@ module Term : sig
         | Integer of int
         | Float of float
         | Boolean of bool
+    (** terms are flat first-order objects *)
 
     type term = t
     (** {!type:term} is a simple type alias for {!type:t} *)
@@ -37,8 +38,10 @@ module Term : sig
         (** [compose l r] constructs a new map that is equivalent to [r(l(term))] *)
 
         val empty : t
+        (** [empty] is a default map that acts as the identity when applied *)
 
         val of_list : (string * term) list -> t
+        (** [of_list xs] builds a map from the list [xs] containing key-value pairs *)
 
         val to_list : t -> (string * term) list
         (** [to_list m] converts [m] to an association list *)
@@ -75,6 +78,7 @@ module Atom : sig
     (** [equal l r] tests for syntactic equality between [l] and [r] *)
 
     val compare : t -> t -> int
+    (** [compare left right] enforces an arbitrary (but consistent) order over [left] and [right] *)
 
     val to_string : t -> string
     (** [to_string atom] converts [atom] to a human-readable string format *)

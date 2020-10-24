@@ -1,18 +1,3 @@
-module Instance = struct
-    type t = Instance of Language.Atom.t list
-
-    let add atom instance = match instance with
-        Instance atoms -> Instance (atom :: atoms)
-
-    let add_all atoms instance = match instance with
-        Instance atoms' -> Instance (atoms @ atoms')
-
-    let empty = []
-
-    let mem atom instance = match instance with
-        Instance atoms -> CCList.mem ~eq:Language.Atom.equal atom atoms
-end
-
 module Rule = struct
     open Language
     open Logic
@@ -56,4 +41,8 @@ end
 
 module Program = struct
     type t = Rule.t list
+
+    let of_list xs = xs
+
+    let rules program = program
 end
