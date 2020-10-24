@@ -8,6 +8,12 @@ module Rule = struct
         body : Atom.t list;
     }
 
+    let make obligation head body = {
+        obligation = obligation;
+        head = head;
+        body = body;
+    }
+
     let map rule m = {
         obligation = Obligation.map rule.obligation m;
         head = Atom.map rule.head m;

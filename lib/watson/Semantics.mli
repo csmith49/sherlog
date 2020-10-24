@@ -1,6 +1,8 @@
 module Rule : sig
     type t
 
+    val make : Logic.Obligation.t -> Language.Atom.t -> Language.Atom.t list -> t
+
     val map : t -> Language.Term.Map.t -> t
     (** [map rule m] applies map [m] to all parts of [rule] *)
 
