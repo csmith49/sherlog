@@ -136,6 +136,6 @@ module Make (V : VERTEX) : (GRAPH with type vertex = V.t) = struct
             outgoing = CCList.map edge_map context.outgoing;
         } in graph
             |> VertexMap.to_list
-            |> CCList.map (CCPair.map2 context_map)
+            |> CCList.map (CCPair.map_snd context_map)
             |> VertexMap.of_list
 end

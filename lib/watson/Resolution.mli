@@ -72,4 +72,6 @@ module Proof : sig
 
     val resolve : Semantics.Program.t -> t -> t
     (** [resolve program proof] uses the rules in [program] to resolve [proof] by expanding resolution nodes until all leaves in the proof tree are labeled with [Success] or [Failure] *)
+
+    val obligation : t -> Logic.Obligation.t
 end

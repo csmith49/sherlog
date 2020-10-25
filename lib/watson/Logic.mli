@@ -16,14 +16,18 @@ module ETerm : sig
 
     val variables : t -> string list
     (** [variables term] returns a list of the string representations of all variables in [term] *)
+
+    val to_string : t -> string
+
+    val equal : t -> t -> bool
 end
 
 module Obligation : sig
     type t =
         | True
         | False
-        | And of t list
-        | Or of t list
+        | And of t * t
+        | Or of t * t
         | Equal of ETerm.t * ETerm.t
         | Sample of ETerm.t * ETerm.t
 
@@ -32,4 +36,11 @@ module Obligation : sig
     val map : t -> Language.Term.Map.t -> t
 
     val of_map : Language.Term.Map.t -> t
+
+    val to_string : t -> string
+
+    val conjoin : t list -> t
+    val disjoin : t list -> t
+
+    val simplify : t -> t
 end

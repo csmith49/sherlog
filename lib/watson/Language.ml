@@ -8,6 +8,14 @@ module Term = struct
 
     type term = t
 
+    let to_string = function
+        | Variable x -> x
+        | Constant c -> c
+        | Integer i -> CCInt.to_string i
+        | Float f -> CCFloat.to_string f
+        | Boolean true -> "⟙" (* unicode large down-tack *)
+        | Boolean false -> "⟘" (* unicode large up-tack *)
+
     let equal left right = match left, right with
         | Variable x, Variable y -> CCString.equal x y
         | Constant a, Constant b -> CCString.equal a b
@@ -23,14 +31,6 @@ module Term = struct
     let occurs name term = match term with
         | Variable x -> CCString.equal name x
         | _ -> false
-
-    let to_string = function
-        | Variable x -> x
-        | Constant c -> c
-        | Integer i -> CCInt.to_string i
-        | Float f -> CCFloat.to_string f
-        | Boolean true -> "true"
-        | Boolean false -> "false"
 
     module Map = struct
         module StringMap = CCMap.Make(CCString)
@@ -100,7 +100,7 @@ module Atom = struct
             | Term.Variable x -> Some x
             | _ -> None)
     let is_ground atom = atom |> arguments |> CCList.for_all Term.is_ground
-    
+
     let compare left right = Pervasives.compare left right
 
     let equal left right = match left, right with

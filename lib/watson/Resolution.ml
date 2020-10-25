@@ -125,4 +125,17 @@ module Proof = struct
         |> Data.Tree.zipper
         |> resolve_zipper program
         |> Data.Tree.of_zipper
+
+    let rec obligation = function
+        | Data.Tree.Node (Success, _) -> Logic.Obligation.True
+        | Data.Tree.Node (Failure, _) -> Logic.Obligation.False
+        | Data.Tree.Node (Resolution (lbl, _), children) ->
+            let children_obligation = children
+                |> CCList.map obligation
+                |> Logic.Obligation.disjoin in
+            let existential_obligation = Label.obligation lbl in
+            let map_obligation = lbl
+                |> Label.map
+                |> Logic.Obligation.of_map in
+            Logic.Obligation.conjoin [existential_obligation ; map_obligation ; children_obligation]
 end
