@@ -1,23 +1,35 @@
-module Cache = struct
-    module AtomSet = CCSet.Make(Language.Atom)
+open Syntax
+open Semantics
 
+module Goal = struct
+    type t = Atom.t list
+
+    let of_list x = x
+    let to_list x = x
+
+    let apply map goal = goal
+        |> to_list
+        |> CCList.map (Atom.apply map)
+        |> of_list
+
+    let extend atoms goal = goal
+        |> to_list
+        |> CCList.append atoms
+        |> of_list
+
+    let discharge goal = match to_list goal with
+        | [] -> None
+        | x :: xs -> Some (x, of_list xs)
+end
+
+module Cache = struct
+    (** Utility module for caching previously-unrolled values *)
+    module AtomSet = CCSet.Make(Atom)
     type t = AtomSet.t
 
     let empty = AtomSet.empty
     let add = AtomSet.add
     let mem = AtomSet.mem
-end
-
-module Goal = struct
-    type t = Language.Atom.t list
-
-    let of_list xs = xs
-
-    let discharge goal = 
-        if CCList.is_empty goal then None
-        else Some (CCList.hd_tl goal)
-
-    let map goal m = CCList.map (fun atom -> Language.Atom.map atom m) goal
 end
 
 module Proof = struct
@@ -32,40 +44,46 @@ module Proof = struct
             cache = Cache.empty;
         }
 
-        (* use Goal.discharge, but check that the discharged atom hasn't already been unfolded and cache the result *)
+        let apply map state = {
+            state with goal = Goal.apply map state.goal;
+        }
+
+        let extend atoms state = {
+            state with goal = Goal.extend atoms state.goal;
+        }
+
         let rec discharge state = match Goal.discharge state.goal with
-        | Some (atom, goal) ->
-            let state = {state with goal = goal} in
-            if Cache.mem atom state.cache then
-                discharge state
-            else
-                let state = {state with cache = Cache.add atom state.cache} in
-                Some (atom, state)
-        | None -> None
-
-        let extend_goal atoms state = {
-            state with goal = state.goal @ atoms
-        }
-
-        let map state m = {
-            state with goal = Goal.map state.goal m
-        }
+            | Some (atom, goal) -> let state = {state with goal = goal} in
+                if Cache.mem atom state.cache then
+                    discharge state
+                else
+                    let state = {state with cache = Cache.add atom state.cache} in
+                    Some (atom, state)
+            | None -> None
     end
 
     module Label = struct
         type t = {
-            obligation : Logic.Obligation.t;
-            map : Language.Term.Map.t;
+            atom : Atom.t;
+            map : Map.t;
+            subgoal : Atom.t list;
         }
 
         let initial = {
-            obligation = Logic.Obligation.True;
-            map = Language.Term.Map.empty;
+            atom = Atom.Atom ("root", []);
+            map = Map.empty;
+            subgoal = [];
         }
 
-        let obligation lbl = lbl.obligation
+        let of_resolution (atom, map, subgoal) = {
+            atom = atom;
+            map = map;
+            subgoal = subgoal;
+        }
 
+        let atom lbl = lbl.atom
         let map lbl = lbl.map
+        let subgoal lbl = lbl.subgoal
     end
 
     type node =
@@ -83,7 +101,7 @@ module Proof = struct
         let node = Resolution (label, state) in
             Data.Tree.leaf node
 
-    (* filter for determining which nodes we can expand *)
+    (* filter for determining where we can and can't expand *)
     let is_expandable tree =
         if Data.Tree.is_leaf tree then 
             match Data.Tree.label tree with
@@ -95,16 +113,13 @@ module Proof = struct
         | Success | Failure -> []
         | Resolution (_, state) -> begin match State.discharge state with
             | Some (atom, state) ->
-                let rules = Semantics.Program.rules program in
-                let resolutions = CCList.filter_map (Semantics.Rule.resolve atom) rules in
-                let make_node (map, obligation, atoms) =
-                    let label = {
-                        Label.obligation = obligation;
-                        map = map;
-                    } in
+                let resolutions = Program.resolve atom program in
+                if CCList.is_empty resolutions then [Failure] else
+                let make_node (atom, map, subgoal) =
+                    let label = Label.of_resolution (atom, map, subgoal) in
                     let state = state
-                        |> State.extend_goal atoms
-                        |> (fun s -> State.map s map) in
+                        |> State.extend subgoal
+                        |> State.apply map in
                     Resolution (label, state)
                 in CCList.map make_node resolutions
             | None -> [Success] end
@@ -125,17 +140,4 @@ module Proof = struct
         |> Data.Tree.zipper
         |> resolve_zipper program
         |> Data.Tree.of_zipper
-
-    let rec obligation = function
-        | Data.Tree.Node (Success, _) -> Logic.Obligation.True
-        | Data.Tree.Node (Failure, _) -> Logic.Obligation.False
-        | Data.Tree.Node (Resolution (lbl, _), children) ->
-            let children_obligation = children
-                |> CCList.map obligation
-                |> Logic.Obligation.disjoin in
-            let existential_obligation = Label.obligation lbl in
-            let map_obligation = lbl
-                |> Label.map
-                |> Logic.Obligation.of_map in
-            Logic.Obligation.conjoin [existential_obligation ; map_obligation ; children_obligation]
 end

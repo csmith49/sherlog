@@ -1,0 +1,6 @@
+(library
+    (name sherlog)
+    (libraries watson data)
+)
+(ocamllex lexer)
+(menhir (modules parser))

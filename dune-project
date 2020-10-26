@@ -1,5 +1,5 @@
 (lang dune 2.6)
-(name watson)
+(name sherlog)
 (version 0.9)
 
 (generate_opam_files true)
@@ -8,10 +8,11 @@
 (authors "Calvin Smith")
 
 (package
-    (name watson)
+    (name sherlog)
     (synopsis "An OCaml library for externally-guarded existential Datalog")
     (depends
         (containers (> 3.0))
         (dune (> 1.5))
     )
 )
+(using menhir 2.1)

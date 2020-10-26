@@ -1,54 +1,68 @@
+open Syntax
+
 module Rule = struct
-    open Language
-    open Logic
+    type t = Rule of Atom.t * Atom.t list
 
-    type t = {
-        obligation : Obligation.t;
-        head : Atom.t;
-        body : Atom.t list;
-    }
+    let to_string = function
+        | Rule (Atom _ as head, body) ->
+            let head = Atom.to_string head in
+            let body = body
+                |> CCList.map Atom.to_string
+                |> CCString.concat ", " in
+            head ^ " ← " ^ body
+        | Rule (Intro (ob, _, _, v) as head, body) ->
+            let head = Atom.to_string head in
+            let body = body
+                |> CCList.map Atom.to_string
+                |> CCString.concat ", " in
+            let values = v
+                |> CCList.map Term.to_string
+                |> CCString.concat ", " in
+            let obligation = Obligation.to_string ob in
+            "∃" ^ values ^ " ⊧ " ^ obligation ^ ". " ^ head ^ " ← " ^ body
 
-    let make obligation head body = {
-        obligation = obligation;
-        head = head;
-        body = body;
-    }
+    let variables = function
+        | Rule (head, body) ->
+            let hvars = Atom.variables head in
+            let bvars = body
+                |> CCList.flat_map Atom.variables in
+            hvars @ bvars
 
-    let map rule m = {
-        obligation = Obligation.map rule.obligation m;
-        head = Atom.map rule.head m;
-        body = CCList.map (fun a -> Atom.map a m) rule.body;
-    }
+    let apply map = function
+        | Rule (head, body) ->
+            let head = Atom.apply map head in
+            let body = CCList.map (Atom.apply map) body in
+                Rule (head, body)
 
     let renaming_index = ref 0
 
     let rename rule =
-        (* get all the variables in the head and body *)
-        let head_variables = Atom.variables rule.head in
-        let body_variables = CCList.flat_map Atom.variables rule.body in
-        let variables = CCList.uniq ~eq:CCString.equal (head_variables @ body_variables) in
-        (* generate new names *)
-        let renamings = CCList.map (fun v -> 
-            let v' = v ^ "_" ^ (string_of_int !renaming_index) in
-            (v, Term.Variable v')) variables in
-        let _ = renaming_index := !renaming_index + 1 in
-        let m = Term.Map.of_list renamings in
-        map rule m
+        let vars = rule
+            |> variables
+            |> CCList.uniq ~eq:CCString.equal in
+        let map = vars
+            |> CCList.map (fun v -> 
+                    let v' = v ^ (string_of_int !renaming_index) in
+                    (v, Term.Variable v')
+                )
+            |> Map.of_list in
+        apply map rule
 
-    let resolve atom rule =
-        let rule = rename rule in
-        match Atom.unify rule.head atom with
-            | Some m ->
-                let obligation = Obligation.map rule.obligation m in
-                let subgoal = CCList.map (fun a -> Atom.map a m) rule.body in
-                Some (m, obligation, subgoal)
+    let resolve atom rule = match rename rule with
+        | Rule (head, body) -> match Atom.unify head atom with
+            | Some map ->
+                let subgoal = CCList.map (Atom.apply map) body in
+                Some (Atom.apply map atom, map, subgoal)
             | None -> None
 end
 
 module Program = struct
     type t = Rule.t list
 
-    let of_list xs = xs
+    let to_list x = x
+    let of_list x = x
 
-    let rules program = program
+    let resolve atom program = program
+        |> to_list
+        |> CCList.filter_map (Rule.resolve atom)
 end
