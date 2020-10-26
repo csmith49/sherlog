@@ -26,7 +26,9 @@ let rec handle_connection handler (ic, oc) () = Lwt_io.read_line_opt ic >>=
             | Some result ->
                 let reply = Yojson.Basic.to_string result in
                 Lwt_io.write_line oc reply >>= (handle_connection handler (ic, oc))
-            | None -> handle_connection handler (ic, oc) () end
+            | None ->
+                let reply = Yojson.Basic.to_string (`String "failure") in
+                Lwt_io.write_line oc reply >>= (handle_connection handler (ic, oc)) end
         | _ -> return_unit)
 
 (* constructs a handler for the output of lwt_unix.accept *)

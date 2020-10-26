@@ -1,4 +1,4 @@
 (executables
-    (names sherlog)
-    (libraries sherlog watson containers)
+    (names run server)
+    (libraries lib containers)
 )

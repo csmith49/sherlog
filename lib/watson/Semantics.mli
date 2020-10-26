@@ -25,6 +25,8 @@ module Program : sig
     val of_list : Rule.t list -> t
     (** [of_list rules] builds a program from the list [rules] *)
 
+    val to_list : t -> Rule.t list
+
     val resolve : Syntax.Atom.t -> t -> (Syntax.Atom.t * Syntax.Map.t * Syntax.Atom.t list) list
     (** [resolve atom program] attempts to resolve [atom] using all rules in [program] non-deterministically *)
 end

@@ -87,7 +87,7 @@ module Compile = struct
     and conjunct_of_solution (solution : Watson.Resolution.Proof.Solution.t) : unit conjunct =
         let intros = solution
             |> Watson.Resolution.Proof.Solution.introductions
-            |> CCList.map (fun (ob, p, v) -> 
+            |> CCList.map (fun (ob, v, p) -> 
                 let value = CCList.hd v in
                 let mechanism = match ob with
                     | Watson.Syntax.Obligation.Assign f -> f in
@@ -173,3 +173,26 @@ let of_proof proof =
     empty
         |> CCList.fold_right add_view views
         |> CCList.fold_right add_observation observations
+
+(* and writing out *)
+let rec to_json model =
+    let observations = model
+        |> observations
+        |> CCList.map observation_to_json in
+    let views = model
+        |> views
+        |> CCList.map view_to_json in
+    `Assoc [
+        ("model", `List views);
+        ("observations", `List observations);
+    ]
+and observation_to_json observation =
+    let pair_to_json (node, value) = `Assoc [
+        ("variable", `String node);
+        ("value", Program.term_to_json value)
+    ] in `List (CCList.map pair_to_json observation)
+and view_to_json (node, parents, gen) = `Assoc [
+    ("variable", `String node);
+    ("dependencies", `List (CCList.map Interface.JSON.Make.string parents));
+    ("generation", Generation.to_json gen);
+]

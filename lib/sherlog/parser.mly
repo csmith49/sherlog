@@ -71,11 +71,11 @@ parameter :
             | "real" ->  Parameter (s, Real)
             | _ -> raise DomainError
     }
-    | BANG; s = SYMBOL; COLON; dom = SYMBOL; LBRACKET; i = INTEGER; RBRACKET; PERIOD {
-        match dom with
-            | "categorical" | "cat" -> Parameter (s, Categorical i)
-            | _ -> raise DomainError
-    }
+    // | BANG; s = SYMBOL; COLON; dom = SYMBOL; LBRACKET; i = INTEGER; RBRACKET; PERIOD {
+    //     match dom with
+    //         | "categorical" | "cat" -> Parameter (s, Categorical i)
+    //         | _ -> raise DomainError
+    // }
     ;
 
 query : atoms = atoms; QMARK { atoms } ;

@@ -34,7 +34,7 @@ let _ = CCList.iter (fun query ->
         |> Watson.Resolution.Proof.resolve program in
     let solutions = Watson.Resolution.Proof.Solution.of_proof proof in
     let _ = print_endline ("Resolution done. Found " ^ (solutions |> CCList.length |> string_of_int) ^ " solutions.") in
-    CCList.iteri (fun i -> fun sol ->
+    let _ = CCList.iteri (fun i -> fun sol ->
         let map = Watson.Resolution.Proof.Solution.map sol in
         let solution = CCList.map (Watson.Syntax.Atom.apply map) query in
         let solution_string = solution
@@ -50,5 +50,8 @@ let _ = CCList.iter (fun query ->
             intro_string ^ " => " ^ solution_string in
         let _ = print_endline ((string_of_int i) ^ ": " ^ output) in
         ()
-    ) solutions
+    ) solutions in
+    let _ = print_endline "Generating model..." in
+    let _ = Sherlog.Model.of_proof solutions in
+    let _ = print_endline "Model generated." in ()
 ) problem.queries

@@ -1,6 +1,6 @@
 (library
     (name sherlog)
-    (libraries watson data)
+    (libraries watson data interface)
 )
 (ocamllex lexer)
 (menhir (modules parser))

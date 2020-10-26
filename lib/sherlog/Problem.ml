@@ -3,29 +3,52 @@ module Parameter = struct
         | Unit
         | Positive
         | Real
-        | Categorical of int
+        (* | Categorical of int *)
 
     let domain_to_string = function
         | Unit -> "[0, 1]"
         | Positive -> "ℝ⁺"
         | Real -> "ℝ"
-        | Categorical n -> "Cat[" ^ (string_of_int n) ^ "]"
+        (* | Categorical n -> "Cat[" ^ (string_of_int n) ^ "]" *)
 
     type t = Parameter of string * domain
 
     let to_string = function Parameter (name, domain) -> name ^ " : " ^ (domain_to_string domain)
+
+    let to_json = function
+        | Parameter (name, dom) ->
+            let domain = match dom with
+                | Unit -> `String "unit"
+                | Positive -> `String "positive"
+                | Real -> `String "real" in
+            `Assoc [
+                ("name", `String name);
+                ("domain", domain);
+            ]
 end
 
 module Location = struct
     type t = Location of string * string
 
     let to_string = function Location (f, m) -> f ^ " @ " ^ m
+
+    let to_json = function
+        | Location (f, m) -> `Assoc [
+            ("method", `String f);
+            ("module", `String m);
+        ]
 end
 
 module Function = struct
     type t = Function of string * Location.t
 
     let to_string = function Function (f, loc) -> f ^ " <- " ^ (Location.to_string loc)
+
+    let to_json = function
+        | Function (f, loc) -> `Assoc [
+            ("name", `String f);
+            ("location", Location.to_json loc)
+        ]
 end
 
 module Line = struct
