@@ -140,4 +140,33 @@ module Proof = struct
         |> Data.Tree.zipper
         |> resolve_zipper program
         |> Data.Tree.of_zipper
+
+    module Solution = struct
+        type t = Label.t list
+
+        let of_proof tree =
+            let is_successful path = match CCList.last_opt path with
+                | Some Success -> true
+                | _ -> false in
+            let labels path = path
+                |> CCList.filter_map (function
+                    | Resolution (lbl, _) -> Some lbl
+                    | _ -> None
+                ) in
+            Data.Tree.paths tree
+                |> CCList.filter is_successful
+                |> CCList.map labels
+
+        let resolution_sequence sol = CCList.map Label.atom sol
+
+        let map sol = sol
+            |> CCList.map Label.map
+            |> CCList.fold_left Syntax.Map.compose Syntax.Map.empty
+
+        let introductions sol = sol
+            |> CCList.filter_map (fun lbl -> match Label.atom lbl with
+                    | Syntax.Atom.Intro (ob, p, _, v) -> Some (ob, v, p)
+                    | _ -> None
+                )
+    end
 end

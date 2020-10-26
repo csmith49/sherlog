@@ -66,6 +66,7 @@ module Obligation : sig
         | Assign of string
     
     val to_string : t -> string
+    val applied_representation : Term.t list -> Term.t list -> t -> string
 
     val compare : t -> t -> int
     val equal : t -> t -> bool

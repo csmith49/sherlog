@@ -108,6 +108,16 @@ module Obligation = struct
     let to_string = function
         | Assign f -> f
 
+    let applied_representation values parameters = function
+        | Assign f ->
+            let values = values
+                |> CCList.map Term.to_string
+                |> CCString.concat ", " in
+            let params = parameters
+                |> CCList.map Term.to_string
+                |> CCString.concat ", " in
+            values ^ " = " ^ f ^ "[" ^ params ^ "]"
+
     let compare = Pervasives.compare
     let equal left right = (compare left right) == 0
 end

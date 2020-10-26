@@ -37,11 +37,14 @@ rule read = parse
     | "]" { RBRACKET }
     (* symbols *)
     | ";" { SEMICOLON }
-    | ":-" { ARROW }
-    | "|" { MID }
+    | "<-" { ARROW }
+    | ":-" { ARROW } (* not the default, but we should at least support tradition *)
+    | ":" { COLON }
+    | "@" { AT }
+    (* | "|" { MID } *)
     | "." { PERIOD }
     | "," { COMMA }
-    | "+" { PLUS }
+    (* | "+" { PLUS } *)
     | "!" { BANG }
     (* queries *)
     | "?" { QMARK }

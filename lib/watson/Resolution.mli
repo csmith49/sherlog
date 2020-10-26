@@ -64,4 +64,14 @@ module Proof : sig
 
     val resolve : Semantics.Program.t -> t -> t
     (** [resolve program proof] uses the rules in [program] to resolve [proof] by expanding resolution nodes until all leaves in the proof tree are labeled with [Success] or [Failure] *)
+
+    module Solution : sig
+        type t
+
+        val of_proof : node Data.Tree.tree -> t list
+        val resolution_sequence : t -> Syntax.Atom.t list
+        val map : t -> Syntax.Map.t
+
+        val introductions : t -> (Syntax.Obligation.t * Syntax.Term.t list * Syntax.Term.t list) list
+    end
 end

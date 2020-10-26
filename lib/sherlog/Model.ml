@@ -1,4 +1,4 @@
-module Value = struct
+(* module Value = struct
     type t = Watson.Logic.ETerm.t
 
     let of_term = Watson.Logic.ETerm.lift
@@ -51,4 +51,4 @@ type t = (Command.t, unit) Graph.t
 (* this module holds all the important compilation pipeline stuff *)
 module Compile = struct
     
-end
+end *)
