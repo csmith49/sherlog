@@ -1,6 +1,5 @@
 %{
-    open Watson.Syntax
-    open Watson.Semantics
+    open Watson
 
     open Problem.Parameter
 

@@ -96,9 +96,9 @@ class Story:
         else:
             return -1.0 * torch.softmax(*[-1.0 * d for d in distances])
 
-    def loss(self, observations):
+    def loss(self):
         namespace, log_probs = self.dice_run()
-        cost = self.cost(namespace, observations)
+        cost = self.cost(namespace, self.observations)
         # dice objective computation
         tau = sum(p for v, p in log_probs.items())
         magic_box = torch.exp(tau - tau.detach())

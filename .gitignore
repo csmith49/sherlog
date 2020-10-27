@@ -1,2 +1,5 @@
 _build
+**/__pycache__
 **/.merlin
+run
+server

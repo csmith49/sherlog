@@ -1,7 +1,7 @@
 (* base types *)
 type node = string
 type view = node * node list * Generation.t
-type observation = (node * Watson.Syntax.Term.t) list
+type observation = (node * Watson.Term.t) list
 
 (* graphs all the way down *)
 module Graph = Data.Graph.Make(CCString)
@@ -44,9 +44,9 @@ let add_observation observation model = { model with observations = observation 
 module Compile = struct
     (* intros are the nodes we pull from the output of resolution - goal is to convert them to views *)
     type intro = {
-        value : Watson.Syntax.Term.t;
+        value : Watson.Term.t;
         mechanism : string;
-        parameters : Watson.Syntax.Term.t list;
+        parameters : Watson.Term.t list;
     }
 
     (* our overall structure comes from the form of proofs given by resolution *)
@@ -82,15 +82,15 @@ module Compile = struct
     type connected_dnf = (node * node list * Generation.t) dnf
     
     (* build initial dnf from "proof" *)
-    let rec initialize (proof : Watson.Resolution.Proof.Solution.t list) : initial_dnf =
+    let rec initialize (proof : Watson.Proof.Solution.t list) : initial_dnf =
         let conjuncts = CCList.map conjunct_of_solution proof in Or conjuncts
-    and conjunct_of_solution (solution : Watson.Resolution.Proof.Solution.t) : unit conjunct =
+    and conjunct_of_solution (solution : Watson.Proof.Solution.t) : unit conjunct =
         let intros = solution
-            |> Watson.Resolution.Proof.Solution.introductions
+            |> Watson.Proof.Solution.introductions
             |> CCList.map (fun (ob, v, p) -> 
                 let value = CCList.hd v in
                 let mechanism = match ob with
-                    | Watson.Syntax.Obligation.Assign f -> f in
+                    | Watson.Obligation.Assign f -> f in
                 ( (), { value = value; mechanism = mechanism; parameters = p; } )
             ) in
         And intros
@@ -100,7 +100,7 @@ module Compile = struct
     (* naming is done uniformly and repeatably, if necessary *)
     let name_intro (intro : intro) : node =
         let name = intro.mechanism in
-        let args = intro.parameters |> CCList.map Watson.Syntax.Term.to_string |> CCString.concat ", " in
+        let args = intro.parameters |> CCList.map Watson.Term.to_string |> CCString.concat ", " in
             name ^ "[" ^ args ^ "]"
 
     (* and lifting is straightforward *)
@@ -114,21 +114,21 @@ module Compile = struct
     (* TODO: explore the above *)
 
     (* step 1: get per-conjunct sub *)
-    let per_conjunct_renaming (dnf : named_dnf) : Watson.Syntax.Map.t list =
+    let per_conjunct_renaming (dnf : named_dnf) : Watson.Map.t list =
         let f (name, intro) = match intro.value with
-            | Watson.Syntax.Term.Variable target -> (Some (target, Watson.Syntax.Term.Variable name), intro)
+            | Watson.Term.Variable target -> (Some (target, Watson.Term.Variable name), intro)
             | _ -> (None, intro) in
         dnf |> map f
             |> tags
             |> CCList.map (fun assocs -> assocs
                 |> CCList.keep_some
-                |> Watson.Syntax.Map.of_list
+                |> Watson.Map.of_list
             )
 
     (* step 2: build distribution in context of sub *)
-    let build_generations (dnf : named_dnf) (maps : Watson.Syntax.Map.t list) : annotated_dnf =
+    let build_generations (dnf : named_dnf) (maps : Watson.Map.t list) : annotated_dnf =
         let gs = maps |> CCList.map (fun map -> fun (name, intro) ->
-            let args = CCList.map (Watson.Syntax.Map.apply map) intro.parameters in
+            let args = CCList.map (Watson.Map.apply map) intro.parameters in
             let gen = Generation.Gen (intro.mechanism, args) in
             let tag = (name, gen) in (tag, intro)) in
         cmap gs dnf
@@ -154,7 +154,7 @@ module Compile = struct
 
     let observations (dnf : connected_dnf) : observation list =
         let f ( (name, _, _), intro ) = match intro.value with
-            | Watson.Syntax.Term.Variable _ -> (None, intro)
+            | Watson.Term.Variable _ -> (None, intro)
             | (_ as term) -> (Some (name, term), intro) in
         dnf |> map f
             |> tags

@@ -1,9 +1,9 @@
 type t =
-    | Gen of string * Watson.Syntax.Term.t list
+    | Gen of string * Watson.Term.t list
     | Placeholder
 
 let variables = function 
-    | Gen (_, terms) -> CCList.flat_map Watson.Syntax.Term.variables terms
+    | Gen (_, terms) -> CCList.flat_map Watson.Term.variables terms
     | _ -> []
 
 let to_json = function

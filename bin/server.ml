@@ -15,7 +15,7 @@ let verbose_print str = if !verbose then print_endline str else ()
 (* message handling *)
 
 (* for evaluation purposes, we keep some state *)
-let program = ref (Watson.Semantics.Program.of_list [])
+let program = ref (Watson.Program.of_list [])
 
 (* decompose json into commands/messages/arguments *)
 let decompose json =
@@ -46,9 +46,9 @@ let handler json = match decompose json with
     | Some ("query", query, _) -> begin match Sherlog.Program.query_of_json query with
         | Some query ->
             let proof = query
-                |> Watson.Resolution.Proof.of_query
-                |> Watson.Resolution.Proof.resolve !program in
-            let solutions = Watson.Resolution.Proof.Solution.of_proof proof in
+                |> Watson.Proof.of_query
+                |> Watson.Proof.resolve !program in
+            let solutions = Watson.Proof.Solution.of_proof proof in
             let model = Sherlog.Model.of_proof solutions in
                 Some (Sherlog.Model.to_json model)
         | _ -> None end

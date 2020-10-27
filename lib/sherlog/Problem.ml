@@ -53,22 +53,22 @@ end
 
 module Line = struct
     type t =
-        | Rule of Watson.Semantics.Rule.t
+        | Rule of Watson.Rule.t
         | Parameter of Parameter.t
-        | Query of Watson.Syntax.Atom.t list
+        | Query of Watson.Atom.t list
         | Function of Function.t
-        | Evidence of Watson.Syntax.Atom.t list
+        | Evidence of Watson.Atom.t list
 
     let to_string = function
-        | Rule r -> Watson.Semantics.Rule.to_string r
+        | Rule r -> Watson.Rule.to_string r
         | Parameter p -> "! " ^ (Parameter.to_string p)
         | Query q -> q
-            |> CCList.map Watson.Syntax.Atom.to_string
+            |> CCList.map Watson.Atom.to_string
             |> CCString.concat ", "
             |> (fun str -> str ^ "?")
         | Function f -> "! " ^ (Function.to_string f)
         | Evidence e -> e
-            |> CCList.map Watson.Syntax.Atom.to_string
+            |> CCList.map Watson.Atom.to_string
             |> CCString.concat ", "
             |> (fun str -> "! " ^ str)
 
@@ -76,7 +76,7 @@ module Line = struct
 end
 
 let simplify_introduction relation arguments f parameters context body =
-    let open Watson.Syntax in let open Watson.Semantics in
+    let open Watson in
     (* fresh var to represent the value getting introduced *)
     let var = Term.Variable "_I" in
     (* building the introduction atom *)
@@ -92,9 +92,9 @@ let simplify_introduction relation arguments f parameters context body =
 type t = {
     parameters : Parameter.t list;
     functions : Function.t list;
-    evidence : (Watson.Syntax.Atom.t list) list;
-    queries : (Watson.Syntax.Atom.t list) list;
-    program : Watson.Semantics.Program.t;
+    evidence : (Watson.Atom.t list) list;
+    queries : (Watson.Atom.t list) list;
+    program : Watson.Program.t;
 }
 
 let of_lines lines =
@@ -118,5 +118,5 @@ let of_lines lines =
         functions = funcs;
         evidence = evidence;
         queries = queries;
-        program = Watson.Semantics.Program.of_list rules;
+        program = Watson.Program.of_list rules;
     }

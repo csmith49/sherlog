@@ -18,10 +18,10 @@ print(f"Found: {len(problem.parameters.items())} parameters and {len(problem.evi
 optimizer = SGD(problem.trainable_parameters(), lr=0.01)
 
 # we'll repeat the training for a few epochs
-for evidence in problem.evidence * 10:
+for evidence in problem.evidence * 100:
     optimizer.zero_grad()
     story = problem.generative_story(evidence)
-    loss = story.loss(story.observations)
+    loss = story.loss()
     loss.backward()
     optimizer.step()
 
