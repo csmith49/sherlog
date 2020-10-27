@@ -1,5 +1,10 @@
 _build
 **/__pycache__
-**/.merlin
+bin/.merlin
+lib/.merlin
+lib/watson/.merlin
+lib/sherlog/.merlin
+lib/interface/.merlin
+lib/data/.merlin
 run
 server
