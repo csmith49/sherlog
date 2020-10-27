@@ -4,12 +4,12 @@
 
 (generate_opam_files true)
 
-(source (github csmith49/watson))
+(source (github csmith49/sherlog))
 (authors "Calvin Smith")
 
 (package
     (name sherlog)
-    (synopsis "An OCaml library for externally-guarded existential Datalog")
+    (synopsis "An OCaml library for deep, probabilistic, generative logic programming")
     (depends
         (containers (> 3.0))
         (dune (> 1.5))
