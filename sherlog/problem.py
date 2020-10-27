@@ -25,44 +25,37 @@ class Parameter:
         domain = json["domain"]
         return cls(name, domain)
 
-class Function:
-    def __init__(self, method, module):
-        self._method = method
-        self._module = module
-        self.module = import_module(self._module)
-        self.method = self.module[self._method]
-
-    def __call__(self, *args, **kwargs):
-        return self.method(*args, **kwargs)
+class Namespace:
+    def __init__(self, name):
+        self.name = name
+        self.module = import_module(name)
 
     @classmethod
     def of_json(cls, json):
-        method = json["method"]
-        module = json["module"]
-        return cls(method, module)
+        name = json
+        return cls(name)
 
 class Problem:
-    def __init__(self, parameters=None, functions=None, evidence=None, program=None, queries=None):
+    def __init__(self, parameters=None, namespaces=None, evidence=None, program=None, queries=None):
         self.parameters = parameters
-        self.functions = functions
+        self.namespaces = namespaces
         self.evidence = evidence
         self.program = program
         self.queries = query
-        # make sure the associated program is actually registered
-        register(self.program)
 
     @classmethod
     def of_json(cls, json):
         parameters = {p.name : p for p in [Parameter.of_json(p) for p in json["parameters"]]}
-        functions = {f.name : f for f in [Function.of_json(f) for f in json["functions"]]}
+        namespaces = {f.name : f for f in [Namespace.of_json(f) for f in json["functions"]]}
         evidence = json["evidence"]
         program = json["program"]
         queries = json["queries"]
-        return cls(parameters=parameters, functions=functions, evidence=evidence, program=program, queries=queries)
+        return cls(parameters=parameters, namespaces=namespaces, evidence=evidence, program=program, queries=queries)
 
     def generative_story(self, evidence):
+        register(self.program)
         story, observations = query(evidence)
-        return Story.of_json(story, observations, self.parameters, self.functions)
+        return Story.of_json(story, observations, self.parameters, self.namespaces)
     
     def trainable_parameters(self):
         for _, v in self.parameters.items():

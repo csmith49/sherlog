@@ -10,5 +10,5 @@ let to_json = function
     | Placeholder -> `Null
     | Gen (f, args) -> `Assoc [
         ("function", `String f);
-        ("arguments", `List (CCList.map Program.term_to_json args));
+        ("arguments", `List (CCList.map Utility.Term.to_json args));
     ]

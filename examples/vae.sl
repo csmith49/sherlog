@@ -1,12 +1,5 @@
 # two encoders and a decoder
-! encode_m <- encode_m @ vae.
-! encode_sd <- encode_sd @ vae.
-! decode <- decode @ vae.
-
-# !module(vae).
-
-# plus a loss
-! ext_loss <- loss @ vae.
+!namespace: vae.
 
 # the structure of the evaluation
 encode_mean(X ; encode_m[X] @ encode_mean, X) <- input(X).

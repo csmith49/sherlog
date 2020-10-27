@@ -37,15 +37,16 @@ rule read = parse
     | "]" { RBRACKET }
     (* symbols *)
     | ";" { SEMICOLON }
-    | "<-" { ARROW }
+    | "<-" | ":-" { ARROW }
     | ":-" { ARROW } (* not the default, but we should at least support tradition *)
     | ":" { COLON }
     | "@" { AT }
-    (* | "|" { MID } *)
     | "." { PERIOD }
     | "," { COMMA }
-    (* | "+" { PLUS } *)
-    | "!" { BANG }
+    (* inference tokens *)
+    | "!parameter" { PARAMETER }
+    | "!namespace" { NAMESPACE }
+    | "!evidence" { EVIDENCE }
     (* queries *)
     | "?" { QMARK }
     (* eof *)

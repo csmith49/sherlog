@@ -16,8 +16,10 @@ let contents =
     let length = in_channel_length channel in
         really_input_string channel length
 
-let lines = Sherlog.Parse.parse_string contents
-let problem = Sherlog.Problem.of_lines lines
+let problem = Sherlog.parse contents
+
+let _ = print_endline "Parsed program:"
+let _ = print_endline (Sherlog.Problem.to_string problem)
 
 (* answer each query *)
 let _ = CCList.iter (fun query ->
@@ -27,7 +29,7 @@ let _ = CCList.iter (fun query ->
         |> CCString.concat ", " in
     let _ = print_endline ("Answering: " ^ query_string) in
     (* build the proof *)
-    let program = problem.program in
+    let program = Sherlog.Problem.program problem in
     let _ = print_endline "Starting resolution..." in
     let proof = query
         |> Watson.Proof.of_query
@@ -52,6 +54,6 @@ let _ = CCList.iter (fun query ->
         ()
     ) solutions in
     let _ = print_endline "Generating model..." in
-    let _ = Sherlog.Model.of_proof solutions in
+    let _ = Sherlog.Model.of_proof proof in
     let _ = print_endline "Model generated." in ()
-) problem.queries
+) (Sherlog.Problem.queries problem)

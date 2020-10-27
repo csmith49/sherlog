@@ -32,10 +32,8 @@ let handler json = match decompose json with
     | Some ("echo", message, _) -> Some message
     (* parse the string as if it were the contents of a file *)
     | Some ("parse", `String message, _) ->
-        let problem = message
-            |> Sherlog.Parse.parse_string
-            |> Sherlog.Problem.of_lines in
-        Some (Sherlog.Program.problem_to_json problem)
+        let problem = message |> Sherlog.parse in
+            Some (Sherlog.Problem.to_json problem)
     (* register a provided program as a piece of global state *)
     | Some ("register", prog, _) -> begin match Sherlog.Program.of_json prog with
         | Some prog ->
@@ -43,13 +41,12 @@ let handler json = match decompose json with
             Some (`Assoc [("result", `String "success")])
         | _ -> None end
     (* evaluate the provided query on the stored program *)
-    | Some ("query", query, _) -> begin match Sherlog.Program.query_of_json query with
+    | Some ("query", query, _) -> begin match Sherlog.Query.of_json query with
         | Some query ->
             let proof = query
                 |> Watson.Proof.of_query
                 |> Watson.Proof.resolve !program in
-            let solutions = Watson.Proof.Solution.of_proof proof in
-            let model = Sherlog.Model.of_proof solutions in
+            let model = Sherlog.Model.of_proof proof in
                 Some (Sherlog.Model.to_json model)
         | _ -> None end
     | _ -> None

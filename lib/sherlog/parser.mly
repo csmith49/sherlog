@@ -6,29 +6,15 @@
     exception DomainError
 %}
 
+// EOF of course a requirement to know when we've stopped parsing
+%token EOF
+
 // all the tokens needed (plus the core term values) to define a pure Datalog program
 %token LPARENS
 %token RPARENS
 %token ARROW
 %token PERIOD
 %token COMMA
-
-// learning annotations are marked with a bang and delimited with colons, etc.
-%token COLON
-%token BANG
-// with arguments provided via brackets
-%token LBRACKET
-%token RBRACKET
-
-%token AT
-
-// question marks are used for traditional queries
-%token QMARK
-
-%token SEMICOLON
-
-// EOF of course a requirement to know when we've stopped parsing
-%token EOF
 
 // tokens for the core term values
 %token TRUE
@@ -38,11 +24,33 @@
 %token <string> SYMBOL
 %token <string> VARIABLE
 
-%start <Problem.Line.t list> problem
+// question marks are used for traditional queries
+%token QMARK
+
+// generative rules need brackets (for parameters)
+%token LBRACKET
+%token RBRACKET
+
+// at-sign (for context)
+%token AT
+
+// and semicolons for separating the generative part from the logical
+%token SEMICOLON
+
+// for inference, we have special tokens for denoting the relevant values
+%token PARAMETER
+%token NAMESPACE
+%token EVIDENCE
+
+// and colons for separating arguments and the like
+%token COLON
+
+
+%start <Problem.line list> problem
 
 %%
 
-// Core Abductive Logic Language (CALL)
+// core logic programming
 term :
     | TRUE { Term.Boolean true }
     | FALSE { Term.Boolean false }
@@ -62,28 +70,9 @@ clause :
     | head = atom; ARROW; body = atoms; PERIOD { Rule.Rule (head, body) } // rule construction
     ;
 
-parameter :
-    | BANG; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
-        match dom with
-            | "unit" -> Parameter (s, Unit)
-            | "positive" | "pos" -> Parameter (s, Positive)
-            | "real" ->  Parameter (s, Real)
-            | _ -> raise DomainError
-    }
-    // | BANG; s = SYMBOL; COLON; dom = SYMBOL; LBRACKET; i = INTEGER; RBRACKET; PERIOD {
-    //     match dom with
-    //         | "categorical" | "cat" -> Parameter (s, Categorical i)
-    //         | _ -> raise DomainError
-    // }
-    ;
-
 query : atoms = atoms; QMARK { atoms } ;
 
-location : f = SYMBOL; AT; m = SYMBOL { Problem.Location.Location (f, m) } ;
-external_function : BANG; f = SYMBOL; ARROW; loc = location; PERIOD { Problem.Function.Function (f, loc) } ;
-
-evidence : BANG; atoms = atoms; PERIOD { atoms } ;
-
+// generative logic programming
 intro_term : f = SYMBOL; LBRACKET; params = terms; RBRACKET { (f, params) } ;
 intro_atom : 
     | rel = SYMBOL; LPARENS; args = terms; SEMICOLON; it = intro_term; RPARENS {
@@ -96,18 +85,37 @@ intro_atom :
     ;
 
 intro_clause : ia = intro_atom; ARROW; body = atoms; PERIOD {
-    let rel, args, f, params, context = ia in Problem.simplify_introduction rel args f params context body
+    let rel, args, f, params, context = ia in Problem.simplify_introduction
+        ~relation:rel ~arguments:args ~generator:f ~parameters:params ~context:context ~body:body
 } ;
 
+
+// inference
+parameter :
+    | PARAMETER; COLON; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
+        match dom with
+            | "unit" -> Parameter (s, Unit)
+            | "positive" | "pos" -> Parameter (s, Positive)
+            | "real" ->  Parameter (s, Real)
+            | _ -> raise DomainError
+    }
+    ;
+
+namespace : NAMESPACE; COLON; name = SYMBOL; PERIOD { Problem.Namespace.Namespace name } ;
+
+evidence: EVIDENCE; COLON; atoms = atoms; PERIOD { atoms } ;
+
+// generating lines to build program from
 line :
-    | clause = clause;              { [Problem.Line.Rule clause] }
-    | parameter = parameter;        { [Problem.Line.Parameter parameter] }
-    | query = query;                { [Problem.Line.Query query] }
-    | ext_f = external_function;    { [Problem.Line.Function ext_f] }
-    | evidence = evidence;          { [Problem.Line.Evidence evidence] }
-    | intro_clause = intro_clause;  { CCList.map Problem.Line.lift_rule intro_clause }
-    // | tag = tag; { `T tag }
-    // | delta_clause = delta_clause { delta_clause |> Delta.simplify }
+    // core logic programming
+    | clause = clause;              { [`Rule clause] }
+    | query = query;                { [`Query query] }
+    // generative logic programming
+    | intro_clause = intro_clause;  { CCList.map (fun r -> `Rule r) intro_clause }
+    // inference
+    | parameter = parameter;        { [`Parameter parameter] }
+    | namespace = namespace;        { [`Namespace namespace] }
+    | evidence = evidence;          { [`Evidence evidence] }
     ;
 
 // entrypoint - collects lists of lines

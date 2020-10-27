@@ -164,6 +164,7 @@ end
 (* using the above, we can build a model from a "proof" *)
 let of_proof proof =
     let dnf = proof
+        |> Watson.Proof.Solution.of_proof
         |> Compile.initialize
         |> Compile.name_intros
         |> Compile.annotate_intros
@@ -189,7 +190,7 @@ let rec to_json model =
 and observation_to_json observation =
     let pair_to_json (node, value) = `Assoc [
         ("variable", `String node);
-        ("value", Program.term_to_json value)
+        ("value", Utility.Term.to_json value)
     ] in `List (CCList.map pair_to_json observation)
 and view_to_json (node, parents, gen) = `Assoc [
     ("variable", `String node);
