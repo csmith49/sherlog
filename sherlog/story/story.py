@@ -4,11 +4,10 @@ from . import statement
 from . import observation
 
 class Story:
-    def __init__(self, statements, observations, parameters, functions):
+    def __init__(self, statements, observations, context):
         self.statements = statements
         self.observations = observations
-        self.parameters = parameters
-        self.functions = functions
+        self.context = context
 
         self.variable_indices = {s.variable.name : i for i, s in enumerate(self.statements)}
 
@@ -38,18 +37,14 @@ class Story:
     def __str__(self):
         return "\n".join(str(stmt) for stmt in self.statements)
 
-    def trainable_parameters(self):
-        for _, parameter in self.parameters.items():
-            yield parameter.value
-        for _, function in self.functions.items():
-            if hasattr(function, "parameters"):
-                yield from function.parameters()
+    def parameters(self):
+        yield from self.context.parameters()
 
     @classmethod
-    def of_json(cls, statements, observations, parameters, functions):
+    def of_json(cls, statements, observations, context):
         statements = [statement.of_json(s) for s in statements]
         observations = [observation.of_json(o) for o in observations]
-        return cls(statements, observations, parameters, functions)
+        return cls(statements, observations, context)
 
     def topological_statements(self):
         # instead of removing edges, we just track which variables have been resolved
@@ -67,29 +62,27 @@ class Story:
             resolved_variables.add(stmt.variable.name)
             initial_statements += [s for s in self.dataflow(stmt) if is_resolved(s)]
 
-    def run(self, parameters):
-        namespace = {k : v for k, v in parameters.items()}
+    def run(self):
         for statement in self.topological_statements():
-            variable, value = statement.run(namespace, self.functions)
-            namespace[variable] = value
-        return namespace
+            variable, value = statement.run(self.context)
+            self.context[variable] = value
+        return self.context
 
     def dice_run(self):
-        namespace = {k : v.value for k, v in self.parameters.items()}
         log_probs = {}
         for statement in self.topological_statements():
-            variable, value, log_prob = statement.dice(namespace, self.functions)
-            namespace[variable] = value
+            variable, value, log_prob = statement.dice(self.context)
+            self.context[variable] = value
             if log_prob is not None:
                 log_probs[variable] = log_prob
-        return namespace, log_probs
+        return self.context, log_probs
 
-    def cost(self, namespace, observations):
+    def cost(self, context, observations):
         distances = []
         for ob in observations:
             distance = torch.tensor(0.0)
             for var, value in ob.items():
-                distance += torch.dist(torch.tensor(value), namespace[var])
+                distance += torch.dist(torch.tensor(value), context[var])
             distances.append(distance)
         # approximate the smallest distance
         if len(distances) == 1: return distances[0]

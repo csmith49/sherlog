@@ -29,19 +29,19 @@ class Generation:
         arguments = [term.of_json(v) for v in json["arguments"]]
         return cls(name, arguments)
 
-    def evaluate_arguments(self, namespace):
+    def evaluate_arguments(self, context):
         arguments = []
         for arg in self.arguments:
             if isinstance(arg, term.Variable):
-                arguments.append(namespace[arg.name])
+                arguments.append(context[arg.name])
             elif isinstance(arg, str):
-                arguments.append(namespace[arg])
+                arguments.append(context[arg])
             else:
                 arguments.append(arg)
         return arguments
 
-    def to_torch(self, namespace, functions):
-        arguments = self.evaluate_arguments(namespace)
+    def to_torch(self, context):
+        arguments = self.evaluate_arguments(context)
         # case-by-case translation of distributions
         if self.name == "beta":
             alpha, beta = arguments[0], arguments[1]
@@ -57,7 +57,7 @@ class Generation:
         # try to find a function implementation
         else:
             try:
-                f = functions[self.name]
+                f = context[self.name]
                 return f(*arguments), None
             except KeyError:
                 pass

@@ -1,8 +1,9 @@
 from .engine import parse, register, query
-from .story import Story
+from .story import Story, Context
 from importlib import import_module
 import torch.distributions.constraints as constraints
 import torch
+import inspect
 
 class Parameter:
     def __init__(self, name, domain):
@@ -46,7 +47,7 @@ class Problem:
     @classmethod
     def of_json(cls, json):
         parameters = {p.name : p for p in [Parameter.of_json(p) for p in json["parameters"]]}
-        namespaces = {f.name : f for f in [Namespace.of_json(f) for f in json["functions"]]}
+        namespaces = {n.name : n for n in [Namespace.of_json(n) for n in json["namespaces"]]}
         evidence = json["evidence"]
         program = json["program"]
         queries = json["queries"]
@@ -55,11 +56,16 @@ class Problem:
     def generative_story(self, evidence):
         register(self.program)
         story, observations = query(evidence)
-        return Story.of_json(story, observations, self.parameters, self.namespaces)
+        context = Context(self.parameters, self.namespaces)
+        return Story.of_json(story, observations, context)
     
     def trainable_parameters(self):
-        for _, v in self.parameters.items():
-            yield v.value
+        for _, parameter in self.parameters.items():
+            yield parameter.value
+        for _, namespace in self.namespaces.items():
+            for _, object in inspect.getmembers(namespace.module):
+                if hasattr(object, "parameters"):
+                    yield from object.parameters()
 
 def load_problem_file(filepath):
     with open(filepath, "r") as f:

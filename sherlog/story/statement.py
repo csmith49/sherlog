@@ -40,14 +40,12 @@ class Statement:
         gen = generation.of_json(json["generation"])
         return cls(variable, dependencies, gen)
 
-    def run(self, namespace, functions):
+    def run(self, context):
         """Evaluates the statement in the provided namespace.
 
         Parameters
         ----------
-        namespace : string-to-term dictionary
-
-        functions : string-to-function dictionary
+        context : context.Context
 
         Returns
         -------
@@ -55,11 +53,11 @@ class Statement:
 
         torch.tensor
         """
-        value, _ = self.generation.to_torch(namespace, functions)
+        value, _ = self.generation.to_torch(context)
         return self.variable.name, value
 
-    def dice(self, namespace, functions):
-        value, log_prob = self.generation.to_torch(namespace, functions)
+    def dice(self, context):
+        value, log_prob = self.generation.to_torch(context)
         return self.variable.name, value, log_prob
 
 def of_json(json):
