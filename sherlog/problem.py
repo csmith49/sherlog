@@ -4,6 +4,7 @@ from importlib import import_module
 import torch.distributions.constraints as constraints
 import torch
 import inspect
+import pickle
 
 class Parameter:
     def __init__(self, name, domain):
@@ -66,6 +67,28 @@ class Problem:
             for _, object in inspect.getmembers(namespace.module):
                 if hasattr(object, "parameters"):
                     yield from object.parameters()
+
+    def save_parameters(self, filepath):
+        output = { "parameters" : {}, "models" : {} }
+        for p, parameter in self.parameters.items():
+            output["parameters"][p] = parameter.value
+        for n, namespace in self.namespaces.items():
+            output["models"][n] = {}
+            for o, object in inspect.getmembers(namespace.module):
+                if hasattr(object, "parameters"):
+                    output["models"][n][o] = object.state_dict()
+        with open(filepath, "wb") as f:
+            pickle.dump(output, f)
+
+    def load_parameters(self, filepath):
+        with open(filepath, "rb") as f:
+            params = pickle.load(f)
+        for p, value in params["parameters"].items():
+            self.parameters[p].value = value
+        for namespace, models in params["models"].items():
+            for name, values in models.items():
+                model = getattr(self.namespaces[namespace].module, name)
+                model.load_state_dict(values)
 
 def load_problem_file(filepath):
     with open(filepath, "r") as f:

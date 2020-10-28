@@ -28,3 +28,15 @@ for evidence in problem.evidence * 100:
 # print the final parameters
 for name, param in problem.parameters.items():
     print (name, param.value)
+
+print("Saving and loading parameters to test...")
+
+# save them to disc
+problem.save_parameters("/tmp/params.slp")
+
+# and, for a sanity check, reset problem and load them back
+problem = sherlog.load_problem_file("./examples/flip.sl")
+problem.load_parameters("/tmp/params.slp")
+
+for name, param in problem.parameters.items():
+    print (name, param.value)

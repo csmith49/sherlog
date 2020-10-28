@@ -82,7 +82,9 @@ class Story:
         for ob in observations:
             distance = torch.tensor(0.0)
             for var, value in ob.items():
-                distance += torch.dist(torch.tensor(value), context[var])
+                if isinstance(value, str):
+                    value = context[value]
+                distance += torch.dist(value, context[var])
             distances.append(distance)
         # approximate the smallest distance
         if len(distances) == 1: return distances[0]
@@ -94,6 +96,9 @@ class Story:
         cost = self.cost(namespace, self.observations)
         # dice objective computation
         tau = sum(p for v, p in log_probs.items())
+        # entire possible there are no log_probs, so:
+        if tau == 0:
+            tau = torch.tensor(0.0)
         magic_box = torch.exp(tau - tau.detach())
         objective = magic_box * cost
         return objective

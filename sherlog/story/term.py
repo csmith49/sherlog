@@ -1,3 +1,5 @@
+import torch
+
 class Variable:
     def __init__(self, name):
         self.name = name
@@ -43,13 +45,13 @@ def of_json(json):
         return Function(symbol, args)
     # integers
     elif type == "integer":
-        return json["value"]
+        return torch.tensor(json["value"])
     # booleans
     elif type == "boolean":
         return json["value"]
     # floats
     elif type == "float":
-        return json["value"]
+        return torch.tensor(json["value"])
     # constants
     elif type == "constant":
         return json["value"]

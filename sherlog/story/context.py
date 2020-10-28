@@ -19,8 +19,8 @@ class Context:
         # check the namespaces
         for _, namespace in self.namespaces.items():
             try:
-                return namespace.module[name]
-            except KeyError: pass
+                return getattr(namespace.module, name)
+            except AttributeError: pass
         # default is to throw exception
         raise KeyError()
 
