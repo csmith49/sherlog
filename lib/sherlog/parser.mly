@@ -4,6 +4,7 @@
     open Problem.Parameter
 
     exception DomainError
+    exception FactError
 %}
 
 // EOF of course a requirement to know when we've stopped parsing
@@ -62,7 +63,10 @@ term :
     ;
 terms : ts = separated_list(COMMA, term) { ts } ;
 
-atom : s = SYMBOL; LPARENS; ts = terms; RPARENS { Atom.Atom (s, ts) } ;
+atom : 
+    | s = SYMBOL; LPARENS; ts = terms; RPARENS { Atom.Atom (s, ts) } 
+    | s = SYMBOL; { Atom.Atom (s, []) }
+    ;
 atoms : ss = separated_list(COMMA, atom) { ss } ;
 
 clause :
@@ -89,6 +93,13 @@ intro_clause : ia = intro_atom; ARROW; body = atoms; PERIOD {
         ~relation:rel ~arguments:args ~generator:f ~parameters:params ~context:context ~body:body
 } ;
 
+// fuzzy facts
+fuzzy_fact : p = term; COLON; a = atom; PERIOD {
+    match a with
+        | Atom.Atom (r, args) -> Problem.simplify_fuzzy_fact ~probability:p ~relation:r ~arguments:args
+        | _ -> raise FactError
+}
+;
 
 // inference
 parameter :
@@ -111,7 +122,9 @@ line :
     | clause = clause;              { [`Rule clause] }
     | query = query;                { [`Query query] }
     // generative logic programming
-    | intro_clause = intro_clause;  { CCList.map (fun r -> `Rule r) intro_clause }
+    | intro_clause = intro_clause;  { intro_clause }
+    // fuzzy fact
+    | fuzzy_fact = fuzzy_fact       { fuzzy_fact }
     // inference
     | parameter = parameter;        { [`Parameter parameter] }
     | namespace = namespace;        { [`Namespace namespace] }

@@ -33,7 +33,9 @@ val simplify_introduction :
     generator:string ->
     parameters:Watson.Term.t list ->
     context:Watson.Term.t list ->
-    body:Watson.Atom.t list -> Watson.Rule.t list
+    body:Watson.Atom.t list -> line list
+
+val simplify_fuzzy_fact : probability:Watson.Term.t -> relation:string -> arguments:Watson.Term.t list -> line list
 
 type t = {
     parameters : Parameter.t list;

@@ -35,7 +35,7 @@ class Story:
             yield self.statements[destination]
 
     def __str__(self):
-        return "\n".join(str(stmt) for stmt in self.statements)
+        return '\n'.join(str(stmt) for stmt in self.topological_statements())
 
     def parameters(self):
         yield from self.context.parameters()

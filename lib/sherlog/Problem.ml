@@ -63,7 +63,18 @@ let simplify_introduction
         (* head <- body, intro *)
         let head = Atom.Atom (relation, arguments @ [var]) in
         let conclusion_rule = Rule.Rule (head, intro :: body) in
-            [ intro_rule ; conclusion_rule ]
+            [ `Rule intro_rule ; `Rule conclusion_rule ]
+
+let simplify_fuzzy_fact
+    ~probability:probability
+    ~relation:relation
+    ~arguments:arguments = simplify_introduction 
+        ~relation:relation 
+        ~arguments:arguments
+        ~generator:"bernoulli"
+        ~parameters:[probability]
+        ~context:(Watson.Term.Constant relation :: arguments)
+        ~body:[]
 
 type t = {
     parameters : Parameter.t list;
