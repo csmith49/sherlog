@@ -4,7 +4,7 @@
     open Problem.Parameter
 
     exception DomainError
-    exception FactError
+    (* exception FactError *)
 %}
 
 // EOF of course a requirement to know when we've stopped parsing
@@ -94,12 +94,12 @@ intro_clause : ia = intro_atom; ARROW; body = atoms; PERIOD {
 } ;
 
 // fuzzy facts
-fuzzy_fact : p = term; COLON; a = atom; PERIOD {
-    match a with
-        | Atom.Atom (r, args) -> Problem.simplify_fuzzy_fact ~probability:p ~relation:r ~arguments:args
-        | _ -> raise FactError
-}
-;
+// fuzzy_fact : p = term; COLON; a = atom; PERIOD {
+//     match a with
+//         | Atom.Atom (r, args) -> Problem.simplify_fuzzy_fact ~probability:p ~relation:r ~arguments:args
+//         | _ -> raise FactError
+// }
+// ;
 
 // inference
 parameter :
@@ -124,7 +124,7 @@ line :
     // generative logic programming
     | intro_clause = intro_clause;  { intro_clause }
     // fuzzy fact
-    | fuzzy_fact = fuzzy_fact       { fuzzy_fact }
+    // | fuzzy_fact = fuzzy_fact       { fuzzy_fact }
     // inference
     | parameter = parameter;        { [`Parameter parameter] }
     | namespace = namespace;        { [`Namespace namespace] }

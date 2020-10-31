@@ -1,13 +1,29 @@
 from collections import defaultdict
 import torch
-from . import statement
-from . import observation
+import pyro
+from pyro.infer.predictive import Predictive
+from .statement import Statement
+from .observation import Observation
+from .context import Context, Value
 
 class Story:
-    def __init__(self, statements, observations, context):
+    def __init__(self, statements, observations, parameters, namespaces):
+        '''Stories are combinations of generative procedures and observations on the generated values.
+
+        Parameters
+        ----------
+        statements : Statement list
+
+        observations : Observation list
+
+        parameters : (string, Parameter) dict
+
+        namespaces : (string, Namespace) dict
+        '''
         self.statements = statements
         self.observations = observations
-        self.context = context
+        self.parameters = parameters
+        self.namespaces = namespaces
 
         self.variable_indices = {s.variable.name : i for i, s in enumerate(self.statements)}
 
@@ -26,10 +42,26 @@ class Story:
                 self.dataflow_graph[source].append(dest)
 
     def variables(self):
+        '''Returns all variables that statement executions can get bound to.
+
+        Returns
+        -------
+        string iterator
+        '''
         for stmt in self.statements:
             yield stmt.variable.name
 
     def dataflow(self, stmt):
+        '''Computes all statements that directly depend on the output of the given statement.
+
+        Parameters
+        ----------
+        stmt : Statement
+
+        Returns
+        -------
+        Statement iterator
+        '''
         index = self.variable_indices[stmt.variable.name]
         for destination in self.dataflow_graph[index]:
             yield self.statements[destination]
@@ -37,16 +69,42 @@ class Story:
     def __str__(self):
         return '\n'.join(str(stmt) for stmt in self.topological_statements())
 
-    def parameters(self):
-        yield from self.context.parameters()
+    def context(self):
+        '''Builds a fresh context from the instance parameters and namespaces.
+
+        Returns
+        -------
+        Context
+        '''
+        return Context(self.parameters, self.namespaces)
 
     @classmethod
-    def of_json(cls, statements, observations, context):
-        statements = [statement.of_json(s) for s in statements]
-        observations = [observation.of_json(o) for o in observations]
-        return cls(statements, observations, context)
+    def of_json(cls, statements, observations, parameters, namespaces):
+        '''Builds a story from a JSON-like object and an already-parsed context (in the form of `parameters` and `namespaces`).
+
+        Parameters
+        ----------
+        statements : (JSON-like object) list
+
+        observations : (JSON-like object) list
+
+        parameters : (string, Paramter) dict
+
+        namespaces : (string, Namespace) dict
+        '''
+        statements = [Statement.of_json(s) for s in statements]
+        observations = [Observation.of_json(o) for o in observations]
+        return cls(statements, observations, parameters, namespaces)
 
     def topological_statements(self):
+        '''Iterates over the statements in the story in topological order.
+
+        The partial order is derived from the dataflow relationship.
+
+        Returns
+        -------
+        Statement iterator
+        '''
         # instead of removing edges, we just track which variables have been resolved
         resolved_variables = set()
         def is_resolved(stmt):
@@ -63,42 +121,120 @@ class Story:
             initial_statements += [s for s in self.dataflow(stmt) if is_resolved(s)]
 
     def run(self):
-        for statement in self.topological_statements():
-            variable, value = statement.run(self.context)
-            self.context[variable] = value
-        return self.context
+        '''Executes the story.
 
-    def dice_run(self):
-        log_probs = {}
+        Returns
+        -------
+        Context
+        '''
+        context = self.context()
         for statement in self.topological_statements():
-            variable, value, log_prob = statement.dice(self.context)
-            self.context[variable] = value
-            if log_prob is not None:
-                log_probs[variable] = log_prob
-        return self.context, log_probs
-
-    def cost(self, context, observations):
-        distances = []
-        for ob in observations:
-            distance = torch.tensor(0.0)
-            for var, value in ob.items():
-                if isinstance(value, str):
-                    value = context[value]
-                distance += torch.dist(value, context[var])
-            distances.append(distance)
-        # approximate the smallest distance
-        if len(distances) == 1: return distances[0]
-        else:
-            return -1.0 * torch.softmax(*[-1.0 * d for d in distances])
+            name, value = statement.run(context)
+            context[name] = value
+        return context
 
     def loss(self):
-        namespace, log_probs = self.dice_run()
-        cost = self.cost(namespace, self.observations)
-        # dice objective computation
-        tau = sum(p for v, p in log_probs.items())
-        # entire possible there are no log_probs, so:
-        if tau == 0:
-            tau = torch.tensor(0.0)
-        magic_box = torch.exp(tau - tau.detach())
-        objective = magic_box * cost
-        return objective
+        '''A function that - when differentiated - gives the gradient of the parameters wrt the Viterbi loss.
+
+        Returns
+        -------
+        tensor
+        '''
+        context = self.run()
+        return surrogate_viterbi_loss(self.observations, context)
+
+    def pyro_model(self):
+        '''Builds a Pyro model for the generative process.
+
+        Returns
+        -------
+        Context
+        '''
+        context = self.run()
+        # build the site for the observations
+        distances = [
+            observation_distance(obs, context) for obs in self.observations
+        ]
+        value = min(distances)
+        distribution = pyro.deterministic("sherlog:result", value)
+        log_probs = stochastic_dependencies(self.observations, context)
+        context["sherlog:result"] = Value(value, distribution, log_probs)
+        return context
+
+    def likelihood(self, num_samples=100):
+        '''Empirically computes the likelihood that the story produces results consistent with the observations.
+
+        Parameters
+        ----------
+        num_samples : int (default 100)
+
+        Returns
+        -------
+        1-d tensor
+        '''
+        predictive = Predictive(self.pyro_model, num_samples=num_samples, return_sites=("sherlog:result",))
+        results = predictive()["sherlog:result"]
+        return torch.sum(results, dim=0) / num_samples
+
+def observation_distance(observation, context, p=1):
+    '''Computes the distance from an observation to the values in the context.
+
+    Parameters
+    ----------
+    observation : Observation
+
+    context : Context
+
+    p : int (default 1)
+
+    Returns
+    -------
+    tensor
+    '''
+    distance = torch.tensor(0.0)
+    for name, value in observation.evaluate(context):
+        distance += torch.dist(value.value, context[name].value, p=1) ** p
+    return distance ** (1/p)
+
+def stochastic_dependencies(observations, context):
+    '''Computes the log-probs for all values in the observations.
+
+    Parameters
+    ----------
+    observations : Observation list
+
+    context : Context
+
+    Returns
+    -------
+    (string, tensor) dict
+    '''
+    dependencies = {}
+    for observation in observations:
+        for name, _ in observation.items():
+            deps = context[name].log_probs
+            dependencies = {**dependencies, **deps}
+    return dependencies
+
+def surrogate_viterbi_loss(observations, context):
+    '''DiCE-based surrogate for the Viterbi loss.
+
+    Parameters
+    ----------
+    observations : Observation list
+
+    context : Context
+
+    Returns
+    -------
+    tensor
+    '''
+    distances = torch.tensor([
+        observation_distance(obs, context) for obs in observations
+    ])
+    dependencies = stochastic_dependencies(observations, context)
+    log_probs = [v for _, v in dependencies.items()]
+    tau = sum(log_probs, start=torch.tensor(0.0))
+    magic_box = torch.exp(tau - tau.detach())
+    cost = torch.min(distances, dim=0).values
+    return magic_box * cost

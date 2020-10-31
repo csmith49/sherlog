@@ -1,5 +1,5 @@
 from . import term
-from . import generation
+from .generation import Generation
 
 class Statement:
     def __init__(self, variable, dependencies, generation):
@@ -7,11 +7,11 @@ class Statement:
 
         Parameters
         ----------
-        variable : term.Variable
+        variable : Variable
 
-        dependencies : term.Variable list
+        dependencies : Variable list
 
-        generation : generation.Generation
+        generation : Generation
         """
         self.variable = variable
         self.dependencies = dependencies
@@ -26,18 +26,15 @@ class Statement:
 
         Parameters
         ----------
-        json : JSON object
-            A JSON representation, as encoded by `json.loads(...)`
+        json : JSON-like object
 
         Returns
         -------
         Statement
-            A statement in the generative story
-
         """
         variable = term.Variable(json["variable"])
         dependencies = [term.Variable(dep) for dep in json["dependencies"]]
-        gen = generation.of_json(json["generation"])
+        gen = Generation.of_json(json["generation"])
         return cls(variable, dependencies, gen)
 
     def run(self, context):
@@ -51,14 +48,7 @@ class Statement:
         -------
         string
 
-        torch.tensor
+        Value
         """
-        value, _ = self.generation.to_torch(context)
+        value = self.generation.evaluate(self.variable.name, context)
         return self.variable.name, value
-
-    def dice(self, context):
-        value, log_prob = self.generation.to_torch(context)
-        return self.variable.name, value, log_prob
-
-def of_json(json):
-    return Statement.of_json(json)

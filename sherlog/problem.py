@@ -57,8 +57,7 @@ class Problem:
     def generative_story(self, evidence):
         register(self.program)
         story, observations = query(evidence)
-        context = Context(self.parameters, self.namespaces)
-        return Story.of_json(story, observations, context)
+        return Story.of_json(story, observations, self.parameters, self.namespaces)
     
     def trainable_parameters(self):
         for _, parameter in self.parameters.items():

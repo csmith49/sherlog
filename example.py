@@ -21,6 +21,7 @@ optimizer = SGD(problem.trainable_parameters(), lr=0.01)
 for evidence in problem.evidence * 100:
     optimizer.zero_grad()
     story = problem.generative_story(evidence)
+
     loss = story.loss()
     loss.backward()
     optimizer.step()
