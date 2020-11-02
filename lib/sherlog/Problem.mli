@@ -19,12 +19,21 @@ module Namespace : sig
     val to_json : t -> Yojson.Basic.t
 end
 
+module Evidence : sig
+    type t =
+        | Evidence of Watson.Atom.t list
+        | ParameterizedEvidence of (string list) * string * Watson.Atom.t list
+
+    val to_string : t -> string
+    val to_json : t -> Yojson.Basic.t
+end
+
 type line = [
     | `Rule of Watson.Rule.t
     | `Query of Watson.Atom.t list
     | `Parameter of Parameter.t
     | `Namespace of Namespace.t
-    | `Evidence of Watson.Atom.t list
+    | `Evidence of Evidence.t
 ]
 
 val simplify_introduction : 
@@ -40,14 +49,14 @@ val simplify_fuzzy_fact : probability:Watson.Term.t -> relation:string -> argume
 type t = {
     parameters : Parameter.t list;
     namespaces : Namespace.t list;
-    evidence : (Watson.Atom.t list) list;
+    evidence : Evidence.t list;
     queries : (Watson.Atom.t list) list;
     program : Watson.Program.t;
 }
 
 val parameters : t -> Parameter.t list
 val namespaces : t -> Namespace.t list
-val evidence : t -> (Watson.Atom.t list) list
+val evidence : t -> Evidence.t list
 val queries : t -> (Watson.Atom.t list) list
 val program : t -> Watson.Program.t
 

@@ -18,6 +18,9 @@ class Observation:
     def items(self):
         yield from self.observations.items()
 
+    def variables(self):
+        yield from self.observations.keys()
+
     @classmethod
     def of_json(cls, json):
         '''Builds an Observation from a JSON-like object.

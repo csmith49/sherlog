@@ -25,11 +25,20 @@ module Problem : sig
         val to_json : t -> Yojson.Basic.t
     end
 
+    module Evidence : sig
+        type t =
+            | Evidence of Watson.Atom.t list
+            | ParameterizedEvidence of (string list) * string * Watson.Atom.t list
+    
+        val to_string : t -> string
+        val to_json : t -> Yojson.Basic.t
+    end
+
     val program : t -> Watson.Program.t
     val queries : t -> (Watson.Atom.t list) list
     val parameters : t -> Parameter.t list
     val namespaces : t -> Namespace.t list
-    val evidence : t -> (Watson.Atom.t list) list
+    val evidence : t -> Evidence.t list
 end
 
 module Program : sig

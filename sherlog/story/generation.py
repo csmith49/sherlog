@@ -137,8 +137,7 @@ def normal(name, mean, sdev):
     '''
     value = torch_dist.Normal(mean.value, sdev.value).rsample()
     distribution = pyro.sample(name, pyro_dist.Normal(mean.distribution, sdev.distribution))
-    log_probs = {**mean.log_probs, **sdev.log_probs}
-    return Value(value, distribution, log_probs)
+    return Value(value, distribution)
 
 def beta(name, alpha, beta):
     '''A reparameterized Beta distribution with parameters `alpha` and `beta`.
@@ -157,8 +156,7 @@ def beta(name, alpha, beta):
     '''
     value = torch_dist.Beta(alpha.value, beta.value).rsample()
     distribution = pyro.sample(name, pyro_dist.Beta(alpha.distribution, beta.distribution))
-    log_probs = {**alpha.log_probs, **beta.log_probs}
-    return Value(value, distribution, log_probs)
+    return Value(value, distribution)
 
 def bernoulli(name, success):
     '''A Bernoulli distribution with parameter `success`.
@@ -175,8 +173,8 @@ def bernoulli(name, success):
     '''
     value = torch_dist.Bernoulli(success.value).sample()
     distribution = pyro.sample(name, pyro_dist.Bernoulli(success.distribution))
-    log_probs = {name : torch_dist.Bernoulli(success.value).log_prob(value), **success.log_probs}
-    return Value(value, distribution, log_probs)
+    log_prob = torch_dist.Bernoulli(success.value).log_prob(value)
+    return Value(value, distribution, log_prob=log_prob)
 
 def external(name, callable, *args):
     '''A call to an external callable with parameters `args`.
@@ -195,8 +193,4 @@ def external(name, callable, *args):
     '''
     value = callable(*(arg.value for arg in args))
     distribution = pyro.deterministic(name, value)
-    # can't use expansion in a generation, so let's just iterate
-    log_probs = {}
-    for arg in args:
-        log_probs.update(arg.log_probs)
-    return Value(value, distribution, log_probs)
+    return Value(value, distribution)

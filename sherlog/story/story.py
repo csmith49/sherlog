@@ -1,13 +1,58 @@
 from collections import defaultdict
+from itertools import chain
 import torch
 import pyro
 from pyro.infer.predictive import Predictive
+from torch import is_storage
 from .statement import Statement
 from .observation import Observation
 from .context import Context, Value
 
+def magic_box(log_probs):
+    tau = sum(log_probs)
+    return torch.exp(tau - tau.detach())
+
+def observation_distance(observation, context, p=1):
+    '''Computes the distance from an observation to the values in the context.
+
+    Parameters
+    ----------
+    observation : Observation
+
+    context : Context
+
+    p : int (default 1)
+
+    Returns
+    -------
+    tensor
+    '''
+    distance = torch.tensor(0.0)
+    for name, value in observation.evaluate(context):
+        distance += torch.dist(value.value, context[name].value, p=1) ** p
+    return distance ** (1/p)
+
+def viterbi_objective(observations, context):
+    '''Objective that - when minimized - maximizes the Viterbi evidence of the observations.
+
+    Parameters
+    ----------
+    observations : Observation list
+
+    context : Context
+
+    Returns
+    -------
+    (tensor, string list)
+    '''
+    distances = torch.tensor([
+        observation_distance(obs, context) for obs in observations
+    ])
+    variables = chain(*(obs.variables() for obs in observations))
+    return torch.min(distances, dim=0).values, variables
+
 class Story:
-    def __init__(self, statements, observations, parameters, namespaces):
+    def __init__(self, statements, observations):
         '''Stories are combinations of generative procedures and observations on the generated values.
 
         Parameters
@@ -22,10 +67,9 @@ class Story:
         '''
         self.statements = statements
         self.observations = observations
-        self.parameters = parameters
-        self.namespaces = namespaces
 
         self.variable_indices = {s.variable.name : i for i, s in enumerate(self.statements)}
+        self.variable_indices_inverse = {v : k for k, v in self.variable_indices.items()}
 
         # map variable indices to variable indices
         self.dependency_graph = defaultdict(lambda: [])
@@ -51,6 +95,26 @@ class Story:
         for stmt in self.statements:
             yield stmt.variable.name
 
+    def dependencies(self, *variables):
+        '''Computes the variable dependencies of a provided set of variables.
+
+        Parameters
+        ----------
+        variables : string iterator
+
+        Returns
+        -------
+        string iterator
+        '''
+        visited = set()
+        worklist = [self.variable_indices[var] for var in variables]
+        while worklist:
+            var = worklist.pop()
+            if var not in visited:
+                visited.add(var)
+                worklist.extend(self.dependency_graph[var])
+        return [self.variable_indices_inverse[i] for i in visited]
+
     def dataflow(self, stmt):
         '''Computes all statements that directly depend on the output of the given statement.
 
@@ -69,18 +133,9 @@ class Story:
     def __str__(self):
         return '\n'.join(str(stmt) for stmt in self.topological_statements())
 
-    def context(self):
-        '''Builds a fresh context from the instance parameters and namespaces.
-
-        Returns
-        -------
-        Context
-        '''
-        return Context(self.parameters, self.namespaces)
-
     @classmethod
-    def of_json(cls, statements, observations, parameters, namespaces):
-        '''Builds a story from a JSON-like object and an already-parsed context (in the form of `parameters` and `namespaces`).
+    def of_json(cls, statements, observations):
+        '''Builds a story from a JSON-like object.
 
         Parameters
         ----------
@@ -88,13 +143,13 @@ class Story:
 
         observations : (JSON-like object) list
 
-        parameters : (string, Paramter) dict
-
-        namespaces : (string, Namespace) dict
+        Returns
+        -------
+        Story
         '''
         statements = [Statement.of_json(s) for s in statements]
         observations = [Observation.of_json(o) for o in observations]
-        return cls(statements, observations, parameters, namespaces)
+        return cls(statements, observations)
 
     def topological_statements(self):
         '''Iterates over the statements in the story in topological order.
@@ -120,52 +175,53 @@ class Story:
             resolved_variables.add(stmt.variable.name)
             initial_statements += [s for s in self.dataflow(stmt) if is_resolved(s)]
 
-    def run(self):
-        '''Executes the story.
+    def run(self, context):
+        '''Executes the story over the provided context, updating the store in-place.
+
+        Parameters
+        ----------
+        context : Context
 
         Returns
         -------
         Context
         '''
-        context = self.context()
         for statement in self.topological_statements():
             name, value = statement.run(context)
             context[name] = value
         return context
 
-    def loss(self):
-        '''A function that - when differentiated - gives the gradient of the parameters wrt the Viterbi loss.
+    def pyro_model(self, context):
+        '''Builds a Pyro model in-place for the generative process executed over the context.
 
-        Returns
-        -------
-        tensor
-        '''
-        context = self.run()
-        return surrogate_viterbi_loss(self.observations, context)
-
-    def pyro_model(self):
-        '''Builds a Pyro model for the generative process.
+        Parameters
+        ----------
+        context : Context
 
         Returns
         -------
         Context
         '''
-        context = self.run()
         # build the site for the observations
         distances = [
             observation_distance(obs, context) for obs in self.observations
         ]
         value = min(distances)
         distribution = pyro.deterministic("sherlog:result", value)
-        log_probs = stochastic_dependencies(self.observations, context)
+        variables = chain(*(obs.variables() for obs in self.observations))
+        log_probs = [context[var].log_prob for var in variables if context[var].is_stochastic]
         context["sherlog:result"] = Value(value, distribution, log_probs)
         return context
 
-    def likelihood(self, num_samples=100):
+    def likelihood(self, context, offset=1, num_samples=100):
         '''Empirically computes the likelihood that the story produces results consistent with the observations.
 
         Parameters
         ----------
+        context : Context
+
+        offset : int (default 1)
+
         num_samples : int (default 100)
 
         Returns
@@ -173,68 +229,47 @@ class Story:
         1-d tensor
         '''
         predictive = Predictive(self.pyro_model, num_samples=num_samples, return_sites=("sherlog:result",))
-        results = predictive()["sherlog:result"]
-        return torch.sum(results, dim=0) / num_samples
+        results = predictive(context)["sherlog:result"]
+        return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
 
-def observation_distance(observation, context, p=1):
-    '''Computes the distance from an observation to the values in the context.
+    def loss(self, context, objectives=(viterbi_objective,)):
+        '''A function that - when differentiated - gives the gradient of the parameters wrt the sum of the objectives.
 
-    Parameters
-    ----------
-    observation : Observation
+        Parameters
+        ----------
+        context : Context
 
-    context : Context
+        objectives : objective iterable
 
-    p : int (default 1)
+        Returns
+        -------
+        tensor
+        '''
+        # for each objective, compute the cost and the log_probs of all stochastic dependencies
+        cost_nodes = []
+        for obj in objectives:
+            cost, vars_used = obj(self.observations, context)
+            log_probs = []
+            for dep in self.dependencies(*vars_used):
+                if context[dep].is_stochastic:
+                    log_probs.append(context[dep].log_prob)
+            cost_nodes.append( (cost, log_probs) )
 
-    Returns
-    -------
-    tensor
-    '''
-    distance = torch.tensor(0.0)
-    for name, value in observation.evaluate(context):
-        distance += torch.dist(value.value, context[name].value, p=1) ** p
-    return distance ** (1/p)
+        # build the standard surrogate
+        surrogate = torch.tensor(0.0)
+        for (cost, log_probs) in cost_nodes:
+            mb_c = magic_box(log_probs)
+            surrogate += mb_c * cost
 
-def stochastic_dependencies(observations, context):
-    '''Computes the log-probs for all values in the observations.
+        # we'll compute a constant baseline
+        b_w = torch.mean(
+            torch.tensor([cost for (cost, _) in cost_nodes])
+        )
+        # subtract it from each stochastic node to form the actual baseline
+        baseline = torch.tensor(0.0)
+        for var in self.variables():
+            if context[var].is_stochastic:
+                mb_w = 1 - magic_box([context[var].log_prob])
+                baseline += mb_w * b_w
 
-    Parameters
-    ----------
-    observations : Observation list
-
-    context : Context
-
-    Returns
-    -------
-    (string, tensor) dict
-    '''
-    dependencies = {}
-    for observation in observations:
-        for name, _ in observation.items():
-            deps = context[name].log_probs
-            dependencies = {**dependencies, **deps}
-    return dependencies
-
-def surrogate_viterbi_loss(observations, context):
-    '''DiCE-based surrogate for the Viterbi loss.
-
-    Parameters
-    ----------
-    observations : Observation list
-
-    context : Context
-
-    Returns
-    -------
-    tensor
-    '''
-    distances = torch.tensor([
-        observation_distance(obs, context) for obs in observations
-    ])
-    dependencies = stochastic_dependencies(observations, context)
-    log_probs = [v for _, v in dependencies.items()]
-    tau = sum(log_probs, start=torch.tensor(0.0))
-    magic_box = torch.exp(tau - tau.detach())
-    cost = torch.min(distances, dim=0).values
-    return magic_box * cost
+        return -1 * (surrogate)

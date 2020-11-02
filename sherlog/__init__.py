@@ -1,1 +1,1 @@
-from .problem import load_problem_file
+from .problem import load_problem_file, tag

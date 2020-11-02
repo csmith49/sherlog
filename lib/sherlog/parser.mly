@@ -45,6 +45,7 @@
 
 // and colons for separating arguments and the like
 %token COLON
+%token IN
 
 
 %start <Problem.line list> problem
@@ -103,7 +104,7 @@ intro_clause : ia = intro_atom; ARROW; body = atoms; PERIOD {
 
 // inference
 parameter :
-    | PARAMETER; COLON; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
+    | PARAMETER; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
         match dom with
             | "unit" -> Parameter (s, Unit)
             | "positive" | "pos" -> Parameter (s, Positive)
@@ -112,9 +113,15 @@ parameter :
     }
     ;
 
-namespace : NAMESPACE; COLON; name = SYMBOL; PERIOD { Problem.Namespace.Namespace name } ;
+namespace : NAMESPACE; name = SYMBOL; PERIOD { Problem.Namespace.Namespace name } ;
 
-evidence: EVIDENCE; COLON; atoms = atoms; PERIOD { atoms } ;
+evidence:
+    | EVIDENCE; atoms = atoms; PERIOD { Problem.Evidence.Evidence atoms }
+    | EVIDENCE; LPARENS; bindings = separated_list(COMMA, SYMBOL); IN; source = SYMBOL; atoms = atoms; PERIOD {
+        Problem.Evidence.ParameterizedEvidence (bindings, source, atoms)
+    }
+    ;
+
 
 // generating lines to build program from
 line :

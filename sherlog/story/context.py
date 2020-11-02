@@ -1,24 +1,24 @@
 from torch import tensor, is_tensor
 
 class Value:
-    __slots__ = ("value", "distribution", "log_probs")
-    def __init__(self, value, distribution, log_probs):
+    def __init__(self, value, distribution, log_prob=None):
         '''Values are the intermediate representations of a run of a story.
 
         Parameters
         ----------
-            value : object
+        value : object
 
-            distribution : pyro.sample
+        distribution : pyro.sample
 
-            log_probs : (string, torch.tensor) dict
+        log_prob : torch.tensor (default None)
         '''
+        # lift the value to a tensor, if need be
         if not is_tensor(value):
             self.value = tensor(value)
         else:
             self.value = value
         self.distribution = distribution
-        self.log_probs = log_probs
+        self.log_prob = log_prob
 
     @classmethod
     def lift(cls, value):
@@ -26,33 +26,41 @@ class Value:
 
         Parameters
         ----------
-            value : object
+        value : object
         '''
-        return cls(value, value, {})
+        return cls(value, value)
+
+    @property
+    def is_stochastic(self):
+        '''True if the value has a log probability, false otherwise.
+
+        Returns
+        -------
+        boolean
+        '''
+        return (self.log_prob is not None)
 
 class Context:
-    def __init__(self, parameters, namespaces):
+    def __init__(self, maps=()):
         '''Contexts maintain maps from identifiers to Value objects.
 
         Parameters
         ----------
-            parameters : (string, Parameter) dict
-
-            namespaces : (string, module) dict
+        maps : dict iter
         '''
         self.store = {}
-        self.parameters = parameters
-        self.namespaces = namespaces
+        self._maps = list(maps)
 
     def register(self, variable, value):
         '''Registers a value in the context store.
 
         Parameters
         ----------
-            variable : string
+        variable : string
 
-            value : Value
+        value : Value
         '''
+        if not isinstance(value, Value): raise TypeError()
         self.store[variable] = value
 
     def __setitem__(self, variable, value):
@@ -60,45 +68,45 @@ class Context:
 
         Parameters
         ----------
-            variable : string
+        variable : string
 
-            value : value
+        value : value
         '''
         self.register(variable, value)
 
     def lookup_callable(self, name):
-        '''Looks for a callable object with identifier `name` in the namespaces.
+        '''Looks for a callable object with identifier `name` in the provided maps.
 
         Parameters
         ----------
-            name : string
+        name : string
 
         Raises
         ------
-            KeyError
+        KeyError
         '''
-        for _, namespace in self.namespaces.items():
+        for map in self._maps:
             try:
                 # check if whatever we find is actually callable
-                value = getattr(namespace.module, name)
+                value = map[name]
                 if callable(value):
                     return value
-            except AttributeError: pass
+            except KeyError: pass
         # by default, throw a key error
         raise KeyError()
 
-    def lookup_value(self, name):
+    def lookup(self, name):
         '''Looks for a value with identifier `name` in the context.
 
-        Checks the context store first, then the provided parameters, then the namespaces.
+        Checks the context store first, then the provided maps.
 
         Parameters
         ----------
-            name : string
+        name : string
 
         Raises
         ------
-            KeyError
+        KeyError
         '''
         # check the store
         # no need to lift, only values are ever added
@@ -106,28 +114,21 @@ class Context:
             return self.store[name]
         except KeyError: pass
 
-        # then check parameters
-        # as these are kept at the program level, lift them to values
-        try:
-            param = self.parameters[name].value
-            return Value.lift(param)
-        except KeyError: pass
-
-        # finally, iterate through the namespaces
-        for _, namespace in self.namespaces.items():
+        # then check the provided maps - lift when found
+        for map in self._maps:
             try:
-                value = getattr(namespace.module, name)
+                value = map[name]
                 return Value.lift(value)
-            except AttributeError: pass
+            except KeyError: pass
         
-        # like the rest of the lookups, the default is to raise an exception
+        # by default, raise KeyError if we don't find what we're looking for
         raise KeyError()
 
     def __getitem__(self, variable):
-        '''Index-getter magic function for `lookup_value`.
+        '''Index-getter magic function for `lookup`.
 
         Parameters
         ----------
         variable : string
         '''
-        return self.lookup_value(variable)
+        return self.lookup(variable)

@@ -37,12 +37,40 @@ module Namespace = struct
         | Namespace n -> `String n
 end
 
+module Evidence = struct
+    type t =
+        | Evidence of Watson.Atom.t list
+        | ParameterizedEvidence of (string list) * string * Watson.Atom.t list
+
+    let to_string = function
+        | Evidence atoms -> atoms
+            |> CCList.map Watson.Atom.to_string
+            |> CCString.concat ", "
+        | ParameterizedEvidence (bindings, source, atoms) ->
+            let atoms = atoms
+                |> CCList.map Watson.Atom.to_string
+                |> CCString.concat ", " in
+            let bindings = bindings
+                |> CCString.concat ", " in
+            bindings ^ " in " ^ source ^ " : " ^ atoms
+
+    let to_json = function
+        | Evidence atoms -> `Assoc [
+            ("atoms", Utility.Atom.conjunct_to_json atoms);
+        ]
+        | ParameterizedEvidence (bindings, source, atoms) -> `Assoc [
+            ("atoms", Utility.Atom.conjunct_to_json atoms);
+            ("bindings", `List (CCList.map Interface.JSON.Make.string bindings));
+            ("source", `String source)
+        ]
+end
+
 type line = [
     | `Rule of Watson.Rule.t
     | `Query of Watson.Atom.t list
     | `Parameter of Parameter.t
     | `Namespace of Namespace.t
-    | `Evidence of Watson.Atom.t list
+    | `Evidence of Evidence.t
 ]
 
 let simplify_introduction
@@ -79,7 +107,7 @@ let simplify_fuzzy_fact
 type t = {
     parameters : Parameter.t list;
     namespaces : Namespace.t list;
-    evidence : (Watson.Atom.t list) list;
+    evidence : Evidence.t list;
     queries : (Watson.Atom.t list) list;
     program : Watson.Program.t;
 }
@@ -126,16 +154,15 @@ let to_string problem =
         |> CCList.map (fun q -> q |> CCList.map Watson.Atom.to_string |> CCString.concat ", ")
         |> CCList.map (fun q -> q ^ "?") in
     let evidence = problem.evidence
-        |> CCList.map (fun e -> e |> CCList.map Watson.Atom.to_string |> CCString.concat ", ")
+        |> CCList.map Evidence.to_string
         |> CCList.map (fun e -> "!evidence: " ^ e) in
     (params @ names @ rules @ queries @ evidence)
         |> CCString.concat "\n"
 
-
 let to_json problem = let open Interface.JSON in `Assoc [
     ("parameters", problem.parameters |> CCList.map Parameter.to_json |> Make.list);
     ("namespaces", problem.namespaces |> CCList.map Namespace.to_json |> Make.list);
-    ("evidence", problem.evidence |> CCList.map Utility.Atom.conjunct_to_json |> Make.list);
+    ("evidence", problem.evidence |> CCList.map Evidence.to_json |> Make.list);
     ("queries", problem.queries |> CCList.map Utility.Atom.conjunct_to_json|> Make.list);
     ("program", problem.program |> Utility.Program.to_json);
 ]

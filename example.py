@@ -1,6 +1,5 @@
 import sherlog
 from torch.optim import SGD
-from itertools import repeat
 import time
 
 # delay to let the server spin up
@@ -11,23 +10,24 @@ time.sleep(1)
 print("Loading the problem file...")
 problem = sherlog.load_problem_file("./examples/flip.sl")
 
-# check the params and evidence we found
-print(f"Found: {len(problem.parameters.items())} parameters and {len(problem.evidence)} pieces of data.")
-
 # build the optimizer
-optimizer = SGD(problem.trainable_parameters(), lr=0.01)
+optimizer = SGD(problem.parameters(), lr=0.1)
 
 # we'll repeat the training for a few epochs
-for evidence in problem.evidence * 100:
+for story, context in problem.stories():
     optimizer.zero_grad()
-    story = problem.generative_story(evidence)
-
-    loss = story.loss()
+    context = story.run(context)
+    loss = story.loss(context)
     loss.backward()
     optimizer.step()
 
+    for name, param in problem._parameters.items():
+        print (name, param.value, param.value.grad)
+
+    problem.clamp_parameters()
+
 # print the final parameters
-for name, param in problem.parameters.items():
+for name, param in problem._parameters.items():
     print (name, param.value)
 
 print("Saving and loading parameters to test...")
@@ -39,5 +39,5 @@ problem.save_parameters("/tmp/params.slp")
 problem = sherlog.load_problem_file("./examples/flip.sl")
 problem.load_parameters("/tmp/params.slp")
 
-for name, param in problem.parameters.items():
+for name, param in problem._parameters.items():
     print (name, param.value)
