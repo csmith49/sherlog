@@ -234,7 +234,7 @@ def surrogate_viterbi_loss(observations, context):
     ])
     dependencies = stochastic_dependencies(observations, context)
     log_probs = [v for _, v in dependencies.items()]
-    tau = sum(log_probs, start=torch.tensor(0.0))
+    tau = sum(log_probs, torch.tensor(0.0))
     magic_box = torch.exp(tau - tau.detach())
     cost = torch.min(distances, dim=0).values
     return magic_box * cost
