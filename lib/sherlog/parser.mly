@@ -89,10 +89,16 @@ intro_atom :
     }
     ;
 
-intro_clause : ia = intro_atom; ARROW; body = atoms; PERIOD {
-    let rel, args, f, params, context = ia in Problem.simplify_introduction
-        ~relation:rel ~arguments:args ~generator:f ~parameters:params ~context:context ~body:body
-} ;
+intro_clause : 
+    | ia = intro_atom; ARROW; body = atoms; PERIOD {
+        let rel, args, f, params, context = ia in Problem.simplify_introduction
+            ~relation:rel ~arguments:args ~generator:f ~parameters:params ~context:context ~body:body
+    } 
+    | ia = intro_atom; PERIOD {
+        let rel, args, f, params, context = ia in Problem.simplify_introduction
+            ~relation:rel ~arguments:args ~generator:f ~parameters:params ~context:context ~body:[]
+    }
+    ;
 
 // fuzzy facts
 // fuzzy_fact : p = term; COLON; a = atom; PERIOD {
@@ -117,7 +123,7 @@ namespace : NAMESPACE; name = SYMBOL; PERIOD { Problem.Namespace.Namespace name 
 
 evidence:
     | EVIDENCE; atoms = atoms; PERIOD { Problem.Evidence.Evidence atoms }
-    | EVIDENCE; LPARENS; bindings = separated_list(COMMA, SYMBOL); IN; source = SYMBOL; atoms = atoms; PERIOD {
+    | EVIDENCE; LPARENS; bindings = separated_list(COMMA, SYMBOL); IN; source = SYMBOL; RPARENS; atoms = atoms; PERIOD {
         Problem.Evidence.ParameterizedEvidence (bindings, source, atoms)
     }
     ;

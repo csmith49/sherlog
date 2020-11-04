@@ -1,16 +1,31 @@
 from importlib import import_module
 from inspect import getmembers
 
-# useful annotating functions
-def tag(obj, name=None):
-    if name is None: name = obj.__name__
-    setattr(obj, "sherlog:tagged", ())
-    setattr(obj, "sherlog:name", name)
-    return obj
+class TagError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+    def __str__(self):
+        return self.msg
 
-def name(obj): return getattr(obj, "sherlog:name")
+class Register:
+    def __init__(self):
+        self._store = {}
 
-def is_tagged(obj): return hasattr(obj, "sherlog:tagged")
+    def tag(self, obj, name=None):
+        if name is None:
+            try: name = obj.__name__
+            except AttributeError:
+                raise TagError(f"Can't derive name for tagged object {obj}")
+        self._store[name] = obj
+        return obj
+
+    def __call__(self, *args, **kwargs):
+        return self.tag(*args, **kwargs)
+
+    def items(self):
+        yield from self._store.items()
+
+def is_register(obj): return isinstance(obj, Register)
 
 # the namespace class holds it all together
 class Namespace:
@@ -18,8 +33,9 @@ class Namespace:
         self._namespace = {}
         for module_name in modules:
             module = import_module(module_name)
-            for obj in getmembers(module, is_tagged):
-                self._namespace[name(obj)] = obj
+            for _, register in getmembers(module, is_register):
+                for name, obj in register.items():
+                    self._namespace[name] = obj
 
     def lookup(self, key):
         return self._namespace[key]

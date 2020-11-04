@@ -9,10 +9,10 @@ from .observation import Observation
 from .context import Context, Value
 
 def magic_box(log_probs):
-    tau = sum(log_probs)
+    tau = sum(log_probs, start=torch.tensor(0.0))
     return torch.exp(tau - tau.detach())
 
-def observation_distance(observation, context, p=1):
+def observation_distance(observation, context, p=2):
     '''Computes the distance from an observation to the values in the context.
 
     Parameters
@@ -29,8 +29,9 @@ def observation_distance(observation, context, p=1):
     '''
     distance = torch.tensor(0.0)
     for name, value in observation.evaluate(context):
-        distance += torch.dist(value.value, context[name].value, p=1) ** p
-    return distance ** (1/p)
+        ob_dist = torch.dist(value.value, context[name].value, p=p)
+        distance += ob_dist
+    return distance
 
 def viterbi_objective(observations, context):
     '''Objective that - when minimized - maximizes the Viterbi evidence of the observations.
@@ -45,11 +46,9 @@ def viterbi_objective(observations, context):
     -------
     (tensor, string list)
     '''
-    distances = torch.tensor([
-        observation_distance(obs, context) for obs in observations
-    ])
+    distances = [observation_distance(obs, context).reshape(1) for obs in observations]
     variables = chain(*(obs.variables() for obs in observations))
-    return torch.min(distances, dim=0).values, variables
+    return torch.min(torch.cat(distances), dim=0).values, variables
 
 class Story:
     def __init__(self, statements, observations):
@@ -272,4 +271,4 @@ class Story:
                 mb_w = 1 - magic_box([context[var].log_prob])
                 baseline += mb_w * b_w
 
-        return -1 * (surrogate)
+        return (surrogate)

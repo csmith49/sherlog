@@ -1,6 +1,7 @@
 from .namespace import Namespace
 from .parameter import Parameter
 from .evidence import Evidence
+from .instance import Instance
 from ..story import Story, Context
 from ..engine import register, query
 
@@ -29,6 +30,8 @@ class Problem:
         self._evidence = evidence
         self.program = program
 
+        register(self.program)
+
     @classmethod
     def of_json(cls, json):
         '''Builds a problem from a JSON-like object.
@@ -43,25 +46,9 @@ class Problem:
         '''
         parameters = [Parameter.of_json(p) for p in json["parameters"]]
         namespaces = json["namespaces"]
-        namespaces = {n.name : n for n in [Namespace.of_json(n) for n in json["namespaces"]]}
         evidence = [Evidence.of_json(e) for e in json["evidence"]]
         program = json["program"]
         return cls(parameters=parameters, namespaces=namespaces, evidence=evidence, program=program)
-
-    def story(self, atoms):
-        '''Constructs a story and set of observations sufficient to generate the atoms.
-
-        Parameters
-        ----------
-        atoms : JSON-like object list
-
-        Returns
-        -------
-        Story
-        '''
-        register(self.program)
-        story, observations = query(atoms)
-        return Story.of_json(story, observations)
 
     def parameters(self):
         '''Returns an iterable over all tuneable parameters in-scope.
@@ -77,21 +64,22 @@ class Problem:
                 yield from obj.parameters()
 
     def evidence(self):
-        '''Returns an iterable over all flattened evidence.
+        '''Returns an iterable over all concretized evidence.
 
         Returns
         -------
         (JSON-like object, (string, torch.tensor) dict) iterable
         '''
         for evidence in self._evidence:
-            yield from evidence.flatten(self._namespace)
+            yield from evidence.concretize(self._namespace)
 
-    def stories(self):
+    def instances(self):
         for atoms, map in self.evidence():
-            story = self.story(atoms)
+            story, observations = query(atoms)
+            story =  Story.of_json(story, observations)
             param_map = {n : p.value for n, p in self._parameters.items()}
             context = Context(maps=(map, param_map, self._namespace))
-            yield (story, context)
+            yield Instance(story, context)
 
     def save_parameters(self, filepath):
         '''Writes all parameter values in scope to a file.

@@ -132,3 +132,12 @@ class Context:
         variable : string
         '''
         return self.lookup(variable)
+
+    def clone(self):
+        '''Constructs a fresh context with an empty store but the same maps.
+
+        Returns
+        -------
+        Context
+        '''
+        return self.__class__(maps=tuple(self._maps))

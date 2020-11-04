@@ -111,7 +111,7 @@ class Generation:
         # check external functions
         else:
             try:
-                f = self.context.lookup_callable(self.name)
+                f = context.lookup_callable(self.name)
                 return external(name, f, *arguments)
             except KeyError: pass
 

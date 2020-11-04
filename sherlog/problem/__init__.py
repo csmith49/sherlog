@@ -1,6 +1,6 @@
 from .problem import Problem
 from ..engine import parse
-from .namespace import tag
+from .namespace import Register
 
 def load_problem_file(filepath):
     with open(filepath, "r") as f:

@@ -18,8 +18,8 @@ class Evidence:
             bindings, source = None, None
         return cls(atoms, bindings=bindings, source=source)
 
-    def flatten(self, namespace):
-        '''Returns an iterable over all flattened (non-parameterized) pieces of evidence.
+    def concretize(self, namespace):
+        '''Returns an iterable over all concretized (non-parameterized) pieces of evidence.
 
         Parameters
         ----------

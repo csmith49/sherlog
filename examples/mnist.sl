@@ -1,5 +1,4 @@
 !namespace mnist.
-!dataset image, class in training_data.
 
 # of course our image from the dataset is, indeed, an image
 is_image(image).
@@ -13,10 +12,10 @@ latent(I ; normal[M, S]) <- mean(I, M), sdev(I, S).
 decode(I ; decode[Z]) <- latent(I, Z).
 
 # we'll focus on the reconstruction loss - adding kl-div for future work
-loss(I, O ; reconstruction_loss[I, O]) <- decode(I, O).
+loss(I, O ; reconstruction_loss[I, O]).
 
 # a query to see the generative story
-loss(image, class, L)?
+loss(O, class, L), decode(image, O)?
 
 # and our observation (implicitly parameterized by the dataset decl.)
-!evidence loss(image, class, 0.0).
+!evidence(image, class in dataset) loss(image, O, 0.0), decode(image, O).
