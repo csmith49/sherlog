@@ -4,5 +4,7 @@ class Instance:
         self.context = context
 
     def loss(self):
-        context = self.story.run(self.context.clone())
-        return self.story.loss(context)
+        return self.story.loss(self.context)
+
+    def likelihood(self, num_samples=100):
+        return self.story.likelihood(self.context, num_samples=num_samples)

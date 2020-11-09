@@ -175,7 +175,7 @@ class Story:
             initial_statements += [s for s in self.dataflow(stmt) if is_resolved(s)]
 
     def run(self, context):
-        '''Executes the story over the provided context, updating the store in-place.
+        '''Executes the story over the provided context, returning a fresh context with the execution stored.
 
         Parameters
         ----------
@@ -185,13 +185,14 @@ class Story:
         -------
         Context
         '''
+        context = context.clone()
         for statement in self.topological_statements():
             name, value = statement.run(context)
             context[name] = value
         return context
 
     def pyro_model(self, context):
-        '''Builds a Pyro model in-place for the generative process executed over the context.
+        '''Builds a Pyro model for the generative process executed over the context.
 
         Parameters
         ----------
@@ -201,6 +202,7 @@ class Story:
         -------
         Context
         '''
+        context = self.run(context)
         # build the site for the observations
         distances = [
             observation_distance(obs, context) for obs in self.observations
@@ -244,6 +246,7 @@ class Story:
         -------
         tensor
         '''
+        context = self.run(context)
         # for each objective, compute the cost and the log_probs of all stochastic dependencies
         cost_nodes = []
         for obj in objectives:

@@ -1,45 +1,40 @@
-from .socket import JSONSocket
+from .socket import connect
 from ..config import PORT
+from time import sleep
 from . import server
 
+sleep(1)
+
 class CommunicationError(Exception): pass
+
+SOCKET = connect(PORT)
 
 def echo(obj):
     message = {
         "command" : "echo",
         "message" : obj
     }
-    with JSONSocket(PORT) as s:
-        s.send(message)
-        response = s.receive()
-    return response
+    return SOCKET.communicate(message)
 
 def parse(string):
     message = {
         "command" : "parse",
         "message" : string
     }
-    with JSONSocket(PORT) as s:
-        s.send(message)
-        response = s.receive()
-    return response
+    return SOCKET.communicate(message)
 
 def register(program):
     message = {
         "command" : "register",
         "message" : program
     }
-    with JSONSocket(PORT) as s:
-        s.send(message)
+    return SOCKET.communicate(message)
 
 def query(q):
     message = {
         "command" : "query",
         "message" : q
     }
-    with JSONSocket(PORT) as s:
-        s.send(message)
-        response = s.receive()
-    if response == "failure":
-        raise CommunicationError()
+    response = SOCKET.communicate(message)
+    if response == "failure": raise CommunicationError()
     return response["model"], response["observations"]

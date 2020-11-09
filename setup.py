@@ -10,6 +10,7 @@ setup(name='sherlog',
       packages=['sherlog'],
       install_requires=[
           "pyro",
-          "pytorch"
+          "torch",
+          "torchvision"
       ],
       zip_safe=False)

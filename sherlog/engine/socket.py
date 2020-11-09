@@ -1,6 +1,7 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from json import loads, dumps
 from ..logs import get
+import atexit
 
 logger = get("engine.socket")
 
@@ -51,3 +52,12 @@ class JSONSocket:
                 logger.info(f"Response retrieved from server on port {self.port}.")
                 return obj
             except: pass
+
+    def communicate(self, obj):
+        self.send(obj)
+        return self.receive()
+
+def connect(port):
+    socket = JSONSocket(port).__enter__()
+    atexit.register(socket.__exit__)
+    return socket

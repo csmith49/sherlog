@@ -11,20 +11,18 @@ print("Loading the problem file...")
 problem = sherlog.load_problem_file("./examples/flip.sl")
 
 # build the optimizer
-optimizer = SGD(problem.parameters(), lr=0.1)
+optimizer = SGD(problem.parameters(), lr=0.05)
 
 # we'll repeat the training for a few epochs
-for story, context in problem.stories():
+for instances in sherlog.batch(list(problem.instances()) * 1000):
+    instance = instances[0]
     optimizer.zero_grad()
-    context = story.run(context)
-    loss = story.loss(context)
+    loss = instance.loss()
     loss.backward()
     optimizer.step()
-
-    for name, param in problem._parameters.items():
-        print (name, param.value, param.value.grad)
-
     problem.clamp_parameters()
+
+    print(problem.log_likelihood(num_samples=100))
 
 # print the final parameters
 for name, param in problem._parameters.items():

@@ -114,9 +114,8 @@ class Problem:
 
     def log_likelihood(self, num_samples=100):
         result = torch.tensor(0.0)
-        for (story, context) in self.stories():
-            context = story.run(context)
-            result += torch.log(story.likelihood(context, num_samples=num_samples))
+        for instance in self.instances():
+            result += torch.log(instance.likelihood(num_samples=num_samples))
         return result
 
     def clamp_parameters(self):
