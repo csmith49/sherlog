@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='sherlog',
       version='0.9',
@@ -7,10 +7,12 @@ setup(name='sherlog',
       author='Calvin Smith',
       author_email='does@notexist.com',
       license='MIT',
-      packages=['sherlog'],
+      packages=find_packages(),
       install_requires=[
-          "pyro",
+          "pyro-ppl",
           "torch",
-          "torchvision"
+          "torchvision",
+          "altair",
+          "alive-progress"
       ],
       zip_safe=False)

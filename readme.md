@@ -24,7 +24,7 @@ This section assumes you have the latest versions of [OPAM](https://opam.ocaml.o
 
 First, we can install the OCaml core with `opam install .`. This will install the executables `sherlog` and `sherlog-server` in the default OPAM installation path (by default, at `~/.opam/default/bin`); either run `opam init` to add the installation path to your path in your shell configuration file, or run `eval $(opam env)` to add the path temporarily.
 
-Next, we can get the Python dependencies and install the SherLog package by running `pip install .`.
+Next, we can install the SherLog Python interface by running `pip3 install . --user`.
 
 ## Usage
 
