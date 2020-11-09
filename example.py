@@ -17,16 +17,16 @@ optimizer = SGD(problem.parameters(), lr=0.05)
 for instances in sherlog.batch(list(problem.instances()) * 1000):
     instance = instances[0]
     optimizer.zero_grad()
-    loss = instance.loss()
+    loss = instance.loss(num_samples=100)
     loss.backward()
     optimizer.step()
     problem.clamp_parameters()
 
-    print(problem.log_likelihood(num_samples=100))
-
 # print the final parameters
 for name, param in problem._parameters.items():
     print (name, param.value)
+
+print("LOSS", problem.log_likelihood(num_samples=100))
 
 print("Saving and loading parameters to test...")
 
