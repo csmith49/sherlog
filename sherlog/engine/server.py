@@ -5,7 +5,7 @@ import atexit
 
 logger = get("engine.server")
 
-SERVER_ARGS = ["./server", "--port", f"{PORT}"]
+SERVER_ARGS = ["sherlog-server", "--port", f"{PORT}"]
 logger.info(f"Starting translation server on port {PORT}...")
 SERVER = Popen(SERVER_ARGS)
 logger.info(f"Translation port successfully started on port {PORT}.")

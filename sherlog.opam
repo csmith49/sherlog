@@ -3,12 +3,16 @@ opam-version: "2.0"
 version: "0.9"
 synopsis:
   "An OCaml library for deep, probabilistic, generative logic programming"
+maintainer: ["cjsmith@cs.wisc.edu"]
 authors: ["Calvin Smith"]
 homepage: "https://github.com/csmith49/sherlog"
 bug-reports: "https://github.com/csmith49/sherlog/issues"
 depends: [
-  "containers" {> "3.0"}
-  "dune" {>= "2.6" & > "1.5"}
+  "containers" {>= "3.0"}
+  "dune" {>= "2.6" & >= "2.6"}
+  "menhir" {>= "20200624"}
+  "yojson" {>= "1.7"}
+  "lwt" {>= "5.3"}
 ]
 build: [
   ["dune" "subst"] {pinned}

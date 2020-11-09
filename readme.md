@@ -22,7 +22,7 @@ Sub-components `1.` and `2.` are implemented in [OCaml](https://ocamlverse.githu
 
 This section assumes you have the latest versions of [OPAM](https://opam.ocaml.org) (installation instructions [here](https://opam.ocaml.org/doc/Install.html)) and [Python](https://www.python.org).
 
-First, we build the dependencies for the OCaml core. Simply run `opam install . --deps-only`. We can then build the daemon `./sherlog` communicates with by running `make server`.
+First, we can install the OCaml core with `opam install .`. This will install the executables `sherlog` and `sherlog-server` in the default OPAM installation path (by default, at `~/.opam/default/bin`); either run `opam init` to add the installation path to your path in your shell configuration file, or run `eval $(opam env)` to add the path temporarily.
 
 Next, we can get the Python dependencies and install the SherLog package by running `pip install .`.
 

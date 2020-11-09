@@ -7,7 +7,7 @@ let spec_list = [
     ("--port", Arg.Set_int port, "Port to host local server on");
     ("--verbose", Arg.Set verbose, "Enable status updates to StdOut");
 ]
-let usage_msg = "Server for GDL"
+let usage_msg = "Server for SherLog"
 let _ = Arg.parse spec_list print_endline usage_msg
 
 let verbose_print str = if !verbose then print_endline str else ()
