@@ -28,7 +28,7 @@ Next, we can install the SherLog Python interface by running `pip3 install . --u
 
 ## Usage
 
-Open a Python interpreter and `import sherlog` to get started.
+Open a Python interpreter and `import sherlog` to get started. Additionally, the OPAM build process installs `sherlog` and `sherlog-server`: run them to see their command-line arguments.
 
 ### Core Syntax
 
