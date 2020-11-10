@@ -13,6 +13,8 @@ setup(name='sherlog',
           "torch",
           "torchvision",
           "altair",
-          "alive-progress"
+          "tablib[all]",
+          "alive-progress",
+          "click"
       ],
       zip_safe=False)
