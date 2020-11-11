@@ -37,7 +37,7 @@ class Statement:
         gen = Generation.of_json(json["generation"])
         return cls(variable, dependencies, gen)
 
-    def run(self, context):
+    def run(self, context, **kwargs):
         """Evaluates the statement in the provided namespace.
 
         Parameters
@@ -50,5 +50,5 @@ class Statement:
 
         Value
         """
-        value = self.generation.evaluate(self.variable.name, context)
+        value = self.generation.evaluate(self.variable.name, context, **kwargs)
         return self.variable.name, value

@@ -24,7 +24,9 @@ problem = sherlog.load_problem_file("./flip.sl")
 @click.option("--learning-rate", default=0.005, help="The learning rate of the optimizer")
 @click.option("--mcmc-size", default=100, help="The number of samples used to approximate a gradient")
 @click.option("--log/--no-log", default=False, help="Enables/disables recording of results")
-def train(epochs, optimizer, learning_rate, mcmc_size, log):
+@click.option("--relax/--no-relax", default=False)
+@click.option("--temperature", default=0.1)
+def train(epochs, optimizer, learning_rate, mcmc_size, log, relax, temperature):
     seed = hashids.encode(randint(0, 100000))
 
     optim = {
@@ -38,20 +40,27 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "optimizer" : optimizer,
         "learning-rate" : learning_rate,
         "mcmc-size" : mcmc_size,
-        "seed" : seed
+        "seed" : seed,
+        "relax" : relax,
+        "temperature" : temperature
     })
+
+    args = {
+        "relax" : relax,
+        "temperature" : temperature
+    }
 
     with alive_bar(len(dataset)) as bar:
         for i, instance in enumerate(dataset):
             optim.zero_grad()
-            loss = instance.loss(num_samples=mcmc_size)
+            loss = instance.loss(num_samples=mcmc_size, evaluation_arguments=args)
             loss.backward()
             optim.step()
             problem.clamp_parameters()
             bar()
 
             if i % 100 == 0:
-                likelihood = problem.log_likelihood(num_samples=500)
+                likelihood = problem.log_likelihood(num_samples=500, evaluation_arguments=args)
                 instrumenter.emit(
                     likelihood=likelihood.item(),
                     step=i,

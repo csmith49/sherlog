@@ -1,5 +1,6 @@
 from . import term
 from .context import Value
+import torch
 import torch.distributions as torch_dist
 import pyro
 import pyro.distributions as pyro_dist
@@ -75,7 +76,7 @@ class Generation:
                 arguments.append(value)
         return arguments
 
-    def evaluate(self, name, context):
+    def evaluate(self, name, context, **kwargs):
         '''Evaluates the generation mechanism in context `context`.
 
         An identifier is also passed to bind the constructed Pyro sample site.
@@ -96,23 +97,23 @@ class Generation:
         # reparameterized beta distribution
         if self.name == "beta":
             a, b = arguments[0], arguments[1]
-            return beta(name, a, b)
+            return beta(name, a, b, **kwargs)
     
         # reparameterized normal distribution
         elif self.name == "normal":
             mean, sdev = arguments[0], arguments[1]
-            return normal(name, mean, sdev)
+            return normal(name, mean, sdev, **kwargs)
         
         # standard bernoulli distribution
         elif self.name == "bernoulli":
             success = arguments[0]
-            return bernoulli(name, success)
+            return bernoulli(name, success, **kwargs)
 
         # check external functions
         else:
             try:
                 f = context.lookup_callable(self.name)
-                return external(name, f, *arguments)
+                return external(name, f, *arguments, **kwargs)
             except KeyError: pass
 
         # if none of the above work, raise an exception
@@ -120,7 +121,7 @@ class Generation:
 
 # ======== GENERATIVE MECHANISMS ========
 
-def normal(name, mean, sdev):
+def normal(name, mean, sdev, **_):
     '''A reparameterized normal distribution with parameters `mean` and `sdev`.
 
     Parameters
@@ -139,7 +140,7 @@ def normal(name, mean, sdev):
     distribution = pyro.sample(name, pyro_dist.Normal(mean.distribution, sdev.distribution))
     return Value(value, distribution)
 
-def beta(name, alpha, beta):
+def beta(name, alpha, beta, **_):
     '''A reparameterized Beta distribution with parameters `alpha` and `beta`.
 
     Parameters
@@ -158,7 +159,7 @@ def beta(name, alpha, beta):
     distribution = pyro.sample(name, pyro_dist.Beta(alpha.distribution, beta.distribution))
     return Value(value, distribution)
 
-def bernoulli(name, success):
+def bernoulli(name, success, relax=False, temperature=0.1, **_):
     '''A Bernoulli distribution with parameter `success`.
 
     Parameters
@@ -167,16 +168,26 @@ def bernoulli(name, success):
 
     success : Value
 
+    relax : boolean (default False)
+
+    temperature : float (default 0.1)
+
     Returns
     -------
     Value
     '''
-    value = torch_dist.Bernoulli(success.value).sample()
-    distribution = pyro.sample(name, pyro_dist.Bernoulli(success.distribution))
-    log_prob = torch_dist.Bernoulli(success.value).log_prob(value)
-    return Value(value, distribution, log_prob=log_prob)
+    if relax: # relaxed bern
+        temp = torch.tensor(temperature)
+        value = torch_dist.RelaxedBernoulli(temp, probs=success.value).rsample()
+        distribution = pyro.sample(name, pyro_dist.RelaxedBernoulliStraightThrough(temp, probs=success.distribution))
+        return Value(value, distribution)
+    else: # standard bernoulli
+        value = torch_dist.Bernoulli(success.value).sample()
+        distribution = pyro.sample(name, pyro_dist.Bernoulli(success.distribution))
+        log_prob = torch_dist.Bernoulli(success.value).log_prob(value)
+        return Value(value, distribution, log_prob=log_prob)
 
-def external(name, callable, *args):
+def external(name, callable, *args, **_):
     '''A call to an external callable with parameters `args`.
 
     Parameters

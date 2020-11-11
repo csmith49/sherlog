@@ -112,10 +112,10 @@ class Problem:
             model = self._namespace[name]
             model.load_state_dict(state_dict)
 
-    def log_likelihood(self, num_samples=100):
+    def log_likelihood(self, num_samples=100, evaluation_arguments={}):
         result = torch.tensor(0.0)
         for instance in self.instances():
-            result += torch.log(instance.likelihood(num_samples=num_samples))
+            result += torch.log(instance.likelihood(num_samples=num_samples, evaluation_arguments=evaluation_arguments))
         return result
 
     def clamp_parameters(self):
