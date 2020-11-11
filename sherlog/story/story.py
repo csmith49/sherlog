@@ -12,27 +12,6 @@ def magic_box(log_probs):
     tau = sum(log_probs, start=torch.tensor(0.0))
     return torch.exp(tau - tau.detach())
 
-def observation_distance(observation, context, p=2):
-    '''Computes the distance from an observation to the values in the context.
-
-    Parameters
-    ----------
-    observation : Observation
-
-    context : Context
-
-    p : int (default 1)
-
-    Returns
-    -------
-    tensor
-    '''
-    distance = torch.tensor(0.0)
-    for name, value in observation.evaluate(context):
-        ob_dist = torch.dist(value.value, context[name].value, p=p)
-        distance += ob_dist
-    return distance
-
 def viterbi_objective(observations, context):
     '''Objective that - when minimized - maximizes the Viterbi evidence of the observations.
 
@@ -46,7 +25,7 @@ def viterbi_objective(observations, context):
     -------
     (tensor, string list)
     '''
-    distances = [observation_distance(obs, context).reshape(1) for obs in observations]
+    distances = [obs.distance(context).reshape(1) for obs in observations]
     variables = chain(*(obs.variables() for obs in observations))
     return torch.min(torch.cat(distances), dim=0).values, variables
 
@@ -204,10 +183,10 @@ class Story:
         '''
         context = self.run(context)
         # build the site for the observations
-        distances = [
-            observation_distance(obs, context) for obs in self.observations
+        similarities = [
+            obs.similarity(context) for obs in self.observations
         ]
-        value = min(distances)
+        value = max(similarities)
         distribution = pyro.deterministic("sherlog:result", value)
         variables = chain(*(obs.variables() for obs in self.observations))
         log_probs = [context[var].log_prob for var in variables if context[var].is_stochastic]

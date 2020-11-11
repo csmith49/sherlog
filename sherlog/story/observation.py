@@ -1,5 +1,6 @@
 from . import term
 from .context import Value
+import torch
 
 class Observation:
     def __init__(self, observations):
@@ -54,3 +55,63 @@ class Observation:
             # otherwise, just lift it
             else:
                 yield (name, Value.lift(value))
+
+    def to_tensor(self, context):
+        '''Converts an observation to a tensor by evaluating in a context.
+
+        Parameters
+        ----------
+        context : Context
+
+        Returns
+        -------
+        torch.tensor
+        '''
+        return torch.tensor([value.value for _, value in self.evaluate(context)])
+
+    def project_context_to_tensor(self, context):
+        '''Converts a context to a tensor via projection of the keys of the observation.
+
+        Parameters
+        ----------
+        context : Context
+
+        Returns
+        -------
+        torch.tensor
+        '''
+        return torch.tensor([context[name].value for name, _ in self.items()])
+
+    def distance(self, context, p=1):
+        '''Computes the L-p distance between the observation and the context.
+
+        Parameters
+        ----------
+        context : Context
+
+        Returns
+        -------
+        torch.tensor
+        '''
+        return torch.dist(
+            self.to_tensor(context),
+            self.project_context_to_tensor(context),
+            p=p
+        )
+
+    def similarity(self, context):
+        '''Computes the cosine similarity between the observation and the context.
+
+        Parameters
+        ----------
+        context : Context
+
+        Returns
+        -------
+        torch.tensor
+        '''
+        return torch.cosine_similarity(
+            self.to_tensor(context),
+            self.project_context_to_tensor(context),
+            dim=0
+        )

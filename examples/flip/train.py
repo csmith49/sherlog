@@ -17,12 +17,12 @@ sleep(1)
 problem = sherlog.load_problem_file("./flip.sl")
 
 @click.command()
-@click.option("--epochs", default=1000, help="Number of training epochs")
+@click.option("--epochs", default=700, help="Number of training epochs")
 @click.option("--optimizer", default="sgd",
     type=click.Choice(['sgd', 'adam'], case_sensitive=False),
     help="The optimization strategy")
-@click.option("--learning-rate", default=0.005, help="The learning rate of the optimizer")
-@click.option("--mcmc-size", default=100, help="The number of samples used to approximate a gradient")
+@click.option("--learning-rate", default=0.01, help="The learning rate of the optimizer")
+@click.option("--mcmc-size", default=50, help="The number of samples used to approximate a gradient")
 @click.option("--log/--no-log", default=False, help="Enables/disables recording of results")
 def train(epochs, optimizer, learning_rate, mcmc_size, log):
     seed = hashids.encode(randint(0, 100000))
