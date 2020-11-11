@@ -275,3 +275,35 @@ class Story:
                 baseline += mb_w * b_w
 
         return (surrogate)
+
+    def density(self, context):
+        '''A function that - when differentiated - gives the gradient of the parameters wrt the pdf.
+
+        Parameters
+        ----------
+        context : Context
+
+        objectives : objective iterable
+
+        Returns
+        -------
+        tensor
+        '''
+        context = self.run(context)
+        # for each objective, compute the cost and the log_probs of all stochastic dependencies
+        cost_nodes = []
+
+        cost, vars_used = viterbi_objective(self.observations, context)
+        log_probs = []
+        for dep in self.dependencies(*vars_used):
+            if context[dep].is_stochastic:
+                log_probs.append(context[dep].log_prob)
+        cost_nodes.append( (cost, log_probs) )
+
+        # build the standard surrogate
+        surrogate = torch.tensor(0.0)
+        for (cost, log_probs) in cost_nodes:
+            mb_c = magic_box(log_probs)
+            surrogate += mb_c * (1 - cost)
+
+        return surrogate

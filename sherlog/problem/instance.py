@@ -8,6 +8,16 @@ class Instance:
     def sample_loss(self):
         return self.story.loss(self.context)
 
+    def sample_density(self):
+        return self.story.density(self.context)
+
+    def density(self, num_samples=1):
+        ds = []
+        for i in range(num_samples):
+            ds.append(self.sample_density())
+        ds = torch.stack(ds)
+        return torch.mean(ds)
+
     def loss(self, num_samples=1):
         losses = []
         for i in range(num_samples):
