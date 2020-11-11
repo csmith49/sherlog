@@ -13,6 +13,9 @@ setup(name='sherlog',
           "torch",
           "torchvision",
           "altair",
-          "alive-progress"
+          "pandas",
+          "alive-progress",
+          "click",
+          "hashids"
       ],
       zip_safe=False)
