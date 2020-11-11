@@ -33,6 +33,18 @@ def observation_distance(observation, context, p=2):
         distance += ob_dist
     return distance
 
+def observation_similarity(observation, context):
+    o_v, c_v = [], []
+    for name, value in observation.evaluate(context):
+        o_v.append(value.value)
+        c_v.append(context[name].value)
+    return torch.cosine_similarity(torch.tensor(o_v), torch.tensor(c_v), dim=0)
+
+def similarity_objective(observations, context):
+    sims = [observation_similarity(obs, context).reshape(1) for obs in observations]
+    variables = chain(*(obs.variables() for obs in observations))
+    return torch.max(torch.cat(sims), dim=0).values, variables
+
 def viterbi_objective(observations, context):
     '''Objective that - when minimized - maximizes the Viterbi evidence of the observations.
 
@@ -205,9 +217,9 @@ class Story:
         context = self.run(context)
         # build the site for the observations
         distances = [
-            observation_distance(obs, context) for obs in self.observations
+            observation_similarity(obs, context) for obs in self.observations
         ]
-        value = min(distances)
+        value = max(distances)
         distribution = pyro.deterministic("sherlog:result", value)
         variables = chain(*(obs.variables() for obs in self.observations))
         log_probs = [context[var].log_prob for var in variables if context[var].is_stochastic]
@@ -293,7 +305,7 @@ class Story:
         # for each objective, compute the cost and the log_probs of all stochastic dependencies
         cost_nodes = []
 
-        cost, vars_used = viterbi_objective(self.observations, context)
+        cost, vars_used = similarity_objective(self.observations, context)
         log_probs = []
         for dep in self.dependencies(*vars_used):
             if context[dep].is_stochastic:
@@ -304,6 +316,6 @@ class Story:
         surrogate = torch.tensor(0.0)
         for (cost, log_probs) in cost_nodes:
             mb_c = magic_box(log_probs)
-            surrogate += mb_c * (1 - cost)
+            surrogate += mb_c * cost
 
         return surrogate

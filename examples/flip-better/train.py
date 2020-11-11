@@ -44,8 +44,9 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         for i in range(epochs):
             optim.zero_grad()
             # build likelihood
-            ls = [instance.density(num_samples=mcmc_size) + 0.0001 for instance in problem.instances()]
-            log_likelihood = sum([torch.log(l) for l in ls], start=torch.tensor(0.0))
+            eps = torch.tensor(0.00000001)
+            ls = [instance.density(num_samples=mcmc_size) for instance in problem.instances()]
+            log_likelihood = sum([torch.log(l + eps) for l in ls], start=torch.tensor(0.0))
 
             # invert the log_likelihood
             loss = -1 * log_likelihood
