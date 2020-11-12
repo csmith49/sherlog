@@ -15,7 +15,7 @@ decode(I ; decode[Z]) <- latent(I, Z).
 loss(I, O ; reconstruction_loss[I, O]).
 
 # a query to see the generative story
-loss(I, O, L), decode(image, O)?
+loss(image, O, 0.0), decode(image, O)?
 
 # and our observation (implicitly parameterized by the dataset decl.)
 !evidence(image, class in dataset) loss(image, O, 0.0), decode(image, O).
