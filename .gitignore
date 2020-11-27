@@ -6,5 +6,4 @@ lib/watson/.merlin
 lib/sherlog/.merlin
 lib/interface/.merlin
 lib/data/.merlin
-run
-server
+.venv
