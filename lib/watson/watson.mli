@@ -3,14 +3,17 @@
 (** {1 Syntax} *)
 
 module Term : sig
-    type t =
+    type value =
         | Variable of string
         | Constant of string
         | Integer of int
         | Float of float
         | Boolean of bool
-        | Function of string * t list
-    (** terms are first-order objects *)
+    and t =
+        | Wildcard
+        | Unit
+        | Value of value
+        | Pair of t * t
 
     val to_string : t -> string
     (** [to_string term] produces a human-readable string representation of [term] *)
@@ -29,6 +32,9 @@ module Term : sig
 
     val occurs : string -> t -> bool
     (** [occurs id term] returns [true] if [Variable id] is a sub-term of [term] and [false] otherwise *)
+
+    val map : (value -> t) -> t -> t
+    (** [map f term] applies function [f] to all values in [term] while preserving the structure*)
 end
 
 module Map : sig

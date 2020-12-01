@@ -42,7 +42,7 @@ let socket address port = let open Lwt_unix in
     let addr = ADDR_INET (address, port) in
     let _ = bind sock addr in
     let _ = listen sock 10 in
-    let _ = setsockopt sock SO_REUSEADDR in (* ensures we can restart the server quickly *)
+    let _ = setsockopt sock SO_REUSEADDR true in (* ensures we can restart the server quickly *)
         sock
 
 (* build the server *)

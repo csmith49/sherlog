@@ -82,7 +82,7 @@ let simplify_introduction
     ~body:body =
         let open Watson in
         (* fresh var to represent the value getting introduced *)
-        let var = Term.Variable "_I" in
+        let var = Term.Value (Term.Variable "_I") in
         (* building the introduction atom *)
         let obligation = Obligation.Assign f in
         let intro = Atom.Intro (obligation, parameters, context, [var]) in
@@ -101,7 +101,7 @@ let simplify_fuzzy_fact
         ~arguments:arguments
         ~generator:"bernoulli"
         ~parameters:[probability]
-        ~context:(Watson.Term.Constant relation :: arguments)
+        ~context:(Watson.Term.Value (Watson.Term.Constant relation) :: arguments)
         ~body:[]
 
 type t = {

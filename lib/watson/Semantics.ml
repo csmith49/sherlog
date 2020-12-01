@@ -43,7 +43,8 @@ module Rule = struct
         let map = vars
             |> CCList.map (fun v -> 
                     let v' = v ^ (string_of_int !renaming_index) in
-                    (v, Term.Variable v')
+                    let term = Term.Value (Term.Variable v') in
+                    (v, term)
                 )
             |> Map.of_list in
         apply map rule

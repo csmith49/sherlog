@@ -116,11 +116,11 @@ module Compile = struct
     (* step 1: get per-conjunct sub *)
     let per_conjunct_renaming (dnf : named_dnf) : Watson.Map.t list =
         let f (name, intro) = match intro.value with
-            | Watson.Term.Variable target -> (Some (target, Watson.Term.Variable name), intro)
+            | Watson.Term.Value (Watson.Term.Variable target) -> 
+                (Some (target, Watson.Term.Value (Watson.Term.Variable name)), intro)
             | _ -> (None, intro) in
-        dnf |> map f
-            |> tags
-            |> CCList.map (fun assocs -> assocs
+        let renamings = dnf |> map f |> tags in
+        renamings |> CCList.map (fun assocs -> assocs
                 |> CCList.keep_some
                 |> Watson.Map.of_list
             )
@@ -154,7 +154,7 @@ module Compile = struct
 
     let observations (dnf : connected_dnf) : observation list =
         let f ( (name, _, _), intro ) = match intro.value with
-            | Watson.Term.Variable _ -> (None, intro)
+            | Watson.Term.Value Watson.Term.Variable _ -> (None, intro)
             | (_ as term) -> (Some (name, term), intro) in
         dnf |> map f
             |> tags

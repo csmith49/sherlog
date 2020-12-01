@@ -4,38 +4,54 @@ module Term = struct
     open Interface.JSON
 
     let rec to_json = function
-        | Watson.Term.Variable x -> `Assoc [
-            mk_type "variable";
-            x |> Make.string |> mk_value;
+        | Watson.Term.Value v -> begin match v with
+            | Watson.Term.Variable x -> `Assoc [
+                mk_type "variable";
+                x |> Make.string |> mk_value;
+            ]
+            | Integer i -> `Assoc [
+                mk_type "integer";
+                i |> Make.int |> mk_value;
+            ]
+            | Float f -> `Assoc [
+                mk_type "float";
+                f |> Make.float |> mk_value;
+            ]
+            | Boolean b -> `Assoc [
+                mk_type "boolean";
+                b |> Make.bool |> mk_value;
+            ]
+            | Constant c -> `Assoc [
+                mk_type "constant";
+                c |> Make.string |> mk_value;
+            ] end
+        | Unit -> `Assoc [mk_type "unit"]
+        | Pair (l, r) -> `Assoc [
+            mk_type "pair";
+            ("left", l |> to_json);
+            ("right", r |> to_json);
         ]
-        | Integer i -> `Assoc [
-            mk_type "integer";
-            i |> Make.int |> mk_value;
-        ]
-        | Float f -> `Assoc [
-            mk_type "float";
-            f |> Make.float |> mk_value;
-        ]
-        | Boolean b -> `Assoc [
-            mk_type "boolean";
-            b |> Make.bool |> mk_value;
-        ]
-        | Constant c -> `Assoc [
-            mk_type "constant";
-            c |> Make.string |> mk_value;
-        ]
-        | Function (f, fs) -> `Assoc [
-            mk_type "function";
-            ("function", `String f);
-            ("arguments", fs |> CCList.map to_json |> Make.list);
-        ]
+        | Wildcard -> `Null
     and mk_type typ = ("type", `String typ)
     and mk_value v = ("value", v)
 
     let rec of_json = function
+        | (`Assoc _) as json -> begin match Parse.(find string "type" json) with
+            | Some "unit" -> Some Watson.Term.Unit
+            | Some "pair" ->
+                let l = Parse.(find of_json "left" json) in
+                let r = Parse.(find of_json "right" json) in
+                begin match l, r with
+                    | Some l, Some r -> Some (Watson.Term.Pair (l, r))
+                    | _ -> None
+                end
+            | Some _ -> value_of_json json
+            | None -> None
+        end
+        | _ -> None
+    and value_of_json = function
         | (`Assoc _) as json ->
-            (* get the type *)
-            begin match Parse.(find string "type" json) with
+            let value = begin match Parse.(find string "type" json) with
                 | Some "integer" -> json
                     |> Parse.(find int "value")
                     |> CCOpt.map (fun i -> Watson.Term.Integer i)
@@ -50,13 +66,9 @@ module Term = struct
                     |> CCOpt.map (fun c -> Watson.Term.Constant c)
                 | Some "variable" -> json
                     |> Parse.(find string "value")
-                    |> CCOpt.map (fun x -> Watson.Term.Variable x)
-                | Some "function" ->
-                    let f = Parse.(find string "function" json) in
-                    let args = Parse.(find (list of_json) "arguments" json) in
-                    CCOpt.map2 (fun f -> fun args -> Watson.Term.Function (f, args)) f args
-                | _ -> None
-            end
+                    |> CCOpt.map (fun x -> Watson.Term.Variable x) 
+                | _ -> None end in
+                CCOpt.map (fun v -> Watson.Term.Value v) value
         | _ -> None
 end
 
