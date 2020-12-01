@@ -1,7 +1,7 @@
 {
     open Parser
 
-    exception ParseError of string
+    exception Error of string
 }
 
 (* whitespace *)
@@ -24,7 +24,7 @@ let digit = ['0'-'9']
 let neg = '-'
 
 (* lexing rules *)
-rule read = parse
+rule read = parse 
     (* whitespace *)
     | (space | tab )+ { read lexbuf }
     | newline { Lexing.new_line lexbuf; read lexbuf }
@@ -36,9 +36,11 @@ rule read = parse
     | "[" { LBRACKET }
     | "]" { RBRACKET }
     (* symbols *)
+    | underscore { BLANK }
     | ";" { SEMICOLON }
-    | "<-" | ":-" { ARROW }
-    | ":-" { ARROW } (* not the default, but we should at least support tradition *)
+    | "<-" { ARROW }
+    | ":-" { ARROW }
+    | "::" { DOUBLECOLON }
     | ":" { COLON }
     | "@" { AT }
     | "." { PERIOD }
@@ -62,4 +64,4 @@ rule read = parse
     | upper (lower | upper | digit | underscore)* prime* { VARIABLE (Lexing.lexeme lexbuf)}
     | lower (lower | upper | digit | underscore)* { SYMBOL (Lexing.lexeme lexbuf) }
     (* escape case *)
-    | _ { raise (ParseError ("Found " ^ (Lexing.lexeme lexbuf) ^ ": don't know how to handle")) }
+    | _ { raise (Error ("Found " ^ (Lexing.lexeme lexbuf) ^ ": don't know how to handle")) }

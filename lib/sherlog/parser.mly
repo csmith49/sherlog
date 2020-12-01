@@ -45,6 +45,8 @@
 
 // and colons for separating arguments and the like
 %token COLON
+%token DOUBLECOLON
+%token BLANK
 %token IN
 
 
@@ -53,14 +55,22 @@
 %%
 
 // core logic programming
-term :
+value :
     | TRUE { Term.Boolean true }
     | FALSE { Term.Boolean false }
     | f = FLOAT { Term.Float f }
-    | i = INTEGER { Term.Integer i} 
+    | i = INTEGER { Term.Integer i }
     | s = SYMBOL { Term.Constant s }
     | x = VARIABLE { Term.Variable x }
-    | f = SYMBOL; LPARENS; args = separated_list(COMMA, term); RPARENS { Term.Function (f, args) }
+    ;
+
+term :
+    | v = value; DOUBLECOLON; t = term { Term.Pair (Term.Value v, t) }
+    | BLANK; DOUBLECOLON; t = term { Term.Pair (Term.Wildcard, t) }
+    | v = value { Term.Value v }
+    | LBRACKET; RBRACKET { Term.Unit }
+    | BLANK { Term.Wildcard }
+    | LPARENS; t = term; RPARENS { t }
     ;
 terms : ts = separated_list(COMMA, term) { ts } ;
 
@@ -81,7 +91,8 @@ query : atoms = atoms; QMARK { atoms } ;
 intro_term : f = SYMBOL; LBRACKET; params = terms; RBRACKET { (f, params) } ;
 intro_atom : 
     | rel = SYMBOL; LPARENS; args = terms; SEMICOLON; it = intro_term; RPARENS {
-        let f, params = it in let context = (Term.Constant rel) :: (args @ params) in
+        let rel_term = Term.Value (Term.Constant rel) in
+        let f, params = it in let context = rel_term :: (args @ params) in
         (rel, args, f, params, context)
     }
     | rel = SYMBOL; LPARENS; args = terms; SEMICOLON; it = intro_term; AT; context = terms; RPARENS {
