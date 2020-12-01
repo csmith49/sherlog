@@ -18,24 +18,19 @@ class Variable:
     def indexed(self, index):
         return f"{self.name}_{index}"
 
-class Function:
-    def __init__(self, symbol, arguments):
-        self.symbol = symbol
-        self.arguments = arguments
-
-    def __eq__(self, other):
-        try:
-            (self.symbol == other.symbol) and all(l == r for l, r in zip(self.arguments, other.arguments))
-        except: False
-
-    def __str__(self):
-        return f"{self.symbol}({', '.join(self.arguments)})"
-
 # conversion
 def of_json(json):
     type = json["type"]
+    # unit
+    if type == "unit":
+        return None
+    # pairs
+    elif type == "pair":
+        left = of_json(json["left"])
+        right = of_json(json["right"])
+        return (left, right)
     # variables
-    if type == "variable":
+    elif type == "variable":
         name = json["value"]
         return Variable(name)
     # functions
@@ -55,6 +50,6 @@ def of_json(json):
     # constants
     elif type == "constant":
         return json["value"]
-    # crash
+    # crash - e.g., no support for wildcards
     else:
         raise NotImplementedError()
