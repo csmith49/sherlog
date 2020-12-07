@@ -88,11 +88,10 @@ class Observation:
         -------
         torch.tensor
         '''
-        return torch.dist(
-            self.to_tensor(context, semantics.torch.algebra),
-            self.project_context_to_tensor(context, algebra),
-            p=p
-        )
+        sum = 0.0
+        for name, value in self.evaluate(context, algebra):
+            sum += (value - context[name]) ** p
+        return sum ** (1/p)
 
     def similarity(self, context, algebra):
         '''Computes the cosine similarity between the observation and the context.
