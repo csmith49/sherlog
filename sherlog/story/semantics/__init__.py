@@ -1,5 +1,5 @@
 from . import torch, dice, pyro, storchastic
+from .semantics import convert_arguments
 
-torch = torch.run
-dice = dice.run
-pyro = pyro.run
+def evaluate(value, context, algebra):
+    return convert_arguments([value], context, algebra)[0]

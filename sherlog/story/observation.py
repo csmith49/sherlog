@@ -1,4 +1,5 @@
 from . import term
+from . import semantics
 import torch
 
 class Observation:
@@ -36,7 +37,7 @@ class Observation:
         observations = {entry["variable"] : term.of_json(entry["value"]) for entry in json}
         return cls(observations)
 
-    def evaluate(self, context):
+    def evaluate(self, context, algebra):
         '''Evaluates an observation in a context.
 
         Parameters
@@ -48,17 +49,9 @@ class Observation:
         (string, Value) dict
         '''
         for name, value in self.observations.items():
-            # if the value is a string, look it up
-            if isinstance(value, str):
-                yield (name, context.lookup_value(value))
-            # otherwise, just lift it
-            else:
-                if not torch.is_tensor(value):
-                    yield (name, torch.tensor(value))
-                else:
-                    yield (name, value)
+            yield (name, semantics.evaluate(value, context, algebra))
 
-    def to_tensor(self, context):
+    def to_tensor(self, context, algebra):
         '''Converts an observation to a tensor by evaluating in a context.
 
         Parameters
@@ -69,7 +62,7 @@ class Observation:
         -------
         torch.tensor
         '''
-        return torch.tensor([value.value for _, value in self.evaluate(context)])
+        return torch.tensor([value for _, value in self.evaluate(context, algebra)])
 
     def project_context_to_tensor(self, context):
         '''Converts a context to a tensor via projection of the keys of the observation.
@@ -82,7 +75,7 @@ class Observation:
         -------
         torch.tensor
         '''
-        return torch.tensor([context[name].value for name, _ in self.items()])
+        return torch.tensor([context[name] for name, _ in self.items()])
 
     def distance(self, context, p=1):
         '''Computes the L-p distance between the observation and the context.
@@ -96,7 +89,7 @@ class Observation:
         torch.tensor
         '''
         return torch.dist(
-            self.to_tensor(context),
+            self.to_tensor(context, semantics.torch.algebra),
             self.project_context_to_tensor(context),
             p=p
         )
@@ -113,7 +106,7 @@ class Observation:
         torch.tensor
         '''
         return torch.cosine_similarity(
-            self.to_tensor(context),
+            self.to_tensor(context, semantics.torch.algebra),
             self.project_context_to_tensor(context),
             dim=0
         )
