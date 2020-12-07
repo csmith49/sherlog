@@ -64,7 +64,7 @@ class Observation:
         '''
         return torch.tensor([value for _, value in self.evaluate(context, algebra)])
 
-    def project_context_to_tensor(self, context):
+    def project_context_to_tensor(self, context, algebra):
         '''Converts a context to a tensor via projection of the keys of the observation.
 
         Parameters
@@ -75,9 +75,9 @@ class Observation:
         -------
         torch.tensor
         '''
-        return torch.tensor([context[name] for name, _ in self.items()])
+        return torch.tensor([algebra.untag(context[name]) for name, _ in self.items()])
 
-    def distance(self, context, p=1):
+    def distance(self, context, algebra, p=1):
         '''Computes the L-p distance between the observation and the context.
 
         Parameters
@@ -90,11 +90,11 @@ class Observation:
         '''
         return torch.dist(
             self.to_tensor(context, semantics.torch.algebra),
-            self.project_context_to_tensor(context),
+            self.project_context_to_tensor(context, algebra),
             p=p
         )
 
-    def similarity(self, context):
+    def similarity(self, context, algebra):
         '''Computes the cosine similarity between the observation and the context.
 
         Parameters
@@ -107,6 +107,6 @@ class Observation:
         '''
         return torch.cosine_similarity(
             self.to_tensor(context, semantics.torch.algebra),
-            self.project_context_to_tensor(context),
+            self.project_context_to_tensor(context, algebra),
             dim=0
         )

@@ -13,7 +13,7 @@ def magic_box(log_probs):
     tau = sum(log_probs, start=torch.tensor(0.0))
     return torch.exp(tau - tau.detach())
 
-def viterbi_objective(observations, context):
+def viterbi_objective(observations, context, algebra):
     '''Objective that - when minimized - maximizes the Viterbi evidence of the observations.
 
     Parameters
@@ -26,7 +26,7 @@ def viterbi_objective(observations, context):
     -------
     (tensor, string list)
     '''
-    distances = [obs.distance(context).reshape(1) for obs in observations]
+    distances = [obs.distance(context, algebra).reshape(1) for obs in observations]
     variables = chain(*(obs.variables() for obs in observations))
     return torch.min(torch.cat(distances), dim=0).values, variables
 
@@ -185,7 +185,7 @@ class Story:
         context = self.run(context, semantics.pyro.run)
         # build the site for the observations
         similarities = [
-            obs.similarity(context) for obs in self.observations
+            obs.similarity(context, semantics.pyro.algebra) for obs in self.observations
         ]
         context["sherlog:result"] = pyro.deterministic("sherlog:result", max(similarities))
         return context
@@ -226,11 +226,11 @@ class Story:
         # for each objective, compute the cost and the log_probs of all stochastic dependencies
         cost_nodes = []
         for obj in objectives:
-            cost, vars_used = obj(self.observations, context)
+            cost, vars_used = obj(self.observations, context, semantics.dice.algebra)
             log_probs = []
             for dep in self.dependencies(*vars_used):
-                if context[dep].is_stochastic:
-                    log_probs.append(context[dep].log_prob)
+                if context[dep][-1] is not None:
+                    log_probs.append(context[dep][-1])
             cost_nodes.append( (cost, log_probs) )
 
         # build the standard surrogate
