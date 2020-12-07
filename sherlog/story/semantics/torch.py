@@ -1,5 +1,6 @@
 from .semantics import Algebra, run_factory
 import torch.distributions as dists
+from torch import tensor, is_tensor
 
 def tag(value):
     if not is_tensor(value): return tensor(value)

@@ -7,7 +7,7 @@ from torch import is_storage
 from .statement import Statement
 from .observation import Observation
 from .context import Context
-from .semantics import torch, dice, pyro
+from . import semantics
 
 def magic_box(log_probs):
     tau = sum(log_probs, start=torch.tensor(0.0))
@@ -182,7 +182,7 @@ class Story:
         -------
         Context
         '''
-        context = self.run(context, pyro.run)
+        context = self.run(context, semantics.pyro.run)
         # build the site for the observations
         similarities = [
             obs.similarity(context) for obs in self.observations
@@ -222,7 +222,7 @@ class Story:
         -------
         tensor
         '''
-        context = self.run(context, dice.run, **kwargs)
+        context = self.run(context, semantics.dice.run, **kwargs)
         # for each objective, compute the cost and the log_probs of all stochastic dependencies
         cost_nodes = []
         for obj in objectives:
