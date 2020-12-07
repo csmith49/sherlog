@@ -50,14 +50,14 @@ def run_factory(algebra):
         # convert the arguments
         args = convert_arguments(args, context, algebra)
 
-        # find the callable
-        f = lookup_callable(f, context, algebra)
-
         # construct callable keyword arguments
         try:
             kwargs = kwargs[f]
         except KeyError:
             kwargs = {}
+
+        # find the callable
+        f = lookup_callable(f, context, algebra)
 
         # return the resulting value
         return f(*args, target=target, **kwargs)

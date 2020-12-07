@@ -7,7 +7,7 @@ from alive_progress import alive_bar
 from time import sleep
 from sherlog.instrumentation import Instrumenter
 import storch
-from storch.method import Reparameterization
+from storch.method import Reparameterization, ScoreFunction
 
 hashids = Hashids()
 
@@ -60,7 +60,7 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
             "method" : Reparameterization
         },
         "bernoulli" : {
-            "method" : Reparameterization
+            "method" : ScoreFunction
         }
     }
 
