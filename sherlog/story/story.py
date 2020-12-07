@@ -182,7 +182,7 @@ class Story:
         -------
         Context
         '''
-        context = self.run(context, pyro)
+        context = self.run(context, pyro.run)
         # build the site for the observations
         similarities = [
             obs.similarity(context) for obs in self.observations
@@ -222,7 +222,7 @@ class Story:
         -------
         tensor
         '''
-        context = self.run(context, dice, **kwargs)
+        context = self.run(context, dice.run, **kwargs)
         # for each objective, compute the cost and the log_probs of all stochastic dependencies
         cost_nodes = []
         for obj in objectives:
