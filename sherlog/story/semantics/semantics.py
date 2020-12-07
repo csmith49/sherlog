@@ -61,3 +61,4 @@ def run_factory(algebra):
 
         # return the resulting value
         return f(*args, target=target, **kwargs)
+    return run
