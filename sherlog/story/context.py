@@ -1,48 +1,8 @@
 from torch import tensor, is_tensor
 
-class Value:
-    def __init__(self, value, distribution, log_prob=None):
-        '''Values are the intermediate representations of a run of a story.
-
-        Parameters
-        ----------
-        value : object
-
-        distribution : pyro.sample
-
-        log_prob : torch.tensor (default None)
-        '''
-        # lift the value to a tensor, if need be
-        if not is_tensor(value):
-            self.value = tensor(value)
-        else:
-            self.value = value
-        self.distribution = distribution
-        self.log_prob = log_prob
-
-    @classmethod
-    def lift(cls, value):
-        '''Lifts a value to a Value object.
-
-        Parameters
-        ----------
-        value : object
-        '''
-        return cls(value, value)
-
-    @property
-    def is_stochastic(self):
-        '''True if the value has a log probability, false otherwise.
-
-        Returns
-        -------
-        boolean
-        '''
-        return (self.log_prob is not None)
-
 class Context:
     def __init__(self, maps=()):
-        '''Contexts maintain maps from identifiers to Value objects.
+        '''Contexts maintain maps from identifiers to values.
 
         Parameters
         ----------
@@ -58,9 +18,8 @@ class Context:
         ----------
         variable : string
 
-        value : Value
+        value : obj
         '''
-        if not isinstance(value, Value): raise TypeError()
         self.store[variable] = value
 
     def __setitem__(self, variable, value):

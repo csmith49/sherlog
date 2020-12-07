@@ -6,7 +6,8 @@ from pyro.infer.predictive import Predictive
 from torch import is_storage
 from .statement import Statement
 from .observation import Observation
-from .context import Context, Value
+from .context import Context
+from .semantics import torch, dice, pyro
 
 def magic_box(log_probs):
     tau = sum(log_probs, start=torch.tensor(0.0))
@@ -153,7 +154,7 @@ class Story:
             resolved_variables.add(stmt.variable.name)
             initial_statements += [s for s in self.dataflow(stmt) if is_resolved(s)]
 
-    def run(self, context):
+    def run(self, context, semantics, **kwargs):
         '''Executes the story over the provided context, returning a fresh context with the execution stored.
 
         Parameters
@@ -166,7 +167,7 @@ class Story:
         '''
         context = context.clone()
         for statement in self.topological_statements():
-            name, value = statement.run(context)
+            name, value = statement.run(context, semantics, **kwargs)
             context[name] = value
         return context
 
@@ -181,16 +182,12 @@ class Story:
         -------
         Context
         '''
-        context = self.run(context)
+        context = self.run(context, pyro)
         # build the site for the observations
         similarities = [
             obs.similarity(context) for obs in self.observations
         ]
-        value = max(similarities)
-        distribution = pyro.deterministic("sherlog:result", value)
-        variables = chain(*(obs.variables() for obs in self.observations))
-        log_probs = [context[var].log_prob for var in variables if context[var].is_stochastic]
-        context["sherlog:result"] = Value(value, distribution, log_probs)
+        context["sherlog:result"] = pyro.deterministic("sherlog:result", max(similarities))
         return context
 
     def likelihood(self, context, offset=1, num_samples=100):
@@ -212,7 +209,7 @@ class Story:
         results = predictive(context)["sherlog:result"]
         return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
 
-    def loss(self, context, objectives=(viterbi_objective,)):
+    def loss(self, context, objectives=(viterbi_objective,), **kwargs):
         '''A function that - when differentiated - gives the gradient of the parameters wrt the sum of the objectives.
 
         Parameters
@@ -225,7 +222,7 @@ class Story:
         -------
         tensor
         '''
-        context = self.run(context)
+        context = self.run(context, dice, **kwargs)
         # for each objective, compute the cost and the log_probs of all stochastic dependencies
         cost_nodes = []
         for obj in objectives:
@@ -242,15 +239,4 @@ class Story:
             mb_c = magic_box(log_probs)
             surrogate += mb_c * cost
 
-        # we'll compute a constant baseline
-        b_w = torch.mean(
-            torch.tensor([cost for (cost, _) in cost_nodes])
-        )
-        # subtract it from each stochastic node to form the actual baseline
-        baseline = torch.tensor(0.0)
-        for var in self.variables():
-            if context[var].is_stochastic:
-                mb_w = 1 - magic_box([context[var].log_prob])
-                baseline += mb_w * b_w
-
-        return (surrogate)
+        return surrogate
