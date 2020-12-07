@@ -1,5 +1,4 @@
 from . import term
-from .generation import Generation
 
 class Statement:
     def __init__(self, variable, dependencies, function, arguments):

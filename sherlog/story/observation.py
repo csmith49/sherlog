@@ -1,5 +1,4 @@
 from . import term
-from .context import Value
 import torch
 
 class Observation:
@@ -54,7 +53,10 @@ class Observation:
                 yield (name, context.lookup_value(value))
             # otherwise, just lift it
             else:
-                yield (name, Value.lift(value))
+                if not torch.is_tensor(value):
+                    yield (name, torch.tensor(value))
+                else:
+                    yield (name, value)
 
     def to_tensor(self, context):
         '''Converts an observation to a tensor by evaluating in a context.
