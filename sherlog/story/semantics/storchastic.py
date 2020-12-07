@@ -1,6 +1,7 @@
 from .semantics import Algebra, run_factory
 from torch import tensor, is_tensor
 import torch.distributions as dists
+import storch
 
 def tag(value):
     if not is_tensor(value): return tensor(value)
@@ -33,3 +34,10 @@ algebra = Algebra(
     }
 )
 run = run_factory(algebra)
+
+def cost(name, value):
+    storch.add_cost(value, name)
+    return value
+
+def backward():
+    return storch.backward()

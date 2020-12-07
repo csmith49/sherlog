@@ -240,3 +240,16 @@ class Story:
             surrogate += mb_c * cost
 
         return surrogate
+
+    def storch(self, context, objectives=(viterbi_objective,), **kwargs):
+        context = self.run(context, semantics.storchastic.run, **kwargs)
+
+        # register the costs
+        for i, obj in enumerate(objectives):
+            cost, _ = obj(self.observations, context, semantics.storchastic.algebra)
+            semantics.storchastic.cost(f"c_{i}", cost)
+
+        # compute the gradient
+        loss = semantics.storchastic.backward()
+
+        return loss, context

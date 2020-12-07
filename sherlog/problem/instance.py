@@ -15,5 +15,9 @@ class Instance:
         losses = torch.stack(losses)
         return torch.mean(losses)
 
+    def storch(self, **kwargs):
+        loss, context = self.story.storch(self.context, **kwargs)
+        return loss, context
+
     def likelihood(self, num_samples=100):
         return self.story.likelihood(self.context, num_samples=num_samples)
