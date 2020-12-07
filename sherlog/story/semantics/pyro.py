@@ -5,7 +5,7 @@ import pyro.distributions as dists
 
 def tag(value):
     if not is_tensor(value): return tensor(value)
-    else: return tensor
+    else: return value
 
 def untag(value): return value
 
