@@ -77,7 +77,8 @@ class Context:
         for map in self._maps:
             try:
                 value = map[name]
-                return Value.lift(value)
+                if is_tensor(value): return value
+                else: return tensor(value)
             except KeyError: pass
         
         # by default, raise KeyError if we don't find what we're looking for
