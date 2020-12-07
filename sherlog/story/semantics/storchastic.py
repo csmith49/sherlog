@@ -8,17 +8,17 @@ def tag(value):
 
 def untag(value): return value
 
-def normal(mean, sdev, *_, target=None, method=None, method_args={}, **_):
+def normal(mean, sdev, *args, target=None, method=None, method_args={}, **kwargs):
     dist = dists.Normal(mean, sdev)
     method = method(target, **method_args)
     return method(dist)
 
-def beta(alpha, beta, *_, target=None, method=None, method_args={}, **_):
+def beta(alpha, beta, *args, target=None, method=None, method_args={}, **kwargs):
     dist = dists.Beta(alpha, beta)
     method = method(target, **method_args)
     return method(dist)
 
-def bernoulli(prob, *_, target=None, method=None, method_args={}, **_):
+def bernoulli(prob, *args, target=None, method=None, method_args={}, **kwargs):
     dist = dists.Bernoulli(prob)
     method = method(target, **method_args)
     return method(dist)

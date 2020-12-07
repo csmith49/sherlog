@@ -8,15 +8,15 @@ def tag(value):
 def untag(value):
     return value
 
-def normal(mean, sdev, *_, **_):
+def normal(mean, sdev, *args, **kwargs):
     dist = dists.Normal(mean, sdev)
     return dist.rsample()
 
-def beta(alpha, beta, *_, **_):
+def beta(alpha, beta, *args, **kwargs):
     dist = dists.Beta(alpha, beta)
     return dist.rsample()
 
-def bernoulli(prob, *_, relax=False, temperature=0.1, **_):
+def bernoulli(prob, *args, relax=False, temperature=0.1, **kwargs):
     if relax:
         temp = tensor(temperature)
         dist = dists.RelaxedBernoulli(temp, prob)
