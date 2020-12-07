@@ -9,15 +9,15 @@ def tag(value):
 
 def untag(value): return value
 
-def normal(mean, sdev, *args, target=target, **kswarg):
+def normal(mean, sdev, *args, target=None, **kswarg):
     dist = dists.Normal(mean, sdev)
     return pyro.sample(target, dist)
 
-def beta(alpha, beta, *args, target=target, **kwargs):
+def beta(alpha, beta, *args, target=None, **kwargs):
     dist = dists.Beta(alpha, beta)
     return pyro.sample(target, dist)
 
-def bernoulli(prob, *args, target=target, **kwargs):
+def bernoulli(prob, *args, target=None, **kwargs):
     dist = dists.Bernoulli(prob)
     return pyro.sample(target, dist)
 
