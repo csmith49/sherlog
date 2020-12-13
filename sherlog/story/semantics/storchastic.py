@@ -2,6 +2,7 @@ from .semantics import Algebra, run_factory
 from torch import tensor, is_tensor
 import torch.distributions as dists
 import storch
+from storch.method import Reparameterization, ScoreFunction
 
 def tag(value):
     if not is_tensor(value): return tensor(value)
@@ -9,17 +10,17 @@ def tag(value):
 
 def untag(value): return value
 
-def normal(mean, sdev, *args, target=None, method=None, method_args={}, **kwargs):
+def normal(mean, sdev, *args, target=None, method=Reparameterization, method_args={}, **kwargs):
     dist = dists.Normal(mean, sdev)
     method = method(target, **method_args)
     return method(dist)
 
-def beta(alpha, beta, *args, target=None, method=None, method_args={}, **kwargs):
+def beta(alpha, beta, *args, target=None, method=Reparameterization, method_args={}, **kwargs):
     dist = dists.Beta(alpha, beta)
     method = method(target, **method_args)
     return method(dist)
 
-def bernoulli(prob, *args, target=None, method=None, method_args={}, **kwargs):
+def bernoulli(prob, *args, target=None, method=ScoreFunction, method_args={}, **kwargs):
     dist = dists.Bernoulli(prob)
     method = method(target, **method_args)
     return method(dist)

@@ -56,12 +56,6 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
     })
 
     storch_args = {
-        "beta" : {
-            "method" : Reparameterization
-        },
-        "bernoulli" : {
-            "method" : ScoreFunction
-        }
     }
 
     with alive_bar(len(dataset)) as bar:
