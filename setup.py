@@ -16,6 +16,7 @@ setup(name='sherlog',
           "pandas",
           "alive-progress",
           "click",
-          "hashids"
+          "hashids",
+          "networkx"
       ],
       zip_safe=False)
