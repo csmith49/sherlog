@@ -1,9 +1,9 @@
 from .namespace import Namespace
 from .parameter import Parameter
 from .evidence import Evidence
-from .instance import Instance
-from ..story import Story, Context
-from ..engine import register, query
+from .observation import Observation
+from .. import interface
+from ..engine import Model, value, Store
 
 import torch
 import pickle
@@ -30,8 +30,6 @@ class Problem:
         self._evidence = evidence
         self.program = program
 
-        register(self.program)
-
     @classmethod
     def of_json(cls, json):
         '''Builds a problem from a JSON-like object.
@@ -50,36 +48,14 @@ class Problem:
         program = json["program"]
         return cls(parameters=parameters, namespaces=namespaces, evidence=evidence, program=program)
 
-    def parameters(self):
-        '''Returns an iterable over all tuneable parameters in-scope.
-
-        Returns
-        -------
-        torch.tensor iterable
-        '''
-        for _, parameter in self._parameters.items():
-            yield parameter.value
-        for _, obj in self._namespace.items():
-            if hasattr(obj, "parameters"):
-                yield from obj.parameters()
-
-    def evidence(self):
-        '''Returns an iterable over all concretized evidence.
-
-        Returns
-        -------
-        (JSON-like object, (string, torch.tensor) dict) iterable
-        '''
+    def stories(self):
         for evidence in self._evidence:
-            yield from evidence.concretize(self._namespace)
-
-    def instances(self):
-        for atoms, map in self.evidence():
-            story, observations = query(atoms)
-            story =  Story.of_json(story, observations)
-            param_map = {n : p.value for n, p in self._parameters.items()}
-            context = Context(maps=(map, param_map, self._namespace))
-            yield Instance(story, context)
+            result = interface.query(self.program, evidence.atoms)
+            model = Model.of_json(result["model"])
+            observations = [Observation.of_json(obs) for obs in result["observations"]]
+            for context in evidence.concretize(self._namespace):
+                store = Store(external=(context, self.parameter_map, self._namespace))
+                yield model, observations, store
 
     def save_parameters(self, filepath):
         '''Writes all parameter values in scope to a file.
@@ -112,14 +88,41 @@ class Problem:
             model = self._namespace[name]
             model.load_state_dict(state_dict)
 
-    def log_likelihood(self, num_samples=100):
-        result = torch.tensor(0.0)
-        for instance in self.instances():
-            result += torch.log(instance.likelihood(num_samples=num_samples))
-        return result
-
     def clamp_parameters(self):
         '''Updates the value of all parameters in-place to satisfy the constraints of their domain.'''
         with torch.no_grad():
             for _, parameter in self._parameters.items():
                 parameter.clamp()
+
+    def parameters(self):
+        '''Returns an iterable over all tuneable parameters in-scope.
+
+        Returns
+        -------
+        torch.tensor iterable
+        '''
+        for _, parameter in self._parameters.items():
+            yield parameter.value
+        for _, obj in self._namespace.items():
+            if hasattr(obj, "parameters"):
+                yield from obj.parameters()
+
+    @property
+    def parameter_map(self):
+        return {n : p.value for n, p in self._parameters.items()}
+
+def load(filepath: str):
+    """Load a problem from a filepath.
+
+    Parameters
+    ----------
+    filepath : str
+
+    Returns
+    -------
+    Problem
+    """
+    with open(filepath, "r") as f:
+        contents = f.read()
+    json = interface.parse(contents)
+    return Problem.of_json(json)

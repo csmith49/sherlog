@@ -27,12 +27,11 @@ class Evidence:
 
         Returns
         -------
-        (JSON-like object, (string, torch.tensor) dict) iterable
+        Dictionary mapping names to external objects
         '''
         if self.is_parameterized: # construct the map for each item in the dataset
             dataset = namespace[self.source]
             for obj in dataset:
-                map = {k : v for k, v in zip(self.bindings, obj)}
-                yield (self.atoms, map)
+                yield {k : v for k, v in zip(self.bindings, obj)}
             pass
-        else: yield (self.atoms, {}) # otherwise, just send the atoms
+        else: yield {} # otherwise, just send a blank map

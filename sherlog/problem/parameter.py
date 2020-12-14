@@ -15,7 +15,7 @@ class Parameter:
         '''
         self.name = name
         self.domain = domain
-        self.value = torch.tensor(1.0, requires_grad=True)
+        self.value = torch.tensor(0.5, requires_grad=True)
         self._epsilon = epsilon
 
     def constraint(self):
