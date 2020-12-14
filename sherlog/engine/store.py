@@ -18,4 +18,11 @@ class Store:
     def __setitem__(self, key, obj):
         if isinstance(key, Variable):
             self._internal[key.name] = obj
-        raise ValueError()
+        else: raise ValueError()
+
+    def lookup_callable(self, name):
+        for external_map in self._external:
+            try:
+                return external_map[name]
+            except KeyError: pass
+        raise KeyError()

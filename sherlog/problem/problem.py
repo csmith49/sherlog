@@ -4,6 +4,7 @@ from .evidence import Evidence
 from .observation import Observation
 from .. import interface
 from ..engine import Model, value, Store
+from ..story import Story
 
 import torch
 import pickle
@@ -54,8 +55,8 @@ class Problem:
             model = Model.of_json(result["model"])
             observations = [Observation.of_json(obs) for obs in result["observations"]]
             for context in evidence.concretize(self._namespace):
-                store = Store(external=(context, self.parameter_map, self._namespace))
-                yield model, observations, store
+                external = (context, self.parameter_map, self._namespace)
+                yield Story(model, observations, external=external)
 
     def save_parameters(self, filepath):
         '''Writes all parameter values in scope to a file.
