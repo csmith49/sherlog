@@ -3,11 +3,31 @@ from . import value
 
 class Statement:
     def __init__(self, target, function, arguments):
+        """An assignment statement of the form `target = function(arguments)`.
+
+        Parameters
+        ----------
+        target : Variable
+        function : string
+        arguments : list of values
+
+        Returns
+        -------
+        Statement
+        """
         self.target = target
         self.function = function
         self.arguments = arguments
 
     def dependencies(self):
+        """Compute variable dependencies.
+
+        A dependency is a variable whose value must be known to evaluate the statement.
+
+        Returns
+        -------
+        Variable iterable
+        """
         for arg in self.arguments:
             if isinstance(arg, value.Variable):
                 yield arg
@@ -35,6 +55,16 @@ class Statement:
 
 class Model:
     def __init__(self, statements):
+        """A collection of statements encoding a generative model.
+
+        Parameters
+        ----------
+        statements : list of Statement objects
+
+        Returns
+        -------
+        Model
+        """
         self._statements = statements
 
         # build the target map
@@ -52,10 +82,28 @@ class Model:
 
     @property
     def statements(self):
+        """An iterable of statements in the model in topological order.
+
+        The order is determined by variable dependencies.
+
+        Returns
+        -------
+        Statement iterable
+        """
         for node in nx.algorithms.dag.topological_sort(self._dataflow_graph):
             yield self._target_map[node]
 
     @classmethod
     def of_json(cls, json):
+        """Builds a model from a JSON-like representation.
+
+        Parameters
+        ----------
+        json : JSON-like object
+
+        Returns
+        -------
+        Model
+        """
         statements = [Statement.of_json(line) for line in json]
         return cls(statements)

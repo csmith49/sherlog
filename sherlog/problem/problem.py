@@ -11,7 +11,7 @@ import pickle
 
 class Problem:
     def __init__(self, parameters, namespaces=None, evidence=None, program=None):
-        '''Object representing a SherLog problem file.
+        """Object representing a SherLog problem file.
 
         Parameters
         ----------
@@ -22,7 +22,7 @@ class Problem:
         evidence : Evidence iterable
 
         program : JSON-like object
-        '''
+        """
         # convert params to name-param map
         self._parameters = {p.name : p for p in parameters}
         # build the namespace obj from the namespaces provided
@@ -33,7 +33,7 @@ class Problem:
 
     @classmethod
     def of_json(cls, json):
-        '''Builds a problem from a JSON-like object.
+        """Build a problem from a JSON-like object.
 
         Parameters
         ----------
@@ -42,7 +42,7 @@ class Problem:
         Returns
         -------
         Problem
-        '''
+        """
         parameters = [Parameter.of_json(p) for p in json["parameters"]]
         namespaces = json["namespaces"]
         evidence = [Evidence.of_json(e) for e in json["evidence"]]
@@ -50,6 +50,12 @@ class Problem:
         return cls(parameters=parameters, namespaces=namespaces, evidence=evidence, program=program)
 
     def stories(self):
+        """Construct all stories encoded by the problem.
+
+        Returns
+        -------
+        Story iterable
+        """
         for evidence in self._evidence:
             result = interface.query(self.program, evidence.atoms)
             model = Model.of_json(result["model"])
@@ -59,12 +65,12 @@ class Problem:
                 yield Story(model, observations, external=external)
 
     def save_parameters(self, filepath):
-        '''Writes all parameter values in scope to a file.
+        """Write all parameter values in scope to a file.
 
         Parameters
         ----------
         filepath : string
-        '''
+        """
         output = { "parameters" : {}, "models" : {} }
         for p, parameter in self._parameters.items():
             output["parameters"][p] = parameter.value
@@ -75,12 +81,12 @@ class Problem:
             pickle.dump(output, f)
 
     def load_parameters(self, filepath):
-        '''Updates (in-place) all parameter values in scope with the values contained in the file.
+        """Update (in-place) all parameter values in scope with the values contained in the file.
 
         Paramters
         ---------
         filepath : string
-        '''
+        """
         with open(filepath, "rb") as f:
             params = pickle.load(f)
         for p, value in params["parameters"].items():
@@ -90,18 +96,18 @@ class Problem:
             model.load_state_dict(state_dict)
 
     def clamp_parameters(self):
-        '''Updates the value of all parameters in-place to satisfy the constraints of their domain.'''
+        """Update the value of all parameters in-place to satisfy the constraints of their domain."""
         with torch.no_grad():
             for _, parameter in self._parameters.items():
                 parameter.clamp()
 
     def parameters(self):
-        '''Returns an iterable over all tuneable parameters in-scope.
+        """Return an iterable over all tuneable parameters in-scope.
 
         Returns
         -------
-        torch.tensor iterable
-        '''
+        tensor iterable
+        """
         for _, parameter in self._parameters.items():
             yield parameter.value
         for _, obj in self._namespace.items():

@@ -1,5 +1,11 @@
 class Variable:
     def __init__(self, name):
+        """Variable from a Sherlog program.
+
+        Parameters
+        ----------
+        name : string
+        """
         self.name = name
 
     def __hash__(self):
@@ -13,6 +19,12 @@ class Variable:
 
 class Constant:
     def __init__(self, name):
+        """Symbolic constant from a Sherlog program.
+
+        Parameters
+        ----------
+        name : string
+        """
         self.name = name
     
     def __eq__(self, other):
@@ -22,6 +34,16 @@ class Constant:
         return self.name
 
 def of_json(json):
+    """Construct a Python object from a JSON representation.
+
+    Parameters
+    ----------
+    json : JSON-like object
+
+    Returns
+    -------
+    Python object
+    """
     # unit
     if json["type"] == "unit": return None
     # pair
