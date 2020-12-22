@@ -1,4 +1,4 @@
-from ..engine import factory
+from ..engine import Algebra
 from torch import tensor, is_tensor
 import torch.distributions as dists
 
@@ -26,7 +26,7 @@ builtins = {
     "normal" : _normal
 }
 
-algebra = factory(
+algebra = Algebra(
     lift,
     unlift,
     builtins

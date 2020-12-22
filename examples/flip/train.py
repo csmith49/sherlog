@@ -6,6 +6,7 @@ from torch.optim import SGD, Adam
 from alive_progress import alive_bar
 from time import sleep
 from sherlog.instrumentation import Instrumenter
+import storch
 
 inst = Instrumenter("likelihood.jsonl", context={"problem" : "flip", "method" : "sgd"})
 hashids = Hashids()
@@ -14,7 +15,7 @@ hashids = Hashids()
 sleep(1)
 
 # load the problem
-problem = sherlog.load_problem_file("./flip.sl")
+problem = sherlog.problem.load("./flip.sl")
 
 @click.command()
 @click.option("--epochs", default=700, help="Number of training epochs")
@@ -32,7 +33,7 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "adam" : Adam
     }[optimizer](problem.parameters(), lr=learning_rate)
 
-    dataset = list(problem.instances()) * epochs
+    dataset = list(problem.stories()) * epochs
 
     instrumenter = Instrumenter("flip-results.jsonl", context={
         "optimizer" : optimizer,
@@ -42,16 +43,16 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
     })
 
     with alive_bar(len(dataset)) as bar:
-        for i, instance in enumerate(dataset):
+        for i, story in enumerate(dataset):
             optim.zero_grad()
-            loss = instance.loss(num_samples=mcmc_size)
-            loss.backward()
+            loss = story.loss()
+            storch.backward()
             optim.step()
             problem.clamp_parameters()
             bar()
 
             if i % 100 == 0:
-                likelihood = problem.log_likelihood(num_samples=500)
+                likelihood = problem.log_likelihood(num_samples=mcmc_size)
                 instrumenter.emit(
                     likelihood=likelihood.item(),
                     step=i,

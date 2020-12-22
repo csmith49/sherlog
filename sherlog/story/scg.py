@@ -1,7 +1,9 @@
-from ..engine import factory
+from ..engine import Algebra
 from torch import tensor, is_tensor, Tensor
 import torch.distributions as dists
 import storch
+from storch.method import Reparameterization, ScoreFunction, Expect, GumbelSoftmax
+
 
 def lift(obj):
     if isinstance(obj, (Tensor, storch.Tensor)): return obj
@@ -9,15 +11,15 @@ def lift(obj):
 
 def unlift(obj): return obj
 
-def _beta(p, q, target=None, method=storch.method.Reparameterization, method_kwargs={}, **kwargs):
+def _beta(p, q, target=None, method=Reparameterization, method_kwargs={}, **kwargs):
     dist = dists.Beta(p, q)
     return method(target.name, **method_kwargs)(dist)
 
-def _bernoulli(p, target=None, method=storch.method.ScoreFunction, method_kwargs={}, **kwargs):
-    dist = dists.Bernoulli(p)
+def _bernoulli(p, target=None, method=GumbelSoftmax, method_kwargs={}, **kwargs):
+    dist = dists.Bernoulli(probs=p)
     return method(target.name, **method_kwargs)(dist)
 
-def _normal(m, s, target=None, method=storch.method.Reparameterization, method_kwargs={}, **kwargs):
+def _normal(m, s, target=None, method=Reparameterization, method_kwargs={}, **kwargs):
     dist = dists.Normal(m, s)
     return method(target.name, **method_kwargs)(dist)
 
@@ -27,7 +29,7 @@ builtins = {
     "normal" : _normal
 }
 
-algebra = factory(
+algebra = Algebra(
     lift,
     unlift,
     builtins

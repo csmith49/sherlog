@@ -26,3 +26,6 @@ class Store:
                 return external_map[name]
             except KeyError: pass
         raise KeyError()
+
+    def __str__(self):
+        return str(self._internal)

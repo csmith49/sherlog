@@ -6,4 +6,4 @@
 from .model import Statement, Model
 from .store import Store
 from . import value
-from .algebra import factory
+from .algebra import Algebra, run, evaluate

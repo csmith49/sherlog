@@ -1,7 +1,11 @@
-from ..engine import factory
+from ..engine import Algebra
 from torch import tensor, is_tensor
 import pyro.distributions as dists
+from pyro.infer.predictive import Predictive
 import pyro
+
+def delta(target, value):
+    return pyro.deterministic(target.name, value)
 
 def lift(obj):
     if not is_tensor(obj): return tensor(obj)
@@ -27,7 +31,7 @@ builtins = {
     "normal" : _normal
 }
 
-algebra = factory(
+algebra = Algebra(
     lift,
     unlift,
     builtins

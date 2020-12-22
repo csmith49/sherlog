@@ -112,6 +112,12 @@ class Problem:
     def parameter_map(self):
         return {n : p.value for n, p in self._parameters.items()}
 
+    def log_likelihood(self, num_samples=1):
+        total = torch.tensor(0.0)
+        for story in self.stories():
+            total += torch.log(story.likelihood(num_samples=num_samples))
+        return total
+
 def load(filepath: str):
     """Load a problem from a filepath.
 

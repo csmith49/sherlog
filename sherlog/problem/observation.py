@@ -1,4 +1,4 @@
-from ..engine import value
+from ..engine import value, evaluate
 
 class Observation:
     def __init__(self, mapping):
@@ -10,3 +10,11 @@ class Observation:
         for obs in json:
             mapping[obs["variable"]] = value.of_json(obs["value"])
         return cls(mapping)
+
+    def variables(self):
+        for k, _ in self.mapping.items():
+            yield value.Variable(k)
+
+    def evaluate(self, store, algebra):
+        for _, v in self.mapping.items():
+            yield evaluate(v, store, algebra)
