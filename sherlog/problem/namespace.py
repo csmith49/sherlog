@@ -9,9 +9,32 @@ class TagError(Exception):
 
 class Register:
     def __init__(self):
+        """A registration object for recording external constants and callables.
+
+        Returns
+        -------
+        Register
+        """
         self._store = {}
 
     def tag(self, obj, name=None):
+        """Tag (and return) an object in the registration system.
+
+        Parameters
+        ----------
+        obj : object
+
+        name : string, optional
+            Defaults to `obj.__name__` if not provided
+
+        Returns
+        -------
+        object
+
+        Raises
+        ------
+        TagError
+        """
         if name is None:
             try: name = obj.__name__
             except AttributeError:

@@ -1,4 +1,6 @@
-from .problem import load_problem_file, Register
+from .problem import Register
+from . import problem
+from . import engine
 import itertools
 
 def batch(data, batch_size=1, magnification=1):

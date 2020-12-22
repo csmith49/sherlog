@@ -3,7 +3,7 @@ import torch.distributions.constraints as constraints
 
 class Parameter:
     def __init__(self, name, domain, epsilon=0.001):
-        '''A parameter is a tuneable symbolic constant in a SherLog program.
+        '''A parameter is a tuneable symbolic constant in a Sherlog program.
 
         Parameters
         ----------
@@ -15,7 +15,7 @@ class Parameter:
         '''
         self.name = name
         self.domain = domain
-        self.value = torch.tensor(1.0, requires_grad=True)
+        self.value = torch.tensor(0.5, requires_grad=True)
         self._epsilon = epsilon
 
     def constraint(self):

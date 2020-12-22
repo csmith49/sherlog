@@ -3,7 +3,7 @@ from json import loads, dumps
 from ..logs import get
 import atexit
 
-logger = get("engine.socket")
+logger = get("interface.socket")
 
 # exception for the socket layer
 class SocketNotBound(Exception):
