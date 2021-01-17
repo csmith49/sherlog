@@ -72,26 +72,14 @@ module Term = struct
         | _ -> None
 end
 
-module Obligation = struct
-    type t = Watson.Obligation.t
+module Guard = struct
+    type t = Watson.Guard.t
 
     open Interface.JSON
 
-    let to_json = function
-        | Watson.Obligation.Assign f -> `Assoc [
-            ("obligation", `String "assign");
-            ("value", `String f);
-        ]
+    let to_json guard = `String (Watson.Guard.to_string guard) 
 
-    let of_json = function
-        | (`Assoc _) as json ->
-            begin match Parse.(find string "obligation" json) with
-                | Some "assign" ->
-                    let value = Parse.(find string "value" json) in
-                    CCOpt.map (fun v -> Watson.Obligation.Assign v) value
-                | _ -> None
-            end
-        | _ -> None
+    let of_json = Parse.string
 end
 
 module Atom = struct
@@ -106,10 +94,10 @@ module Atom = struct
         ("arguments", `List (CCList.map Term.to_json args));]
     | Watson.Atom.Intro (ob, p, c, v) -> `Assoc [
         ("kind", `String "intro");
-        ("obligation", Obligation.to_json ob);
+        ("guard", Guard.to_json ob);
         ("parameters", `List (CCList.map Term.to_json p));
         ("context", `List (CCList.map Term.to_json c));
-        ("values", `List (CCList.map Term.to_json v));
+        ("target", Term.to_json v);
     ]
 
     let of_json = function
@@ -120,12 +108,12 @@ module Atom = struct
                 let args = Parse.(find (list Term.of_json) "arguments" json) in
                     CCOpt.map2 (fun rel -> fun args -> Watson.Atom.Atom (rel, args)) rel args
             | Some "intro" ->
-                let obligation = Parse.(find Obligation.of_json "obligation" json) in
+                let guard = Parse.(find Guard.of_json "guard" json) in
                 let parameters = Parse.(find (list Term.of_json) "parameters" json) in
                 let context = Parse.(find (list Term.of_json) "context" json) in
-                let values = Parse.(find (list Term.of_json) "values" json) in
-                begin match obligation, parameters, context, values with
-                    | Some ob, Some p, Some c, Some v -> Some (Watson.Atom.Intro (ob, p, c, v))
+                let target = Parse.(find Term.of_json "target" json) in
+                begin match guard, parameters, context, target with
+                    | Some ob, Some p, Some c, Some t -> Some (Watson.Atom.Intro (ob, p, c, t))
                     | _ -> None end
             | _ -> None
         end

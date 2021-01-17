@@ -46,8 +46,7 @@ let _ = CCList.iter (fun query ->
             |> CCString.concat ", " in
         let intros = Watson.Proof.Solution.introductions sol in
         let intro_string = intros
-            (* |> CCList.map (fun (ob, v, p) -> let v = CCList.map (Watson.Syntax.Map.apply map) v in let p = CCList.map (Watson.Syntax.Map.apply map) p in (ob, v, p)) *)
-            |> CCList.map (fun (ob, v, p) -> Watson.Obligation.applied_representation v p ob)
+            |> CCList.map (fun (guard, parameters, _, target) -> Watson.Guard.applied_representation target parameters guard)
             |> CCList.rev
             |> CCString.concat "; " in
         let output = if CCString.is_empty intro_string then solution_string else
