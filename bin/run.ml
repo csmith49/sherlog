@@ -1,9 +1,11 @@
 (* references for cmd-line parsing *)
 let filepath = ref ""
 let verbose  = ref false
+let depth    = ref 100
 
 let spec_list = [
     ("--input",   Arg.Set_string filepath, "Input SherLog (.sl) file");
+    ("--depth",   Arg.Set_int depth,   "Sets maximum resolution depth");
     ("--verbose", Arg.Set verbose,         "Enables verbose output");
 ]
 
@@ -33,7 +35,7 @@ let _ = CCList.iter (fun query ->
     let _ = print_endline "Starting resolution..." in
     let proof = query
         |> Watson.Proof.of_query
-        |> Watson.Proof.resolve program in
+        |> Watson.Proof.resolve ~max_depth:!depth program in
     let solutions = Watson.Proof.Solution.of_proof proof in
     let _ = print_endline ("Resolution done. Found " ^ (solutions |> CCList.length |> string_of_int) ^ " solutions.") in
     let _ = CCList.iteri (fun i -> fun sol ->

@@ -124,8 +124,12 @@ module Proof = struct
                 in CCList.map make_node resolutions
             | None -> [Success] end
 
-    let rec resolve_zipper program zipper = match Data.Tree.find is_expandable zipper with
-        | Some zipper ->
+    let depth zipper = zipper
+        |> Data.Tree.path_to_focus
+        |> CCList.length
+
+    let rec resolve_zipper max_depth program zipper = match Data.Tree.find is_expandable zipper with
+        | Some zipper when depth zipper <= max_depth ->
             (* compute the current visible node *)
             let node = zipper |> Data.Tree.focus |> Data.Tree.label in
             (* use the strategy to compute the successor states in the search *)
@@ -133,12 +137,12 @@ module Proof = struct
             let subtree = Data.Tree.Node (node, children) in
             (* rebuild zipper and recurse *)
             let zipper = zipper |> Data.Tree.set_focus subtree in
-            resolve_zipper program zipper
-        | None -> zipper
+            resolve_zipper max_depth program zipper
+        | _ -> zipper
 
-    let resolve program tree = tree
+    let resolve ?max_depth:(depth=CCInt.max_int) program tree = tree
         |> Data.Tree.zipper
-        |> resolve_zipper program
+        |> resolve_zipper depth program
         |> Data.Tree.of_zipper
 
     module Solution = struct

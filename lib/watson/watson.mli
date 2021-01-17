@@ -208,7 +208,7 @@ module Proof : sig
     val of_query : Atom.t list -> t
     (** [of_query atoms] builds an initial, unexplored resolution proof with the intent of answering the conjunctive query [atoms] *)
 
-    val resolve : Program.t -> t -> t
+    val resolve : ?max_depth:int -> Program.t -> t -> t
     (** [resolve program proof] uses the rules in [program] to resolve [proof] by expanding resolution nodes until all leaves in the proof tree are labeled with [Success] or [Failure] *)
 
     module Solution : sig
