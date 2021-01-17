@@ -10,16 +10,14 @@ module Rule = struct
                 |> CCList.map Atom.to_string
                 |> CCString.concat ", " in
             head ^ " ← " ^ body
-        | Rule (Intro (ob, p, _, v) as head, body) ->
+        | Rule (Intro (guard, parameters, _, target) as head, body) ->
             let head = Atom.to_string head in
             let body = body
                 |> CCList.map Atom.to_string
                 |> CCString.concat ", " in
-            let values = v
-                |> CCList.map Term.to_string
-                |> CCString.concat ", " in
-            let obligation = Obligation.applied_representation v p ob in
-            "∃" ^ values ^ " ⊧ " ^ obligation ^ ". " ^ head ^ " ← " ^ body
+            let guard = Guard.applied_representation target parameters guard in
+            let target = target |> Term.to_string in
+            "∃" ^ target ^ " ⊧ " ^ guard ^ ". " ^ head ^ " ← " ^ body
 
     let variables = function
         | Rule (head, body) ->

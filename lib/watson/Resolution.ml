@@ -167,9 +167,9 @@ module Proof = struct
             |> CCList.map Label.map
             |> CCList.fold_left Syntax.Map.compose Syntax.Map.empty
 
-        let introductions sol = sol
+        let introductions solution = solution
             |> CCList.filter_map (fun lbl -> match Label.atom lbl with
-                    | Syntax.Atom.Intro (ob, p, _, v) -> Some (ob, v, p)
+                    | Syntax.Atom.Intro (g, p, c, v) -> Some (g, p, c, v)
                     | _ -> None
                 )
     end
