@@ -48,9 +48,9 @@ class Statement:
         -------
         Statement
         """
-        target = value.Variable(json["variable"])
-        function = json["generation"]["function"]
-        arguments = [value.of_json(arg) for arg in json["generation"]["arguments"]]
+        target = value.Variable(json["target"])
+        semantics = json["semantics"]
+        arguments = [value.of_json(p) for p in json["parameters"])
         return cls(target, function, arguments)
 
 class Model:

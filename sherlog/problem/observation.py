@@ -28,8 +28,8 @@ class Observation:
         Observation
         """
         mapping = {}
-        for obs in json:
-            mapping[obs["variable"]] = value.of_json(obs["value"])
+        for k, v in json.items():
+            mapping[k] = value.of_json(v)
         return cls(mapping)
 
     def variables(self):

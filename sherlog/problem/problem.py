@@ -57,12 +57,12 @@ class Problem:
         Story iterable
         """
         for evidence in self._evidence:
-            result = interface.query(self.program, evidence.atoms)
-            model = Model.of_json(result["model"])
-            observations = [Observation.of_json(obs) for obs in result["observations"]]
             for context in evidence.concretize(self._namespace):
                 external = (context, self.parameter_map, self._namespace)
-                yield Story(model, observations, external=external)
+                for model, observation in interface.query(self.program, evidence.atoms):
+                    model = Model.of_json(model)
+                    observation = Observation.of_json(obsevation)
+                    yield Story(model, observation, external=external)
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
