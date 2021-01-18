@@ -33,7 +33,7 @@ def parse(source: str):
     if response == "failure": raise CommunicationError()
     return response
 
-def query(program, query):
+def query(program, query, max_depth=None):
     """Run a Sherlog program on a query.
 
     Parameters
@@ -52,7 +52,8 @@ def query(program, query):
     message = {
         "command" : "run",
         "program" : program,
-        "query"   : query
+        "query"   : query,
+        "depth"   : max_depth
     }
     response = SOCKET.communicate(message)
     if response == "failure": raise CommunicationError()

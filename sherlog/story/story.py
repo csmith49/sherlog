@@ -6,9 +6,9 @@ import torch
 import storch
 
 class Story:
-    def __init__(self, model, observations, external=()):
+    def __init__(self, model, observation, external=()):
         self.model = model
-        self.observations = observations
+        self.observation = observation
         self._external = external
 
     @property
@@ -27,12 +27,11 @@ class Story:
         # build the site for the result
         result = value.Variable("sherlog:result")
         similarities = []
-        for obs in self.observations:
-            obs_t = torch.stack(list(obs.evaluate(store, stochastic.algebra)))
-            store_t = torch.stack([store[v] for v in obs.variables()])
-            similarities.append(torch.cosine_similarity(obs_t, store_t, dim=0))
+        obs_t = torch.stack(list(self.observation.evaluate(store, stochastic.algebra)))
+        store_t = torch.stack([store[v] for v in self.observation.variables()])
+        similarities.append(torch.cosine_similarity(obs_t, store_t, dim=0))
         store[result] = stochastic.delta(result, max(similarities))
-        
+            
         return store
 
     def likelihood(self, offset=1, num_samples=100):
@@ -47,18 +46,15 @@ class Story:
         store = self.run(scg.algebra)
         
         # build the observation distances
-        distances = []
-        for obs in self.observations:
-            obs_vec = obs.evaluate(store, scg.algebra)
-            store_vec = [store[v] for v in obs.variables()]
+        obs_vec = self.observation.evaluate(store, scg.algebra)
+        store_vec = [store[v] for v in self.observation.variables()]
     
-            total = torch.tensor(0.0)
-            for o, s in zip(obs_vec, store_vec):
-                total += torch.dist(o, s, p=2)
-            distances.append(total)
+        total = torch.tensor(0.0)
+        for o, s in zip(obs_vec, store_vec):
+            total += torch.dist(o, s, p=2)
 
         result = value.Variable("sherlog:result")
-        store[result] = torch.min(torch.stack(distances))
+        store[result] = total 
         storch.add_cost(store[result], result.name)
 
         return store

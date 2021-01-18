@@ -71,12 +71,11 @@ module Map : sig
     end
 end
 
-module Obligation : sig
-    type t =
-        | Assign of string
+module Guard : sig
+    type t = string
     
     val to_string : t -> string
-    val applied_representation : Term.t list -> Term.t list -> t -> string
+    val applied_representation : Term.t -> Term.t list -> t -> string
 
     val compare : t -> t -> int
     val equal : t -> t -> bool
@@ -85,7 +84,7 @@ end
 module Atom : sig
     type t =
         | Atom of string * Term.t list
-        | Intro of Obligation.t * Term.t list * Term.t list * Term.t list
+        | Intro of Guard.t * Term.t list * Term.t list * Term.t
     (** atoms are the fundamental relational values in Watson *)
 
     val to_string : t -> string
@@ -218,6 +217,6 @@ module Proof : sig
         val resolution_sequence : t -> Atom.t list
         val map : t -> Map.t
 
-        val introductions : t -> (Obligation.t * Term.t list * Term.t list) list
+        val introductions : t -> (Guard.t * Term.t list * Term.t list * Term.t) list
     end
 end

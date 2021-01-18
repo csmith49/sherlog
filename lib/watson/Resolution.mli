@@ -72,6 +72,6 @@ module Proof : sig
         val resolution_sequence : t -> Syntax.Atom.t list
         val map : t -> Syntax.Map.t
 
-        val introductions : t -> (Syntax.Obligation.t * Syntax.Term.t list * Syntax.Term.t list) list
+        val introductions : t -> (Syntax.Guard.t * Syntax.Term.t list * Syntax.Term.t list * Syntax.Term.t) list
     end
 end

@@ -1,6 +1,6 @@
 module Term = Syntax.Term
 module Map = Syntax.Map
-module Obligation = Syntax.Obligation
+module Guard = Syntax.Guard
 module Atom = Syntax.Atom
 
 module Rule = Semantics.Rule

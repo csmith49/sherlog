@@ -113,31 +113,30 @@ module Map = struct
     end
 end
 
-module Obligation = struct
-    type t =
-        | Assign of string
+module Guard = struct
+    type t = string
 
-    let to_string = function
-        | Assign f -> f
+    let to_string g = g
 
-    let applied_representation values parameters = function
-        | Assign f ->
-            let values = values
-                |> CCList.map Term.to_string
-                |> CCString.concat ", " in
-            let params = parameters
-                |> CCList.map Term.to_string
-                |> CCString.concat ", " in
-            values ^ " = " ^ f ^ "[" ^ params ^ "]"
+    let applied_representation target parameters guard =
+        let target = Term.to_string target in
+        let parameters = parameters
+            |> CCList.map Term.to_string
+            |> CCString.concat ", " in
+        target ^ " = " ^ guard ^ "[" ^ parameters ^ "]"
 
-    let compare = Stdlib.compare
+    let compare = CCString.compare
     let equal left right = (compare left right) == 0
 end
 
 module Atom = struct
     type t =
         | Atom of string * Term.t list
-        | Intro of Obligation.t * Term.t list * Term.t list * Term.t list
+        | Intro of Guard.t * Term.t list * Term.t list * Term.t
+
+    let subterms = function
+        | Atom (_, args) -> args
+        | Intro (_, parameters, context, target) -> parameters @ context @ [target]
 
     let to_string = function
         | Atom (r, args) ->
@@ -145,33 +144,33 @@ module Atom = struct
                 |> CCList.map Term.to_string
                 |> CCString.concat ", " in
             r ^ "(" ^ args ^ ")"
-        | Intro (obligation, parameters, context, values) ->
-            let obligation = Obligation.to_string obligation in
-            let args = (parameters @ context @ values)
+        | Intro (guard, _, _, _) as intro ->
+            let guard = Guard.to_string guard in
+            let args = subterms intro
                 |> CCList.map Term.to_string
                 |> CCString.concat ", " in
-            "Intro(" ^ obligation ^ ", " ^ args ^ ")"
+            "Intro(" ^ guard ^ ", " ^ args ^ ")"
 
-    let variables = function
-        | Atom (_, args) -> CCList.flat_map Term.variables args
-        | Intro (_, params, context, values) -> CCList.flat_map Term.variables (params @ context @ values)
+    let variables atom = atom
+        |> subterms
+        |> CCList.flat_map Term.variables
 
     let apply map = function
         | Atom (r, args) ->
             let args = CCList.map (Map.apply map) args in
                 Atom (r, args)
-        | Intro (obligation, params, context, values) ->
+        | Intro (guard, params, context, target) ->
             let params = CCList.map (Map.apply map) params in
             let context = CCList.map (Map.apply map) context in
-            let values = CCList.map (Map.apply map) values in
-                Intro (obligation, params, context, values)
+            let target = Map.apply map target in
+                Intro (guard, params, context, target)
 
     let unify left right = match left, right with
-        | Atom (p, ps), Atom (q, qs) when CCString.equal p q ->
-            let eqs = CCList.map2 Map.Unification.equate ps qs in
+        | Atom (p, _), Atom (q, _) when CCString.equal p q ->
+            let eqs = CCList.map2 Map.Unification.equate (subterms left) (subterms right) in
                 Map.Unification.resolve_equalities eqs
-        | Intro (po, pp, pc, pv), Intro (qo, qp, qc, qv) when Obligation.equal po qo ->
-            let eqs = CCList.map2 Map.Unification.equate (pp @ pc @ pv) (qp @ qc @ qv) in
+        | Intro (p, _, _, _), Intro (q, _, _, _) when Guard.equal p q ->
+            let eqs = CCList.map2 Map.Unification.equate (subterms left) (subterms right) in
                 Map.Unification.resolve_equalities eqs
         | _ -> None
 

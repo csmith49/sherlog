@@ -84,8 +84,8 @@ let simplify_introduction
         (* fresh var to represent the value getting introduced *)
         let var = Term.Value (Term.Variable "_I") in
         (* building the introduction atom *)
-        let obligation = Obligation.Assign f in
-        let intro = Atom.Intro (obligation, parameters, context, [var]) in
+        let guard = f in
+        let intro = Atom.Intro (guard, parameters, context, var) in
         (* intro <- body *)
         let intro_rule = Rule.Rule (intro, body) in
         (* head <- body, intro *)
