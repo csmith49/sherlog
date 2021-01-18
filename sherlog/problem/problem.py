@@ -139,3 +139,17 @@ def load(filepath: str):
         contents = f.read()
     json = interface.parse(contents)
     return Problem.of_json(json)
+
+def loads(contents: str):
+    """Load a problem from a string.
+
+    Parameters
+    ----------
+    contents : str
+
+    Returns
+    -------
+    Problem
+    """
+    json = interface.parse(contents)
+    return Problem.of_json(json)
