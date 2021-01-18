@@ -16,11 +16,11 @@ parser.add_argument("--resolution", default=100, help="Instrumentation resolutio
 parser.add_argument("--optimizer", default="sgd", choices=["sgd", "adam"], help="Optimization strategy")
 parser.add_argument("--learning-rate", default=0.01, help="Optimizer learning rate")
 parser.add_argument("--log", action="store_true", help="Enables recording of results")
-parser.add_argument("--size", default=10, help="Generated network size")
-parser.add_argument("--stress", default=0.2, help="Parameter: smoke-causing stress (unit)")
-parser.add_argument("--influence", default=0.3, help="Parameter: smoke-causing peer pressure (unit)")
-parser.add_argument("--spontaneous", default=0.1, help="Parameter: rate of spontaneous cancer (unit)")
-parser.add_argument("--comorbid", default=0.3, help="Parameters: rate of smoking-induced cancer (unit)")
+parser.add_argument("--size", default=10, type=int, help="Generated network size")
+parser.add_argument("--stress", default=0.2, type=float, help="Parameter: smoke-causing stress (unit)")
+parser.add_argument("--influence", default=0.3, type=float, help="Parameter: smoke-causing peer pressure (unit)")
+parser.add_argument("--spontaneous", default=0.1, type=float, help="Parameter: rate of spontaneous cancer (unit)")
+parser.add_argument("--comorbid", default=0.3, type=float, help="Parameters: rate of smoking-induced cancer (unit)")
 
 args = parser.parse_args()
 
@@ -61,10 +61,12 @@ instrumenter = Instrumenter("smoker-results.jsonl", context={
 })
 
 print("Starting training...")
+
+data = list(problem.stories()) * args.epochs
+
 # start the training
-with alive_bar(args.epochs) as bar:
-    for i in range(args.epochs):
-        story = list(problem.stories())[0]
+with alive_bar(len(data)) as bar:
+    for i, story in enumerate(data):
 
         # compute gradients
         optim.zero_grad()
@@ -77,7 +79,7 @@ with alive_bar(args.epochs) as bar:
         bar()
 
         # generate some statistics
-        if i % resolution == 0:
+        if i % args.resolution == 0:
             likelihood = problem.log_likelihood(num_samples=500)
             instrumenter.emit(
                 likelihood=likelihood.item(),
@@ -88,12 +90,12 @@ with alive_bar(args.epochs) as bar:
                 comorbid=problem._parameters["comorbid"].value.item()
             )
 
-    # print the final parameters
-    print("Learned parameters:")
-    for name, param in problem._parameters.items():
-        print(f"\t{name} -- {param.value:f}")
+# print the final parameters
+print("Learned parameters:")
+for name, param in problem._parameters.items():
+    print(f"\t{name} -- {param.value:f}")
 
-    likelihood = problem.log_likelihood(num_samples=1000)
-    print(f"Final log-likelihood: {likelihood:f}")
+likelihood = problem.log_likelihood(num_samples=1000)
+print(f"Final log-likelihood: {likelihood:f}")
 
-    if log: instrumenter.flush()
+if args.log: instrumenter.flush()
