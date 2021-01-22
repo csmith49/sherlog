@@ -102,18 +102,19 @@ module Compile = struct
             |> Observation.of_list
 end
 
-let of_proof proof =
-    let stories = proof
-        |> Watson.Proof.Solution.of_proof
+let of_solutions solutions =
+    let stories = solutions
         |> CCList.map Compile.initialize
-        |> CCList.map Compile.name 
+        |> CCList.map Compile.name
         |> CCList.map Compile.annotate in
     stories
         |> CCList.map (fun s ->
-                let assignments = Compile.assignments s in
-                let observation = Compile.observation s in
-                    (assignments, observation)
+            let assignments = Compile.assignments s in
+            let observation = Compile.observation s in
+                (assignments, observation)
         )
+
+let of_proof proof = let solutions = Watson.Proof.Solution.of_proof proof in of_solutions solutions
 
 (* and writing out *)
 let to_json model =

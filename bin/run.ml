@@ -1,12 +1,16 @@
 (* references for cmd-line parsing *)
 let filepath = ref ""
 let verbose  = ref false
-let depth    = ref 100
+let depth = ref CCInt.max_int
+let width = ref CCInt.max_int
+let seeds = ref 1
 
 let spec_list = [
     ("--input",   Arg.Set_string filepath, "Input SherLog (.sl) file");
-    ("--depth",   Arg.Set_int depth,   "Sets maximum resolution depth");
     ("--verbose", Arg.Set verbose,         "Enables verbose output");
+    ("--depth",   Arg.Set_int depth,       "Sets the maximum depth of resolution");
+    ("--width",   Arg.Set_int width,       "Sets the width of the resolution beam");
+    ("--seeds",   Arg.Set_int seeds,       "Sets the number of resolution seeds");
 ]
 
 let usage_msg = "SherLog Program Interpreter"
@@ -33,10 +37,12 @@ let _ = CCList.iter (fun query ->
     (* build the proof *)
     let program = Sherlog.Problem.program problem in
     let _ = print_endline "Starting resolution..." in
-    let proof = query
-        |> Watson.Proof.of_query
-        |> Watson.Proof.resolve ~max_depth:!depth program in
-    let solutions = Watson.Proof.Solution.of_proof proof in
+    let configuration = { Watson.Proof.Random.default_configuration with
+        depth = !depth; width = !width; seeds = !seeds;
+    } in
+    let proofs = query
+        |> Watson.Proof.Random.resolve configuration program in
+    let solutions = CCList.flat_map Watson.Proof.Solution.of_proof proofs in
     let _ = print_endline ("Resolution done. Found " ^ (solutions |> CCList.length |> string_of_int) ^ " solutions.") in
     let _ = CCList.iteri (fun i -> fun sol ->
         let map = Watson.Proof.Solution.map sol in
@@ -53,8 +59,5 @@ let _ = CCList.iter (fun query ->
             intro_string ^ " => " ^ solution_string in
         let _ = print_endline ((string_of_int i) ^ ": " ^ output) in
         ()
-    ) solutions in
-    let _ = print_endline "Generating model..." in
-    let _ = Sherlog.Model.of_proof proof in
-    let _ = print_endline "Model generated." in ()
+    ) solutions in ()
 ) (Sherlog.Problem.queries problem)

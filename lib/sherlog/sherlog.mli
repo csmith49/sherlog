@@ -59,6 +59,8 @@ module Model : sig
     val to_json : t -> Yojson.Basic.t
 
     val of_proof : Watson.Proof.t -> t
+
+    val of_solutions : Watson.Proof.Solution.t list -> t
 end
 
 val parse : string -> Problem.t

@@ -62,8 +62,20 @@ module Proof : sig
     val of_query : Syntax.Atom.t list -> t
     (** [of_query atoms] builds an initial, unexplored resolution proof with the intent of answering the conjunctive query [atoms] *)
 
-    val resolve : ?max_depth:int -> Semantics.Program.t -> t -> t
+    val resolve : Semantics.Program.t -> t -> t
     (** [resolve program proof] uses the rules in [program] to resolve [proof] by expanding resolution nodes until all leaves in the proof tree are labeled with [Success] or [Failure] *)
+
+    module Random : sig
+        type configuration = {
+            depth : int;
+            width : int;
+            seeds : int;
+        }
+
+        val default_configuration : configuration
+
+        val resolve : configuration -> Semantics.Program.t -> Syntax.Atom.t list -> t list
+    end
 
     module Solution : sig
         type t
