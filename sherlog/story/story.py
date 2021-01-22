@@ -12,6 +12,10 @@ class Story:
         self._external = external
 
     @property
+    def weight(self):
+        return 1
+
+    @property
     def store(self):
         return Store(external=self._external)
 
@@ -42,7 +46,7 @@ class Story:
         results = model()["sherlog:result"]
         return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
 
-    def loss(self, p=2):
+    def loss(self, p=2, index=0):
         store = self.run(scg.algebra)
         
         # build the observation distances
@@ -53,8 +57,8 @@ class Story:
         for o, s in zip(obs_vec, store_vec):
             total += torch.dist(o, s, p=2)
 
-        result = value.Variable("sherlog:result")
-        store[result] = total 
+        result = value.Variable(f"sherlog:result:{index}")
+        store[result] = total
         storch.add_cost(store[result], result.name)
 
         return store

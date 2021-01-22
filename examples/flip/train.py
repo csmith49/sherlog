@@ -33,8 +33,6 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "adam" : Adam
     }[optimizer](problem.parameters(), lr=learning_rate)
 
-    dataset = list(problem.stories()) * epochs
-
     instrumenter = Instrumenter("flip-results.jsonl", context={
         "optimizer" : optimizer,
         "learning-rate" : learning_rate,
@@ -42,13 +40,14 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "seed" : seed
     })
 
-    with alive_bar(len(dataset)) as bar:
-        for i, story in enumerate(dataset):
-            optim.zero_grad()
-            loss = story.loss()
-            storch.backward()
-            optim.step()
-            problem.clamp_parameters()
+    with alive_bar(epochs) as bar:
+        for i in range(epochs):
+            for stories in problem.stories():
+                optim.zero_grad()
+                loss = problem.objective(stories)
+                storch.backward()
+                optim.step()
+                problem.clamp_parameters()
             bar()
 
             if i % 100 == 0:

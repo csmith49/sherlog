@@ -20,11 +20,14 @@ let handler json = match Interface.JSON.Parse.(find string "command" json) with
             |> CCOpt.flat_map Sherlog.Query.of_json in
         let program = Interface.JSON.Parse.(find identity "program" json)
             |> CCOpt.flat_map Sherlog.Program.of_json in
+        let depth = match Interface.JSON.Parse.(find identity "depth" json) with
+            | Some (`Int depth) -> depth
+            | _ -> 1000 in
         begin match query, program with
             | Some query, Some program ->
                 let model = query
                     |> Watson.Proof.of_query
-                    |> Watson.Proof.resolve program
+                    |> Watson.Proof.resolve ~max_depth:depth program
                     |> Sherlog.Model.of_proof in
                 Some (Sherlog.Model.to_json model)
             | _ -> None

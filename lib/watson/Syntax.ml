@@ -167,10 +167,16 @@ module Atom = struct
 
     let unify left right = match left, right with
         | Atom (p, _), Atom (q, _) when CCString.equal p q ->
-            let eqs = CCList.map2 Map.Unification.equate (subterms left) (subterms right) in
+            let l = subterms left in
+            let r = subterms right in
+            if (CCList.length l) != (CCList.length r) then None else
+            let eqs = CCList.map2 Map.Unification.equate l r in
                 Map.Unification.resolve_equalities eqs
         | Intro (p, _, _, _), Intro (q, _, _, _) when Guard.equal p q ->
-            let eqs = CCList.map2 Map.Unification.equate (subterms left) (subterms right) in
+            let l = subterms left in
+            let r = subterms right in
+            if (CCList.length l) != (CCList.length r) then None else
+            let eqs = CCList.map2 Map.Unification.equate l r in
                 Map.Unification.resolve_equalities eqs
         | _ -> None
 

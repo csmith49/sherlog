@@ -8,6 +8,7 @@ from ..story import Story
 
 import torch
 import pickle
+import random
 
 class Problem:
     def __init__(self, parameters, namespaces=None, evidence=None, program=None):
@@ -30,6 +31,17 @@ class Problem:
         # just record the rest
         self._evidence = evidence
         self.program = program
+        # build up the stories
+        self._stories = []
+        for evidence in self._evidence:
+            for context in evidence.concretize(self._namespace):
+                external = (context, self.parameter_map, self._namespace)
+                stories = []
+                for result in interface.query(self.program, evidence.atoms):
+                    model = Model.of_json(result["story"])
+                    observation = Observation.of_json(result["observation"])
+                    stories.append(Story(model, observation, external=external))
+                self._stories.append(stories)
 
     @classmethod
     def of_json(cls, json):
@@ -54,15 +66,17 @@ class Problem:
 
         Returns
         -------
-        Story iterable
+        Story list iterable
         """
-        for evidence in self._evidence:
-            for context in evidence.concretize(self._namespace):
-                external = (context, self.parameter_map, self._namespace)
-                for model, observation in interface.query(self.program, evidence.atoms):
-                    model = Model.of_json(model)
-                    observation = Observation.of_json(obsevation)
-                    yield Story(model, observation, external=external)
+        yield from self._stories
+
+    def objective(self, stories, k=100):
+        # pick k stories proportional to the weight
+        weights = [story.weight for story in stories]
+        stories = random.choices(stories, weights, k=k)
+
+        # compute the loss of each
+        losses = [story.loss(index=i) for i, story in enumerate(stories)]
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
@@ -120,8 +134,9 @@ class Problem:
 
     def log_likelihood(self, num_samples=1):
         total = torch.tensor(0.0)
-        for story in self.stories():
-            total += torch.log(story.likelihood(num_samples=num_samples))
+        for stories in self.stories():
+            for story in stories:
+                total += torch.log(story.likelihood(num_samples=num_samples))
         return total
 
 def load(filepath: str):

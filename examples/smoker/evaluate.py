@@ -33,15 +33,15 @@ hashids = Hashids()
 seed = hashids.encode(randint(0, 100000))
 
 print("Building the problem...")
-problem = sherlog.problem.loads(
-    generation.generate_problem(
+g = generation.generate_problem(
         args.size,
         stress=args.stress,
         influence=args.influence,
         spontaneous=args.spontaneous,
         comorbid=args.comorbid
     )
-)
+print(g)
+problem = sherlog.problem.loads(g)
 
 print("Initializing the optimizer and instrumentation...")
 optim = {
@@ -62,25 +62,23 @@ instrumenter = Instrumenter("smoker-results.jsonl", context={
 
 print("Starting training...")
 
-data = list(problem.stories()) * args.epochs
-
 # start the training
-with alive_bar(len(data)) as bar:
-    for i, story in enumerate(data):
-
-        # compute gradients
-        optim.zero_grad()
-        store = story.loss()
-        storch.backward()
-        optim.step()
-        problem.clamp_parameters()
+with alive_bar(args.epochs) as bar:
+    for i in range(args.epochs):
+        for stories in problem.stories():
+            # compute gradients
+            optim.zero_grad()
+            loss = problem.objective(stories, k=5)
+            storch.backward()
+            optim.step()
+            problem.clamp_parameters()
         
         # update the bar
         bar()
 
         # generate some statistics
         if i % args.resolution == 0:
-            likelihood = problem.log_likelihood(num_samples=500)
+            likelihood = problem.log_likelihood(num_samples=1)
             instrumenter.emit(
                 likelihood=likelihood.item(),
                 step=i,
@@ -95,7 +93,7 @@ print("Learned parameters:")
 for name, param in problem._parameters.items():
     print(f"\t{name} -- {param.value:f}")
 
-likelihood = problem.log_likelihood(num_samples=1000)
+likelihood = problem.log_likelihood(num_samples=1)
 print(f"Final log-likelihood: {likelihood:f}")
 
 if args.log: instrumenter.flush()

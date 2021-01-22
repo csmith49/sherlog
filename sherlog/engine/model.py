@@ -50,8 +50,8 @@ class Statement:
         """
         target = value.Variable(json["target"])
         semantics = json["semantics"]
-        arguments = [value.of_json(p) for p in json["parameters"])
-        return cls(target, function, arguments)
+        arguments = [value.of_json(p) for p in json["parameters"]]
+        return cls(target, semantics, arguments)
 
 class Model:
     def __init__(self, statements):
@@ -73,13 +73,12 @@ class Model:
             self._target_map[statement.target] = statement
 
         # build the dataflow graph
-        dataflow_edges = []
+        self._dataflow_graph = nx.DiGraph()
         for statement in self._statements:
+            self._dataflow_graph.add_node(statement.target)
             for dependency in statement.dependencies():
-                edge = (dependency, statement.target)
-                dataflow_edges.append(edge)
-        self._dataflow_graph = nx.DiGraph(dataflow_edges)
-
+                self._dataflow_graph.add_edge(dependency, statement.target)
+ 
     @property
     def statements(self):
         """An iterable of statements in the model in topological order.

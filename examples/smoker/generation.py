@@ -8,23 +8,27 @@ def flip(weight):
 learnable = [
     # stress
     "!parameter stress : unit",
-    "stress_int(P ; bernoulli[stress]) <- person(P)",
-    "stress(P) <- stress_int(P, 1.0)",
+    "stress_latent(P ; bernoulli[stress]) <- person(P)",
+    "stress(P) <- stress_latent(P, 1.0)",
+    "not_stress(P) <- stress_latent(P, 0.0)",
     
     # influence
     "!parameter influence : unit",
-    "influences_int(X, Y ; bernoulli[influence]) <- friend(X, Y)",
-    "influences(X, Y) <- influences_int(X, Y, 1.0)",
+    "influences_latent(X, Y ; bernoulli[influence]) <- friend(X, Y)",
+    "influences(X, Y) <- influences_latent(X, Y, 1.0)",
+    "not_influences(X, Y) <- influences_latent(X, Y, 0.0)",
 
     # spontaneous cancer
     "!parameter spontaneous : unit",
-    "cancer_spontaneous_int(P ; bernoulli[spontaneous]) <- person(P)",
-    "cancer_spontaneous(P) <- cancer_spontaneous_int(P, 1.0)",
+    "cancer_spontaneous_latent(P ; bernoulli[spontaneous]) <- person(P)",
+    "cancer_spontaneous(P) <- cancer_spontaneous_latent(P, 1.0)",
+    "not_cancer_spontaneous(P) <- cancer_spontaneous_latent(P, 0.0)",
 
     # comorbid cancer
     "!parameter comorbid : unit",
-    "cancer_smoke_int(P ; bernoulli[comorbid]) <- person(P)",
-    "cancer_smoke(P) <- cancer_smoke_int(P, 1.0)"
+    "cancer_smoke_latent(P ; bernoulli[comorbid]) <- person(P)",
+    "cancer_smoke(P) <- cancer_smoke_latent(P, 1.0)",
+    "not_cancer_smoke(P) <- cancer_smoke_latent(P, 0.0)"
 ]
 
 core = [
@@ -94,7 +98,7 @@ def generate_observations(graph, ground_truth):
 
     return observations
 
-def convert_observations_to_evidence(observations):
+def convert_observations_to_facts(observations):
     atoms = ["null()"]
     for node in observations["smokes"]:
         atom = f"smokes(p_{node})"
@@ -102,9 +106,50 @@ def convert_observations_to_evidence(observations):
     for node in observations["cancer"]:
         atom = f"cancer(p_{node})"
         atoms.append(atom)
-    return f"!evidence {', '.join(atoms)}"
+    return atoms
 
-def generate_problem(size, stress=0.2, influence=0.3, spontaneous=0.1, comorbid=0.3):
+def convert_ground_truth_to_facts(graph, ground_truth, observed_portion=0.4):
+    atoms = []
+    for node in graph:
+        # stress
+        if flip(observed_portion):
+            if node in ground_truth["stress"]:
+                atom = f"stress(p_{node})"
+            else:
+                atom = f"not_stress(p_{node})"
+            atoms.append(atom)
+        # spontaneous
+        if flip(observed_portion):
+            if node in ground_truth["spontaneous"]:
+                atom = f"cancer_spontaneous(p_{node})"
+            else:
+                atom = f"not_cancer_spontaneous(p_{node})"
+            atoms.append(atom)
+        # comorbid
+        if flip(observed_portion):
+            if node in ground_truth["comorbid"]:
+                atom = f"cancer_smoke(p_{node})"
+            else:
+                atom = f"not_cancer_smoke(p_{node})"
+            atoms.append(atom)
+
+    # influences
+    for edge in graph.edges():
+        if flip(observed_portion):
+            u, v = edge
+            if edge in ground_truth["influence"]:
+                atom = f"influences(p_{u}, p_{v})"
+            else:
+                atom = f"not_influences(p_{u}, p_{v})"
+            atoms.append(atom)
+    
+    return atoms
+
+def convert_facts_to_evidence(facts):
+    return f"!evidence {', '.join(facts)}"
+
+
+def generate_problem(size, stress=0.2, influence=0.3, spontaneous=0.1, comorbid=0.3, observed=1.0):
     # step 1: make the graph
     g = generate_network(size)
     # step 2: construct the ground truth
@@ -112,7 +157,10 @@ def generate_problem(size, stress=0.2, influence=0.3, spontaneous=0.1, comorbid=
     # step 3: infer observations
     observations = generate_observations(g, ground_truth)
     # step 4: build list of lines
-    lines = learnable + core + convert_network_to_facts(g) + [convert_observations_to_evidence(observations)]
+    evidence = convert_facts_to_evidence(
+        convert_observations_to_facts(observations) + convert_ground_truth_to_facts(g, ground_truth, observed_portion=observed)
+    )
+    lines = learnable + core + convert_network_to_facts(g) + [evidence]
     # step 5: build string
     return '\n'.join([f"{line}." for line in lines])
 
