@@ -41,7 +41,7 @@ let handler json = match Interface.JSON.Parse.(find string "command" json) with
         let width = Interface.JSON.Parse.(find int "width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
         let seeds = Interface.JSON.Parse.(find int "seeds" json)
-            |> CCOpt.get_or ~default:CCInt.max_int in
+            |> CCOpt.get_or ~default:1 in
         let configuration = {Watson.Proof.Random.default_configuration with
             depth = depth; width = width; seeds = seeds;
         } in begin match query, program with
