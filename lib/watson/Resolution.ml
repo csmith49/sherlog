@@ -124,12 +124,8 @@ module Proof = struct
                 in CCList.map make_node resolutions
             | None -> [Success] end
 
-    let depth zipper = zipper
-        |> Data.Tree.path_to_focus
-        |> CCList.length
-
-    let rec resolve_zipper max_depth program zipper = match Data.Tree.find is_expandable zipper with
-        | Some zipper when depth zipper <= max_depth ->
+    let rec resolve_zipper program zipper = match Data.Tree.find is_expandable zipper with
+        | Some zipper ->
             (* compute the current visible node *)
             let node = zipper |> Data.Tree.focus |> Data.Tree.label in
             (* use the strategy to compute the successor states in the search *)
@@ -137,13 +133,65 @@ module Proof = struct
             let subtree = Data.Tree.Node (node, children) in
             (* rebuild zipper and recurse *)
             let zipper = zipper |> Data.Tree.set_focus subtree in
-            resolve_zipper max_depth program zipper
+            resolve_zipper program zipper
         | _ -> zipper
 
-    let resolve ?max_depth:(depth=CCInt.max_int) program tree = tree
+    let resolve program tree = tree
         |> Data.Tree.zipper
-        |> resolve_zipper depth program
+        |> resolve_zipper program
         |> Data.Tree.of_zipper
+
+    module Random = struct
+        type configuration = {
+            depth : int;
+            width : int;
+            seeds : int;
+        }
+
+        let default_configuration = {
+            depth = CCInt.max_int;
+            width = CCInt.max_int;
+            seeds = 1;
+        }
+
+        let depth zipper = zipper
+            |> Data.Tree.path_to_focus
+            |> CCList.length
+
+        let rec resolve_zipper configuration program zipper = match Data.Tree.find is_expandable zipper with
+            | Some zipper ->
+                (* get the current node *)
+                let node = zipper |> Data.Tree.focus |> Data.Tree.label in
+                (* build the subtree using the constraints of the configuration *)
+                let children = match (depth zipper) >= configuration.depth with
+                    | true -> [Failure]
+                    | false ->
+                        let expansions = expand_node program node in
+                        if (CCList.length expansions) > configuration.width then
+                            let random_subset = expansions
+                                |> CCRandom.pick_list
+                                |> CCRandom.sample_without_duplicates
+                                    ~cmp:Stdlib.compare
+                                    configuration.width
+                            in CCRandom.run random_subset
+                        else expansions in
+                (* rebuild and recurse *)
+                let subtree = Data.Tree.Node (node, children |> CCList.map Data.Tree.leaf) in
+                let zipper = zipper |> Data.Tree.set_focus subtree in
+                resolve_zipper configuration program zipper
+            (* if nothing is expandable, exit the recursion *)
+            | _ -> zipper
+
+        let resolve_tree configuration program tree = tree
+            |> Data.Tree.zipper
+            |> resolve_zipper configuration program
+            |> Data.Tree.of_zipper
+
+        let resolve configuration program query =
+            let initial_tree = of_query query in
+            let trees = CCList.replicate configuration.seeds initial_tree in
+                CCList.map (resolve_tree configuration program) trees
+    end
 
     module Solution = struct
         type t = Label.t list
