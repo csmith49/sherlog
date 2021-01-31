@@ -25,8 +25,15 @@ let variables atom = atom
     |> Identifier.uniq
 
 let apply h atom = { atom with
-    terms = atom.terms |> CCList.map (Homomorphism.apply h);
+    terms = atom.terms |> CCList.map (Substitution.apply h);
 }
 
 let unifiable left right =
-    (CCString.equal (relation left) (relation right)) && (CCInt.equal (arity left) (arity right))
+    if (relation left) != (relation right)
+        then false
+        else (arity left) == (arity right)
+
+let unify left right = if unifiable left right
+    then let constraints = CCList.map2 Substitution.Unification.equate (terms left) (terms right) in
+        Substitution.Unification.resolve_equalities constraints
+    else None
