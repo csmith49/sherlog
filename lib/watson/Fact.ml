@@ -20,3 +20,10 @@ let to_string fact = fact
 let discharge fact = match ASet.choose_opt fact with
 	| Some atom -> Some (atom, ASet.remove atom fact)
 	| _ -> None
+
+let variables fact = fact
+    |> atoms
+    |> CCList.flat_map Atom.variables
+    |> Identifier.uniq
+
+let mem = ASet.mem
