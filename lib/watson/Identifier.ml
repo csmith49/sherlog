@@ -29,3 +29,20 @@ let avoiding_index ids =
 			if x > target then target else find_unused xs (target + 1) in
 	let used = ids |> CCList.map index |> CCList.sort_uniq ~cmp:CCInt.compare in
 	find_unused used 0
+
+module JSON = struct
+	let encode id = `Assoc [
+		("name", `String (name id));
+		("index", `Int (index id));
+	]
+
+	let decode json =
+		let name = JSON.Parse.(find string "name" json) in
+		let index = JSON.Parse.(find int "index" json) in
+		match name, index with
+			| Some name, Some index -> name
+				|> of_string
+				|> reindex index
+				|> CCOpt.return
+			| _ -> None
+end

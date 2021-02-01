@@ -14,3 +14,8 @@ val of_string : string -> t
 val uniq : t list -> t list
 
 val avoiding_index : t list -> int
+
+module JSON : sig
+    val encode : t -> JSON.t
+    val decode : JSON.t -> t option
+end

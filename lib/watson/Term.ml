@@ -42,3 +42,49 @@ let rec variables = function
         |> CCList.flat_map variables
         |> Identifier.uniq
     | _ -> []
+
+
+module JSON = struct
+    let lift typ encoder value = `Assoc [
+        ("type", `String typ);
+        ("value", encoder value);
+    ]
+    let rec encode = function
+        | Variable x -> lift "variable" Identifier.JSON.encode x
+        | Symbol s -> lift "symbol" JSON.Make.string s
+        | Integer i -> lift "integer" JSON.Make.int i
+        | Float f -> lift "float" JSON.Make.float f
+        | Boolean b -> lift "boolean" JSON.Make.bool b
+        | Unit -> `Assoc [("type", `String "unit")]
+        | Function (f, args) -> `Assoc [
+            ("type", `String "function");
+            ("value", `String f);
+            ("arguments", `List (args |> CCList.map encode));
+        ]
+        | Wildcard -> `Assoc [("type", `String "wildcard")]
+
+    let rec decode json = match JSON.Parse.(find string "type" json) with
+        | Some "variable" -> json
+            |> JSON.Parse.(find Identifier.JSON.decode "value")
+            |> CCOpt.map (fun x -> Variable x)
+        | Some "symbol" -> json
+            |> JSON.Parse.(find string "value")
+            |> CCOpt.map (fun s -> Symbol s)
+        | Some "integer" -> json
+            |> JSON.Parse.(find int "value")
+            |> CCOpt.map (fun i -> Integer i)
+        | Some "float" -> json
+            |> JSON.Parse.(find float "value")
+            |> CCOpt.map (fun f -> Float f)
+        | Some "boolean" -> json
+            |> JSON.Parse.(find bool "value")
+            |> CCOpt.map (fun b -> Boolean b)
+        | Some "unit" -> Some Unit
+        | Some "function" ->
+            let f = json |> JSON.Parse.(find string "value") in
+            let args = json
+                |> JSON.Parse.(find (list decode) "arguments") in
+            CCOpt.map2 (fun f -> fun args -> Function (f, args)) f args
+        | Some "wildcard" -> Some Wildcard
+        | _ -> None
+end

@@ -3,6 +3,11 @@ type t = {
     terms : Term.t list;
 }
 
+let make relation terms = {
+    relation = relation;
+    terms = terms;
+}
+
 let compare = Stdlib.compare
 let equal l r = (compare l r) == 0
 
@@ -37,3 +42,16 @@ let unify left right = if unifiable left right
     then let constraints = CCList.map2 Substitution.Unification.equate (terms left) (terms right) in
         Substitution.Unification.resolve_equalities constraints
     else None
+
+module JSON = struct
+    let encode atom = `Assoc [
+        ("type", `String "atom");
+        ("relation", `String (relation atom));
+        ("terms", `List (atom |> terms |> CCList.map Term.JSON.encode));
+    ]
+
+    let decode json =
+        let relation = JSON.Parse.(find string "relation" json) in
+        let terms = JSON.Parse.(find (list Term.JSON.decode) "terms" json) in
+        CCOpt.map2 make relation terms
+end

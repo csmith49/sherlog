@@ -3,6 +3,11 @@ type t = {
     body : Atom.t list;
 }
 
+let make head body = {
+    head = head;
+    body = body;
+}
+
 let head rule = rule.head
 let body rule = rule.body
 
@@ -24,3 +29,16 @@ let avoiding_rename ids rule =
         |> CCList.map (fun x -> (x, rename x)) in
     let substitution = Substitution.of_list assoc in
         apply substitution rule
+
+module JSON = struct
+    let encode rule = `Assoc [
+        ("type", `String "rule");
+        ("head", rule |> head |> Atom.JSON.encode);
+        ("body", `List (rule |> body |> CCList.map Atom.JSON.encode));
+    ]
+
+    let decode json =
+        let head = JSON.Parse.(find Atom.JSON.decode "head" json) in
+        let body = JSON.Parse.(find (list Atom.JSON.decode) "body" json) in
+        CCOpt.map2 make head body
+end

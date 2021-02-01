@@ -1,0 +1,4 @@
+(library
+ 	(name JSON)
+ 	(libraries containers yojson)
+)

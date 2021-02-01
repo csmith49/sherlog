@@ -17,3 +17,8 @@ val is_ground : t -> bool
 val occurs : Identifier.t -> t -> bool
 
 val variables : t -> Identifier.t list
+
+module JSON : sig
+    val encode : t -> JSON.t
+    val decode : JSON.t -> t option
+end
