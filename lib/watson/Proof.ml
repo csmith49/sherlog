@@ -26,18 +26,51 @@ module State = struct
 
     let extend atoms state = let atoms = Fact.of_atoms atoms in
         { state with goal = state.goal |> Fact.conjoin atoms}
+
+    let resolve state rule = match discharge state with
+        | Some (atom, state) ->
+            let rule = Rule.avoiding_rename (variables state) rule in
+            begin match Atom.unify atom (Rule.head rule) with
+                | Some sub ->
+                    let state = state
+                        |> extend (Rule.body rule)
+                        |> apply sub in
+                    let atom = Atom.apply sub atom in
+                        Some (atom, state)
+                | None -> None
+            end
+        | None -> None
 end
 
-let resolve state rule = match State.discharge state with
-    | Some (atom, state) ->
-        let rule = Rule.avoiding_rename (State.variables state) rule in
-        begin match Atom.unify atom (Rule.head rule) with
-            | Some sub ->
-                let state = state
-                    |> State.extend (Rule.body rule)
-                    |> State.apply sub in
-                let atom = Atom.apply sub atom in
-                    Some (atom, state)
-            | None -> None
-        end
-    | None -> None
+type resolution = Atom.t * State.t
+type t = resolution list
+
+let resolutions proof = proof
+
+let of_fact fact =
+    let atom = Atom.make "true" [] in
+    let state = State.of_fact fact in
+    let resolution = (atom, state) in
+        [resolution]
+        
+let to_fact proof = proof
+    |> resolutions
+    |> CCList.map fst
+    |> Fact.of_atoms
+
+let is_complete proof = match CCList.last_opt proof with
+    | Some (_, state) -> State.is_empty state
+    | _ -> false
+
+let remaining_obligation proof = match CCList.last_opt proof with
+    | Some (_, state) -> state.State.goal
+    | _ -> Fact.empty
+
+let length = CCList.length
+
+let resolve proof rule = match CCList.last_opt proof with
+    | Some (_, state) -> begin match State.resolve state rule with
+        | Some resolution -> Some (proof @ [resolution])
+        | None -> None
+    end
+    | _ -> None
