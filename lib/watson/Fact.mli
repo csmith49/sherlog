@@ -1,5 +1,8 @@
 type t
 
+val compare : t -> t -> int
+val equal : t -> t -> bool
+
 val empty : t
 val singleton : Atom.t -> t
 val mem : Atom.t -> t -> bool

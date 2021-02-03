@@ -1,6 +1,7 @@
 type t
 
 val empty : t
+val make : Watson.Rule.t list -> (Watson.Atom.t list) list -> t
 
 val dependencies : t -> Watson.Rule.t list
 val constraints : t -> (Watson.Atom.t list) list

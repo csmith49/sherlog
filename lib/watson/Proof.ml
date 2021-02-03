@@ -4,6 +4,12 @@ module State = struct
         cache : Fact.t;
     }
 
+    let compare left right = match Fact.compare left.goal right.goal with
+        | 0 -> Fact.compare left.cache right.cache
+        | (_ as c) -> c
+    
+    let equal left right = (compare left right) == 0
+
     let of_fact fact = {
         goal = fact;
         cache = Fact.empty;
@@ -45,7 +51,11 @@ end
 type resolution = Atom.t * State.t
 type t = resolution list
 
+let compare = CCList.compare (CCPair.compare Atom.compare State.compare)
+let equal = CCList.equal (CCPair.equal Atom.equal State.equal)
+
 let resolutions proof = proof
+let extend proof resolution = proof @ [resolution]
 
 let of_fact fact =
     let atom = Atom.make "true" [] in
@@ -70,7 +80,7 @@ let length = CCList.length
 
 let resolve proof rule = match CCList.last_opt proof with
     | Some (_, state) -> begin match State.resolve state rule with
-        | Some resolution -> Some (proof @ [resolution])
+        | Some resolution -> Some (extend proof resolution)
         | None -> None
     end
     | _ -> None

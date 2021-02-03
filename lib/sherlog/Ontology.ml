@@ -10,6 +10,8 @@ let empty = {
 	constraints = [];
 }
 
+let make deps cons = { dependencies = deps; constraints = cons }
+
 let dependencies ontology = ontology.dependencies
 let constraints ontology = ontology.constraints
 

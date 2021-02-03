@@ -1,6 +1,9 @@
 module State : sig
     type t
 
+    val compare : t -> t -> int
+    val equal : t -> t -> bool
+
     val of_fact : Fact.t -> t
 
     val discharge : t -> (Atom.t * t) option
@@ -18,6 +21,11 @@ end
 
 type resolution = Atom.t * State.t
 type t
+
+val extend : t -> resolution -> t
+
+val compare : t -> t -> int
+val equal : t -> t -> bool
 
 val resolutions : t -> resolution list
 

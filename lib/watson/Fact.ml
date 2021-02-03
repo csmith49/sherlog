@@ -2,6 +2,9 @@ module ASet = CCSet.Make(Atom)
 
 type t = ASet.t
 
+let compare = ASet.compare
+let equal = ASet.equal
+
 let atoms = ASet.to_list
 let of_atoms = ASet.of_list
 let singleton = ASet.singleton
