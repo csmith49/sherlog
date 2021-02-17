@@ -1,25 +1,30 @@
-module Node : sig
-    type t = {
-        target : string;
-        guard : string;
-        parameters : Watson.Term.t list;
-    }
+module Assignment : sig
+    type t
+
+    val make : string -> string -> Watson.Term.t list -> t
+
+    val target : t -> string
+    val guard : t -> string 
+    val parameters : t -> Watson.Term.t list
+
+    module JSON : sig
+        val encode : t -> JSON.t
+        val decode : JSON.t -> t option
+    end
 end
 
-module Observation : sig
-
-end
-
+type observation = (string * Watson.Term.t) list
 type t
 
+val make : Assignment.t list -> observation -> observation -> t
 
+val assignments : t -> Assignment.t list
+val meet : t -> observation
+val avoid : t -> observation
 
 module JSON : sig
     val encode : t -> JSON.t
+    val decode : JSON.t -> t option
 end
 
-type t
-
-val of_solutions : Watson.Proof.Solution.t list -> t
-val of_proof : Watson.Proof.t -> t
-val to_json : t -> Yojson.Basic.t
+val of_explanation : Explanation.t -> Explanation.t -> t

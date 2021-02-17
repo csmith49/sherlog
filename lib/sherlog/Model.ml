@@ -1,125 +1,158 @@
 module Assignment = struct
     type t = {
         target : string;
-        semantics : Watson.Guard.t;
+        guard : string;
         parameters : Watson.Term.t list;
     }
 
-    let to_json a = `Assoc [
-        ("target", `String a.target);
-        ("semantics", Utility.Guard.to_json a.semantics);
-        ("parameters", `List (CCList.map Utility.Term.to_json a.parameters));
+    let make target guard params = {
+        target = target ; guard = guard ; parameters = params ;
+    }
+
+    let target a = a.target
+    let guard a = a.guard
+    let parameters a = a.parameters
+
+    module JSON = struct
+        let encode a = `Assoc [
+            ("type", `String "assignment");
+            ("target", `String (target a));
+            ("guard", `String (guard a));
+            ("parameters", `List (a |> parameters |> CCList.map Watson.Term.JSON.encode));
+        ]
+
+        let decode json = 
+            let target = JSON.Parse.(find string "target" json) in
+            let guard = JSON.Parse.(find string "guard" json) in
+            let parameters = JSON.Parse.(find (list Watson.Term.JSON.decode) "parameters" json) in
+            match target, guard, parameters with
+                | Some target, Some guard, Some parameters -> Some {
+                    target = target;
+                    guard = guard;
+                    parameters = parameters;
+                }
+                | _ -> None
+    end
+end
+
+type observation = (string * Watson.Term.t) list
+
+type t = {
+    assignments : Assignment.t list;
+    meet : observation;
+    avoid : observation;
+}
+
+let make assignments meet avoid = {
+    assignments = assignments ; meet = meet ; avoid = avoid ;
+}
+
+let assignments m = m.assignments
+let meet m = m.meet
+let avoid m = m.avoid
+
+module JSON = struct
+    let encode model = `Assoc [
+        ("type", `String "model");
+        ("assignments", `List (model |> assignments |> CCList.map Assignment.JSON.encode));
+        ("meet", `Assoc (model |> meet |> CCList.map (CCPair.map_snd Watson.Term.JSON.encode)));
+        ("avoid", `Assoc (model |> avoid |> CCList.map (CCPair.map_snd Watson.Term.JSON.encode)));
     ]
+
+    let decode json = 
+        let assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
+        let meet = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "meet" json) in
+        let avoid = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "avoid" json) in
+        match assignments, meet, avoid with
+            | Some assignments, Some meet, Some avoid -> Some {
+                assignments = assignments;
+                meet = meet;
+                avoid = avoid;
+            }
+        | _ -> None
 end
-
-module Observation = struct
-    type t = (string * Watson.Term.t) list
-
-    let of_list xs = xs
-
-    let to_json o = `Assoc (CCList.map (CCPair.map_snd Utility.Term.to_json) o) 
-end
-
-type t = (Assignment.t list * Observation.t) list
 
 module Compile = struct
-    type introduction = {
-        target : Watson.Term.t;
-        semantics : Watson.Guard.t;
-        parameters : Watson.Term.t list;
-        context : Watson.Term.t list;
-    }
-    type 'a conjunct = And of ('a * introduction) list
+    type intro = Explanation.Introduction.t
 
-    (* minor utilities *)
-    let tags (conjunct : 'a conjunct) : 'a list = match conjunct with
-        | And xs -> CCList.map fst xs
+    (* a simple annotated type to mark the compilation process and hold the intermediate results *)
+    type 'a taglist = ('a * intro) list
 
-    let map (f : ('a * introduction) -> ('b * introduction)) (conjunct : 'a conjunct) : 'b conjunct = match conjunct with
-        | And xs -> And (CCList.map f xs)
+    (* construct a taglist from an explanation - no processing, no tag *)
+    let of_explanation (ex : Explanation.t) : unit taglist = ex
+        |> Explanation.introductions
+        |> CCList.map (CCPair.make ())
 
-    let initialize (solution : Watson.Proof.Solution.t) : unit conjunct =
-        let intros = solution
-            |> Watson.Proof.Solution.introductions
-            |> CCList.map (fun (g, p, c, v) ->
-                let intro = {
-                    target = v;
-                    semantics = g;
-                    parameters = p;
-                    context = c;
-                } in
-                ( (), intro )
-            ) in
-        And intros
-
-    let name_introduction (intro : introduction) : string =
-        let name = intro.semantics in
-        let args = intro.parameters
+    (* name a single introduction *)
+    let name_intro (intro : intro) : string = 
+        let f = intro
+            |> Explanation.Introduction.mechanism in
+        let p = intro
+            |> Explanation.Introduction.parameters
             |> CCList.map Watson.Term.to_string
             |> CCString.concat ", " in
-        let cons = intro.context
+        let c = intro
+            |> Explanation.Introduction.context
             |> CCList.map Watson.Term.to_string
             |> CCString.concat ", " in
-        name ^ "[" ^ args ^ " | " ^ cons ^ "]"    
+        f ^ "[" ^ p ^ " | " ^ c ^ "]"
 
-    let name (conjunct : unit conjunct) : string conjunct =
-        let f ((), intro) = (name_introduction intro, intro) in map f conjunct
+    (* tag each intro with the computed name *)
+    let associate_names (intros : unit taglist) : string taglist =
+    let f ((), intro) = (name_intro intro, intro) in
+        CCList.map f intros
 
-    let renaming (conjunct : string conjunct) : Watson.Map.t =
-        let f (name, intro) = match intro.target with
-            | Watson.Term.Value (Watson.Term.Variable target) ->
-                (Some (target, Watson.Term.Value (Watson.Term.Variable name)), intro)
+    (* build map from targets to computed names *)
+    let renaming (intros : string taglist) : Watson.Substitution.t =
+        let f (name, intro) = match Explanation.Introduction.target intro with
+            | Watson.Term.Variable x ->
+                let target = Watson.Term.Variable (Watson.Identifier.of_string name) in
+                (Some (x, target), intro)
             | _ -> (None, intro) in
-        conjunct
-            |> map f
-            |> tags
+        CCList.map f intros
+            |> CCList.map fst
             |> CCList.keep_some
-            |> Watson.Map.of_list
+            |> Watson.Substitution.of_list
 
-    let construct_assignments (conjunct : string conjunct) (renaming : Watson.Map.t) : Assignment.t conjunct =
-        let f (name, intro) =
+    (* build assignments from named intros *)
+    let rec assignments (intros : string taglist) : Assignment.t taglist =
+        let s = renaming intros in
+        CCList.map (build_assignment s) intros
+    and build_assignment (s : Watson.Substitution.t) : (string * intro) -> (Assignment.t * intro) = function
+        (name, intro) ->
             let assignment = {
                 Assignment.target = name;
-                semantics = intro.semantics;
-                parameters = CCList.map (Watson.Map.apply renaming) intro.parameters;
-            } in (assignment, intro)
-        in map f conjunct
-
-    let annotate (conjunct : string conjunct) : Assignment.t conjunct =
-        construct_assignments conjunct (renaming conjunct)
-
-    let assignments (conjunct : Assignment.t conjunct) : Assignment.t list = tags conjunct
-
-    let observation (conjunct : Assignment.t conjunct) : Observation.t =
-        let f (assignment, intro) = match intro.target with
-            | Watson.Term.Value (Watson.Term.Variable _) -> (None, intro)
-            | (_ as term) -> let tag = (assignment.Assignment.target, term) in
+                guard = Explanation.Introduction.mechanism intro;
+                parameters = intro
+                    |> Explanation.Introduction.parameters
+                    |> CCList.map (Watson.Substitution.apply s);
+            } in
+            (assignment, intro)
+    
+    (* get observation *)
+    let observation (intros : Assignment.t taglist) : observation =
+        let f (assignment, intro) = match Explanation.Introduction.target intro with
+            | Watson.Term.Variable _ -> (None, intro)
+            | (_ as term) ->
+                let tag = (Assignment.target assignment, term) in
                 (Some tag, intro) in
-        conjunct
-            |> map f
-            |> tags
+        CCList.map f intros
+            |> CCList.map fst
             |> CCList.keep_some
-            |> Observation.of_list
+
 end
 
-let of_solutions solutions =
-    let stories = solutions
-        |> CCList.map Compile.initialize
-        |> CCList.map Compile.name
-        |> CCList.map Compile.annotate in
-    stories
-        |> CCList.map (fun s ->
-            let assignments = Compile.assignments s in
-            let observation = Compile.observation s in
-                (assignments, observation)
-        )
-
-let of_proof proof = let solutions = Watson.Proof.Solution.of_proof proof in of_solutions solutions
-
-(* and writing out *)
-let to_json model =
-    let f (assignments, observation) = `Assoc [
-            ("story", `List (CCList.map Assignment.to_json assignments));
-            ("observation", Observation.to_json observation);
-        ] in
-    `List (CCList.map f model)
+let of_explanation positive negative =
+    let pa = positive
+        |> Compile.of_explanation
+        |> Compile.associate_names
+        |> Compile.assignments in
+    let na = negative
+        |> Compile.of_explanation
+        |> Compile.associate_names
+        |> Compile.assignments in
+    {
+        assignments = pa @ na |> CCList.map fst;
+        meet = pa |> Compile.observation;
+        avoid = na |> Compile.observation;
+    }
