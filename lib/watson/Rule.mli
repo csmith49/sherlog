@@ -11,6 +11,8 @@ val apply : Substitution.t -> t -> t
 
 val avoiding_rename : Identifier.t list -> t -> t
 
+val to_string : t -> string
+
 module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option

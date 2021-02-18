@@ -30,6 +30,13 @@ let avoiding_rename ids rule =
     let substitution = Substitution.of_list assoc in
         apply substitution rule
 
+let to_string rule =
+    let head = Atom.to_string rule.head in
+    let body = rule.body
+        |> CCList.map Atom.to_string
+        |> CCString.concat ", " in
+    head ^ " <- " ^ body
+
 module JSON = struct
     let encode rule = `Assoc [
         ("type", `String "rule");
@@ -37,8 +44,8 @@ module JSON = struct
         ("body", `List (rule |> body |> CCList.map Atom.JSON.encode));
     ]
 
-    let decode json =
-        let head = JSON.Parse.(find Atom.JSON.decode "head" json) in
-        let body = JSON.Parse.(find (list Atom.JSON.decode) "body" json) in
-        CCOpt.map2 make head body
+    let decode json = let open CCOpt in
+        let* head = JSON.Parse.(find Atom.JSON.decode "head" json) in
+        let* body = JSON.Parse.(find (list Atom.JSON.decode) "body" json) in
+        return (make head body)
 end

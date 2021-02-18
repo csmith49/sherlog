@@ -9,11 +9,11 @@ let to_list = IMap.to_list
 
 let rec apply h = function
     | Term.Variable x -> begin match IMap.find_opt x h with
+        | Some (Term.Variable y as term) when Identifier.equal x y -> term
         | Some term -> if Term.is_ground term then term else apply h term
         | None -> Term.Variable x end
-    | Term.Function (f, args) -> 
-        let args' = CCList.map (apply h) args in
-            Term.Function (f, args')
+    | Term.Function (f, args) -> let args' = CCList.map (apply h) args in
+        Term.Function (f, args')
     | (_ as term) -> term
 
 let simplify h =

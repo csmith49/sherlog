@@ -34,14 +34,15 @@ let apply h atom = { atom with
 }
 
 let unifiable left right =
-    if (relation left) != (relation right)
-        then false
-        else (arity left) == (arity right)
+    (CCString.equal_caseless (relation left) (relation right)) &&
+        (CCInt.equal (arity left) (arity right))
 
-let unify left right = if unifiable left right
-    then let constraints = CCList.map2 Substitution.Unification.equate (terms left) (terms right) in
-        Substitution.Unification.resolve_equalities constraints
-    else None
+let unify left right = 
+    if unifiable left right then 
+        let constraints = CCList.map2 Substitution.Unification.equate (terms left) (terms right) in
+            Substitution.Unification.resolve_equalities constraints
+    else 
+        None
 
 module JSON = struct
     let encode atom = `Assoc [
@@ -50,8 +51,8 @@ module JSON = struct
         ("terms", `List (atom |> terms |> CCList.map Term.JSON.encode));
     ]
 
-    let decode json =
-        let relation = JSON.Parse.(find string "relation" json) in
-        let terms = JSON.Parse.(find (list Term.JSON.decode) "terms" json) in
-        CCOpt.map2 make relation terms
+    let decode json = let open CCOpt in
+        let* relation = JSON.Parse.(find string "relation" json) in
+        let* terms = JSON.Parse.(find (list Term.JSON.decode) "terms" json) in
+            return (make relation terms)
 end

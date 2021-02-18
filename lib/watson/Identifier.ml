@@ -36,13 +36,11 @@ module JSON = struct
 		("index", `Int (index id));
 	]
 
-	let decode json =
-		let name = JSON.Parse.(find string "name" json) in
-		let index = JSON.Parse.(find int "index" json) in
-		match name, index with
-			| Some name, Some index -> name
+	let decode json = let open CCOpt in
+		let* name = JSON.Parse.(find string "name" json) in
+		let* index = JSON.Parse.(find int "index" json) in
+			name
 				|> of_string
 				|> reindex index
-				|> CCOpt.return
-			| _ -> None
+				|> return
 end

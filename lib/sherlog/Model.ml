@@ -21,17 +21,11 @@ module Assignment = struct
             ("parameters", `List (a |> parameters |> CCList.map Watson.Term.JSON.encode));
         ]
 
-        let decode json = 
-            let target = JSON.Parse.(find string "target" json) in
-            let guard = JSON.Parse.(find string "guard" json) in
-            let parameters = JSON.Parse.(find (list Watson.Term.JSON.decode) "parameters" json) in
-            match target, guard, parameters with
-                | Some target, Some guard, Some parameters -> Some {
-                    target = target;
-                    guard = guard;
-                    parameters = parameters;
-                }
-                | _ -> None
+        let decode json = let open CCOpt in
+            let* target = JSON.Parse.(find string "target" json) in
+            let* guard = JSON.Parse.(find string "guard" json) in
+            let* parameters = JSON.Parse.(find (list Watson.Term.JSON.decode) "parameters" json) in
+                return (make target guard parameters)
     end
 end
 
@@ -59,17 +53,11 @@ module JSON = struct
         ("avoid", `Assoc (model |> avoid |> CCList.map (CCPair.map_snd Watson.Term.JSON.encode)));
     ]
 
-    let decode json = 
-        let assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
-        let meet = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "meet" json) in
-        let avoid = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "avoid" json) in
-        match assignments, meet, avoid with
-            | Some assignments, Some meet, Some avoid -> Some {
-                assignments = assignments;
-                meet = meet;
-                avoid = avoid;
-            }
-        | _ -> None
+    let decode json = let open CCOpt in
+        let* assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
+        let* meet = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "meet" json) in
+        let* avoid = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "avoid" json) in
+            return (make assignments meet avoid)
 end
 
 module Compile = struct

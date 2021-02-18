@@ -1,4 +1,4 @@
 (library
-    (name interface)
+    (name network)
     (libraries containers yojson lwt lwt.unix)
 )

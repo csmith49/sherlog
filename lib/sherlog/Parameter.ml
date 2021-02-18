@@ -42,8 +42,9 @@ module JSON = struct
 			("domain", domain)
 		]
 
-	let decode json =
-		let name = JSON.Parse.(find string "name" json) in
-		let domain = JSON.Parse.(find string "domain" json) in
-		CCOpt.map2 make name (CCOpt.flat_map domain_of_string domain)
+	let decode json = let open CCOpt in
+		let* name = JSON.Parse.(find string "name" json) in
+		let* domain_rep = JSON.Parse.(find string "domain" json) in
+		let* domain = domain_of_string domain_rep in
+			return (make name domain)
 end

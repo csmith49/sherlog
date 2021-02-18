@@ -2,6 +2,8 @@ type t = Watson.Atom.t list
 
 let make atoms = atoms
 
+let to_fact ev = Watson.Fact.of_atoms ev
+
 module JSON = struct
 	let encode evidence = `Assoc [
 		("type", `String "evidence");

@@ -27,8 +27,8 @@ module JSON = struct
 		("constraints", `List (ontology |> constraints |> CCList.map encode_constraint));
 	]
 
-	let decode json =
-		let dependencies = JSON.Parse.(find (list Rule.JSON.decode) "dependencies" json) in
-		let constraints = JSON.Parse.(find (list (list Atom.JSON.decode)) "constraints" json) in
-		CCOpt.map2 (fun dep -> fun con -> {dependencies = dep; constraints = con;}) dependencies constraints
+	let decode json = let open CCOpt in
+		let* dependencies = JSON.Parse.(find (list Rule.JSON.decode) "dependencies" json) in
+		let* constraints = JSON.Parse.(find (list (list Atom.JSON.decode)) "constraints" json) in
+			return (make dependencies constraints)
 end
