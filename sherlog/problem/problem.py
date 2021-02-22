@@ -31,17 +31,6 @@ class Problem:
         # just record the rest
         self._evidence = evidence
         self.program = program
-        # build up the stories
-        self._stories = []
-        for evidence in self._evidence:
-            for context in evidence.concretize(self._namespace):
-                external = (context, self.parameter_map, self._namespace)
-                stories = []
-                for result in interface.query(self.program, evidence.atoms):
-                    model = Model.of_json(result["story"])
-                    observation = Observation.of_json(result["observation"])
-                    stories.append(Story(model, observation, external=external))
-                self._stories.append(stories)
 
     @classmethod
     def of_json(cls, json):
@@ -56,10 +45,10 @@ class Problem:
         Problem
         """
         parameters = [Parameter.of_json(p) for p in json["parameters"]]
-        namespaces = json["namespaces"]
+        # namespaces = json["namespaces"]
         evidence = [Evidence.of_json(e) for e in json["evidence"]]
         program = json["program"]
-        return cls(parameters=parameters, namespaces=namespaces, evidence=evidence, program=program)
+        return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
     def stories(self):
         """Construct all stories encoded by the problem.
@@ -68,7 +57,13 @@ class Problem:
         -------
         Story list iterable
         """
-        yield from self._stories
+        external = (self.parameter_map, self._namespace)
+        for evidence in self._evidence:
+            for model_json in query(self.program, evidence.atoms):
+                model = Model.of_json(model_json["assignments"])
+                meet = Observation.of_json(model_json["meet"])
+                avoid = Observation.of_json(model_json["avoid"])
+                yield Story(model, meet, avoid, external=external)
 
     def objective(self, stories, k=100):
         # pick k stories proportional to the weight
