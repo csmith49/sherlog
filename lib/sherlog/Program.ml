@@ -38,7 +38,25 @@ module Filter = struct
 	let total proofs = proofs
 	
 	(* TODO - fix this to ensure consistency wrt params and contexts *)
-	let intro_consistent proofs = proofs
+	let rec intro_consistent proofs = CCList.filter is_intro_consistent proofs
+	and is_intro_consistent proof =
+		let size = proof
+			|> Watson.Proof.to_fact
+			|> Watson.Fact.atoms
+			|> CCList.length in
+		let unique_intros = proof
+			|> Watson.Proof.to_fact
+			|> Watson.Fact.atoms
+			|> CCList.filter_map Explanation.Introduction.of_atom
+			|> CCList.map intro_hash
+			|> CCList.uniq ~eq:(CCList.equal Watson.Term.equal)
+			|> CCList.length in
+		CCInt.equal size unique_intros
+	and intro_hash intro =
+		let mechanism = Watson.Term.Symbol (Explanation.Introduction.mechanism intro) in
+		let parameters = Explanation.Introduction.parameters intro in
+		let context = Explanation.Introduction.context intro in
+			mechanism :: (parameters @ context)
 	
 	let length l proofs = proofs
 		|> CCList.filter (fun p -> Watson.Proof.length p <= l)

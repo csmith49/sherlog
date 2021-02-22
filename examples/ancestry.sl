@@ -6,5 +6,5 @@ parent(brooke, damocles).
 ancestor(X, Y) <- parent(X, Y).
 ancestor(X, Y) <- parent(X, Z), ancestor(Z, Y).
 
-# query
-ancestor(xerces, X)?
+# evidence
+!evidence ancestor(xerces, X).

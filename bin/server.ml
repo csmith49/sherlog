@@ -15,6 +15,34 @@ let handler json = match JSON.Parse.(find string "command" json) with
         JSON.Parse.(find string "program" json)
             |> CCOpt.map Sherlog.IO.parse
             |> CCOpt.map Sherlog.Program.JSON.encode
+    | Some "query" -> let open CCOpt in
+        (* get core program and query *)
+        let* program = JSON.Parse.(find Sherlog.Program.JSON.decode "program" json) in
+        let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "query" json) 
+            |> CCOpt.map Sherlog.Evidence.to_fact in
+        (* get parameters for search *)
+        let search_length = JSON.Parse.(find int "depth" json)
+            |> CCOpt.get_or ~default:CCInt.max_int in
+        let search_width = JSON.Parse.(find int "width" json)
+            |> CCOpt.get_or ~default:CCInt.max_int in
+        (* build filter from parameters *)
+        let filter = Sherlog.Program.Filter.(
+            width search_width >> length search_length >> intro_consistent
+        ) in
+        let models = query
+            |> Sherlog.Program.prove program filter
+            |> CCList.flat_map (fun proof ->
+                    let contradiction_proofs = Sherlog.Program.contradict program filter proof in
+                    let contradictions = if CCList.length contradiction_proofs > 0
+                        then contradiction_proofs |> CCList.map Sherlog.Explanation.of_proof
+                        else [Sherlog.Explanation.empty] in
+                    let justification = Sherlog.Explanation.of_proof proof in
+                    CCList.map (fun contradiction ->
+                        Sherlog.Model.of_explanation justification contradiction
+                    ) contradictions
+                )
+            |> CCList.map Sherlog.Model.JSON.encode in
+        return (`List models)
     | _ -> None
 
 (* main *)
