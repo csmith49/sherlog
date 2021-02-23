@@ -57,3 +57,6 @@ class Observation:
         """
         for _, v in self.mapping.items():
             yield evaluate(v, store, algebra)
+
+    def __str__(self):
+        return str(self.mapping)

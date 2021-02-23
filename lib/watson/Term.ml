@@ -1,5 +1,5 @@
 type t =
-    | Variable of Identifier.t
+    | Variable of string
     | Symbol of string
     | Integer of int
     | Float of float
@@ -9,7 +9,7 @@ type t =
     | Wildcard
 
 let rec to_string = function
-    | Variable x -> Identifier.to_string x
+    | Variable x -> x
     | Symbol s -> s
     | Integer i -> CCInt.to_string i
     | Float f -> CCFloat.to_string f
@@ -32,7 +32,7 @@ let rec is_ground = function
     | _ -> true
 
 let rec occurs x = function
-    | Variable y when Identifier.equal x y -> true
+    | Variable y when CCString.equal x y -> true
     | Function (_, args) -> args |> CCList.exists (occurs x)
     | _ -> false
 
@@ -40,7 +40,7 @@ let rec variables = function
     | Variable x -> [x]
     | Function (_, args) -> args
         |> CCList.flat_map variables
-        |> Identifier.uniq
+        |> CCList.uniq ~eq:CCString.equal
     | _ -> []
 
 
@@ -50,7 +50,7 @@ module JSON = struct
         ("value", encoder value);
     ]
     let rec encode = function
-        | Variable x -> lift "variable" Identifier.JSON.encode x
+        | Variable x -> lift "variable" JSON.Make.string x
         | Symbol s -> lift "symbol" JSON.Make.string s
         | Integer i -> lift "integer" JSON.Make.int i
         | Float f -> lift "float" JSON.Make.float f
@@ -65,7 +65,7 @@ module JSON = struct
 
     let rec decode json = match JSON.Parse.(find string "type" json) with
         | Some "variable" -> json
-            |> JSON.Parse.(find Identifier.JSON.decode "value")
+            |> JSON.Parse.(find string "value")
             |> CCOpt.map (fun x -> Variable x)
         | Some "symbol" -> json
             |> JSON.Parse.(find string "value")

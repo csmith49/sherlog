@@ -27,7 +27,7 @@ let to_string atom =
 let variables atom = atom
     |> terms
     |> CCList.flat_map Term.variables
-    |> Identifier.uniq
+    |> CCList.uniq ~eq:CCString.equal
 
 let apply h atom = { atom with
     terms = atom.terms |> CCList.map (Substitution.apply h);

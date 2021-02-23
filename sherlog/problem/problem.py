@@ -1,6 +1,5 @@
 from .namespace import Namespace
 from .parameter import Parameter
-from .evidence import Evidence
 from .observation import Observation
 from .. import interface
 from ..engine import Model, value, Store
@@ -20,7 +19,7 @@ class Problem:
 
         namespaces : string iterable
 
-        evidence : Evidence iterable
+        evidence : JSON-like object iterable
 
         program : JSON-like object
         """
@@ -46,8 +45,8 @@ class Problem:
         """
         parameters = [Parameter.of_json(p) for p in json["parameters"]]
         # namespaces = json["namespaces"]
-        evidence = [Evidence.of_json(e) for e in json["evidence"]]
-        program = json["program"]
+        evidence = json["evidence"]
+        program = json
         return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
     def stories(self):
@@ -59,7 +58,7 @@ class Problem:
         """
         external = (self.parameter_map, self._namespace)
         for evidence in self._evidence:
-            for model_json in query(self.program, evidence.atoms):
+            for model_json in interface.query(self.program, evidence):
                 model = Model.of_json(model_json["assignments"])
                 meet = Observation.of_json(model_json["meet"])
                 avoid = Observation.of_json(model_json["avoid"])

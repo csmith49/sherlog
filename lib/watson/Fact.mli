@@ -19,4 +19,4 @@ val to_string : t -> string
 
 val discharge : t -> (Atom.t * t) option
 
-val variables : t -> Identifier.t list
+val variables : t -> string list

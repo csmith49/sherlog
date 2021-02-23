@@ -1,0 +1,144 @@
+{'command': 'sample', 'program': [
+        {'head': {'kind': 'intro', 'guard': 'beta', 'parameters': [
+                    {'type': 'constant', 'value': 'p'
+                    },
+                    {'type': 'constant', 'value': 'q'
+                    }
+                ], 'context': [
+                    {'type': 'constant', 'value': 'weight'
+                    },
+                    {'type': 'variable', 'value': 'C'
+                    }
+                ], 'target': {'type': 'variable', 'value': '_I'
+                }
+            }, 'body': [
+                {'kind': 'atom', 'relation': 'is_coin', 'arguments': [
+                        {'type': 'variable', 'value': 'C'
+                        }
+                    ]
+                }
+            ]
+        },
+        {'head': {'kind': 'atom', 'relation': 'weight', 'arguments': [
+                    {'type': 'variable', 'value': 'C'
+                    },
+                    {'type': 'variable', 'value': '_I'
+                    }
+                ]
+            }, 'body': [
+                {'kind': 'intro', 'guard': 'beta', 'parameters': [
+                        {'type': 'constant', 'value': 'p'
+                        },
+                        {'type': 'constant', 'value': 'q'
+                        }
+                    ], 'context': [
+                        {'type': 'constant', 'value': 'weight'
+                        },
+                        {'type': 'variable', 'value': 'C'
+                        }
+                    ], 'target': {'type': 'variable', 'value': '_I'
+                    }
+                },
+                {'kind': 'atom', 'relation': 'is_coin', 'arguments': [
+                        {'type': 'variable', 'value': 'C'
+                        }
+                    ]
+                }
+            ]
+        },
+        {'head': {'kind': 'intro', 'guard': 'bernoulli', 'parameters': [
+                    {'type': 'variable', 'value': 'P'
+                    }
+                ], 'context': [
+                    {'type': 'constant', 'value': 'flip'
+                    },
+                    {'type': 'variable', 'value': 'C'
+                    }
+                ], 'target': {'type': 'variable', 'value': '_I'
+                }
+            }, 'body': [
+                {'kind': 'atom', 'relation': 'weight', 'arguments': [
+                        {'type': 'variable', 'value': 'C'
+                        },
+                        {'type': 'variable', 'value': 'P'
+                        }
+                    ]
+                }
+            ]
+        },
+        {'head': {'kind': 'atom', 'relation': 'flip', 'arguments': [
+                    {'type': 'variable', 'value': 'C'
+                    },
+                    {'type': 'variable', 'value': '_I'
+                    }
+                ]
+            }, 'body': [
+                {'kind': 'intro', 'guard': 'bernoulli', 'parameters': [
+                        {'type': 'variable', 'value': 'P'
+                        }
+                    ], 'context': [
+                        {'type': 'constant', 'value': 'flip'
+                        },
+                        {'type': 'variable', 'value': 'C'
+                        }
+                    ], 'target': {'type': 'variable', 'value': '_I'
+                    }
+                },
+                {'kind': 'atom', 'relation': 'weight', 'arguments': [
+                        {'type': 'variable', 'value': 'C'
+                        },
+                        {'type': 'variable', 'value': 'P'
+                        }
+                    ]
+                }
+            ]
+        },
+        {'head': {'kind': 'atom', 'relation': 'results', 'arguments': [
+                    {'type': 'variable', 'value': 'C'
+                    },
+                    {'type': 'constant', 'value': 'heads'
+                    }
+                ]
+            }, 'body': [
+                {'kind': 'atom', 'relation': 'flip', 'arguments': [
+                        {'type': 'variable', 'value': 'C'
+                        },
+                        {'type': 'float', 'value': 1.0
+                        }
+                    ]
+                }
+            ]
+        },
+        {'head': {'kind': 'atom', 'relation': 'results', 'arguments': [
+                    {'type': 'variable', 'value': 'C'
+                    },
+                    {'type': 'constant', 'value': 'tails'
+                    }
+                ]
+            }, 'body': [
+                {'kind': 'atom', 'relation': 'flip', 'arguments': [
+                        {'type': 'variable', 'value': 'C'
+                        },
+                        {'type': 'float', 'value': 0.0
+                        }
+                    ]
+                }
+            ]
+        },
+        {'head': {'kind': 'atom', 'relation': 'is_coin', 'arguments': [
+                    {'type': 'constant', 'value': 'coin1'
+                    }
+                ]
+            }, 'body': []
+        }
+    ], 'query': {'atoms': [
+            {'kind': 'atom', 'relation': 'results', 'arguments': [
+                    {'type': 'constant', 'value': 'coin1'
+                    },
+                    {'type': 'constant', 'value': 'heads'
+                    }
+                ]
+            }
+        ]
+    }
+}

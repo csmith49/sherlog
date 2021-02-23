@@ -94,7 +94,7 @@ module Compile = struct
     let renaming (intros : string taglist) : Watson.Substitution.t =
         let f (name, intro) = match Explanation.Introduction.target intro with
             | Watson.Term.Variable x ->
-                let target = Watson.Term.Variable (Watson.Identifier.of_string name) in
+                let target = Watson.Term.Variable name in
                 (Some (x, target), intro)
             | _ -> (None, intro) in
         CCList.map f intros

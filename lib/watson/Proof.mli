@@ -14,7 +14,7 @@ module State : sig
 
     val is_empty : t -> bool
     
-    val variables : t -> Identifier.t list
+    val variables : t -> string list
 
     val resolve : t -> Rule.t -> (Atom.t * t) option
 end

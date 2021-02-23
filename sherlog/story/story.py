@@ -6,9 +6,10 @@ import torch
 import storch
 
 class Story:
-    def __init__(self, model, observation, external=()):
+    def __init__(self, model, meet, avoid, external=()):
         self.model = model
-        self.observation = observation
+        self.meet = meet
+        self.avoid = avoid
         self._external = external
 
     @property

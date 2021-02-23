@@ -27,6 +27,6 @@ let discharge fact = match ASet.choose_opt fact with
 let variables fact = fact
     |> atoms
     |> CCList.flat_map Atom.variables
-    |> Identifier.uniq
+    |> CCList.uniq ~eq:CCString.equal
 
 let mem = ASet.mem

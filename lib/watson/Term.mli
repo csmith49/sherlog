@@ -1,5 +1,5 @@
 type t =
-    | Variable of Identifier.t
+    | Variable of string
     | Symbol of string
     | Integer of int
     | Float of float
@@ -14,9 +14,9 @@ val compare : t -> t -> int
 val equal : t -> t -> bool
 
 val is_ground : t -> bool
-val occurs : Identifier.t -> t -> bool
+val occurs : string -> t -> bool
 
-val variables : t -> Identifier.t list
+val variables : t -> string list
 
 module JSON : sig
     val encode : t -> JSON.t

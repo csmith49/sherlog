@@ -1,4 +1,4 @@
-module IMap = CCMap.Make(Identifier)
+module IMap = CCMap.Make(CCString)
 
 type t = Term.t IMap.t
 
@@ -9,7 +9,7 @@ let to_list = IMap.to_list
 
 let rec apply h = function
     | Term.Variable x -> begin match IMap.find_opt x h with
-        | Some (Term.Variable y as term) when Identifier.equal x y -> term
+        | Some (Term.Variable y as term) when CCString.equal x y -> term
         | Some term -> if Term.is_ground term then term else apply h term
         | None -> Term.Variable x end
     | Term.Function (f, args) -> let args' = CCList.map (apply h) args in
@@ -18,7 +18,7 @@ let rec apply h = function
 
 let simplify h =
     let nontrivial key value = match value with
-        | Term.Variable x -> not (Identifier.equal key x)
+        | Term.Variable x -> not (CCString.equal key x)
         | _ -> true
     in IMap.filter nontrivial h
 
@@ -29,6 +29,14 @@ let compose l r =
         | `Right x -> Some x
         | `Both (x, _) -> Some x in
     IMap.merge_safe ~f:choose_left l r
+
+let to_string h = h
+    |> IMap.to_list
+    |> CCList.map (fun (k, v) ->
+            k ^ " : " ^ (Term.to_string v)
+        )
+    |> CCString.concat ", "
+    |> fun s -> "[" ^ s ^ "]"
 
 module Unification = struct
     type equality = Eq of Term.t * Term.t

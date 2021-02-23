@@ -1,4 +1,4 @@
-from .value import Variable, Constant
+from .value import Variable, Symbol
 
 class Store:
     def __init__(self, external=()):
@@ -21,7 +21,7 @@ class Store:
         if isinstance(key, Variable):
             return self._internal[key.name]
         # for constants, check the external maps in order
-        elif isinstance(key, Constant):
+        elif isinstance(key, Symbol):
             for external_map in self._external:
                 try:
                     return external_map[key.name]

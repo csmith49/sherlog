@@ -50,7 +50,7 @@ def query(program, query, depth=None, width=None, seeds=None):
     CommunicationError
     """
     message = {
-        "command" : "sample",
+        "command" : "query",
         "program" : program,
         "query"   : query,
     }

@@ -36,7 +36,7 @@ module State = struct
     let resolve state rule = match discharge state with
         | Some (atom, state) ->
             let rule = Rule.avoiding_rename (variables state) rule in
-            begin match Atom.unify atom (Rule.head rule) with
+            begin match Atom.unify (Rule.head rule) atom with
                 | Some sub ->
                     let state = state
                         |> extend (Rule.body rule)

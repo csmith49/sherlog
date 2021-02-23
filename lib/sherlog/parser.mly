@@ -56,7 +56,7 @@ value :
     | f = FLOAT { Term.Float f }
     | i = INTEGER { Term.Integer i }
     | s = SYMBOL { Term.Symbol s }
-    | x = VARIABLE { Term.Variable (Identifier.of_string x) }
+    | x = VARIABLE { Term.Variable x }
     ;
 
 term :

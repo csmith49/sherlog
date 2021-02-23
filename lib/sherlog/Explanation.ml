@@ -27,28 +27,32 @@ module Introduction = struct
 
 	let of_atom atom = let open Watson.Term in
 		(* check the relation *)
-		if (Watson.Atom.relation atom) != "introduction" then None else
+		if not (CCString.equal (Watson.Atom.relation atom) "introduction") then None else
 		(* unpack the arguments *)
 		match Watson.Atom.terms atom with
-			| [m; p; c; y] ->
-				let mechanism = match m with
+			| [m; p; c; y] -> let open CCOpt in
+				let* mechanism = match m with
 					| Function ("mechanism", [Symbol m]) -> Some m
 					| _ -> None in
-				let parameters = match p with
+				let* parameters = match p with
 					| Function ("parameters", p) -> Some p
 					| _ -> None in
-				let context = match c with
+				let* context = match c with
 					| Function ("context", c) -> Some c
 					| _ -> None in
-				let target = match y with
+				let* target = match y with
 					| Function ("target", [y]) -> Some y
 					| _ -> None in
 				(* no such thing as CCOpt.map4... *)
-				begin match mechanism, parameters, context, target with
-					| Some m, Some p, Some c, Some y -> Some (make m p c y)
-					| _ -> None
-				end
+				return (make mechanism parameters context target)
 			| _ -> None
+
+	let to_string intro =
+		let t = intro |> target |> Watson.Term.to_string in
+		let f = intro |> mechanism in
+		let p = intro |> parameters |> CCList.map Watson.Term.to_string |> CCString.concat ", " in
+		let c = intro |> context |> CCList.map Watson.Term.to_string |> CCString.concat ", " in
+			t ^ " <- " ^ f ^ "(" ^ p ^ " | " ^ c ^ ")"
 end
 
 type t = Introduction.t list
@@ -62,3 +66,8 @@ let of_proof proof = proof
 	|> CCList.filter_map Introduction.of_atom
 
 let join = CCList.append
+
+let to_string ex = ex
+	|> introductions
+	|> CCList.map Introduction.to_string
+	|> CCString.concat ", "

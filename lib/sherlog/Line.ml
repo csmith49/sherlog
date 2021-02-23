@@ -13,7 +13,7 @@ let encode_intro
     ~parameters:parameters
     ~context:context
     ~body:body =
-        let target = Watson.Term.Variable (Watson.Identifier.of_string "_I") in
+        let target = Watson.Term.Variable "_I" in
         let intro = Explanation.Introduction.make f parameters context target
             |> Explanation.Introduction.to_atom in
         (* intro <- body *)

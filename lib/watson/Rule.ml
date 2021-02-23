@@ -14,21 +14,28 @@ let body rule = rule.body
 let variables rule =
     let hvars = rule |> head |> Atom.variables in
     let bvars = rule |> body |> CCList.flat_map Atom.variables in
-    Identifier.uniq (hvars @ bvars)
+    CCList.uniq ~eq:CCString.equal (hvars @ bvars)
 
 let apply h rule = {
     head = rule |> head |> Atom.apply h;
     body = rule |> body |> CCList.map (Atom.apply h);
 }
 
-let avoiding_rename ids rule =
-    let index = Identifier.avoiding_index ids in
-    let rename x = Term.Variable (Identifier.reindex index x) in
+let avoiding_rename vars rule =
+    let rec avoid name index = match index with
+        | None ->
+            if CCList.mem ~eq:CCString.equal name vars
+                then avoid name (Some 0)
+                else Term.Variable name
+        | Some i -> let name' = name ^ "_" ^ (CCInt.to_string i) in
+            if CCList.mem ~eq:CCString.equal name' vars
+                then avoid name (Some (i + 1))
+                else Term.Variable name' in
     let assoc = rule
         |> variables
-        |> CCList.map (fun x -> (x, rename x)) in
-    let substitution = Substitution.of_list assoc in
-        apply substitution rule
+        |> CCList.map (fun x -> (x, avoid x None)) in
+    let sub = Substitution.of_list assoc in
+        apply sub rule
 
 let to_string rule =
     let head = Atom.to_string rule.head in

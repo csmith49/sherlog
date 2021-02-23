@@ -10,6 +10,8 @@ module Introduction : sig
 
     val to_atom : t -> Watson.Atom.t
     val of_atom : Watson.Atom.t -> t option
+
+    val to_string : t -> string
 end
 
 type t
@@ -20,3 +22,5 @@ val empty : t
 val of_proof : Watson.Proof.t -> t
 
 val join : t -> t -> t
+
+val to_string : t -> string
