@@ -64,9 +64,8 @@ class Problem:
                 avoid = Observation.of_json(model_json["avoid"])
                 yield Story(model, meet, avoid, external=external)
 
-    def objective(self, stories):
-        # compute the loss of each
-        losses = [story.objective(index=i) for i, story in enumerate(stories)]
+    def objectives(self, stories):
+        return [story.objective(index=i) for i, story in enumerate(stories)]
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.

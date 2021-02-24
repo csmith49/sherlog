@@ -1,6 +1,7 @@
 from .problem import Register
 from . import problem
 from . import engine
+from . import inference
 import itertools
 
 def batch(data, batch_size=1, magnification=1):
