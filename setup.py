@@ -14,6 +14,8 @@ setup(name='sherlog',
           "torch",
           "rich",
           "click",
-          "hashids"
+          "hashids",
+          "pandas",
+          "altair"
       ],
       zip_safe=False)
