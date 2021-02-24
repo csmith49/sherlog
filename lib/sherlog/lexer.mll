@@ -45,13 +45,11 @@ rule read = parse
     | "@" { AT }
     | "." { PERIOD }
     | "," { COMMA }
-    | "in" { IN }
     (* inference tokens *)
     | "!parameter" { PARAMETER }
-    | "!namespace" { NAMESPACE }
     | "!evidence" { EVIDENCE }
-    (* queries *)
-    | "?" { QMARK }
+    | "!dependency" { DEPENDENCY }
+    | "!constraint" { CONSTRAINT }
     (* eof *)
     | eof { EOF }
     (* boolean *)

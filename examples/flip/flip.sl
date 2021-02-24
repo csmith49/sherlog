@@ -13,9 +13,6 @@ results(C, tails) <- flip(C, 0.0).
 # observations
 is_coin(coin1).
 
-#query
-results(coin1, heads)?
-
 # evidence
 !evidence results(coin1, heads).
 !evidence results(coin1, heads).

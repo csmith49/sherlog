@@ -10,53 +10,43 @@ let _ = Arg.parse spec_list print_endline usage_msg
 
 (* message handling *)
 
-let handler json = match Interface.JSON.Parse.(find string "command" json) with
+let handler json = match JSON.Parse.(find string "command" json) with
     | Some "parse" ->
-        Interface.JSON.Parse.(find string "program" json)
-            |> CCOpt.map Sherlog.parse
-            |> CCOpt.map Sherlog.Problem.to_json
-    | Some "run" ->
-        let query = Interface.JSON.Parse.(find identity "query" json) 
-            |> CCOpt.flat_map Sherlog.Query.of_json in
-        let program = Interface.JSON.Parse.(find identity "program" json)
-            |> CCOpt.flat_map Sherlog.Program.of_json in
-        begin match query, program with
-            | Some query, Some program ->
-                let model = query
-                    |> Watson.Proof.of_query
-                    |> Watson.Proof.resolve program
-                    |> Sherlog.Model.of_proof in
-                Some (Sherlog.Model.to_json model)
-            | _ -> None
-        end
-    | Some "sample" ->
-        (* get program and query *)
-        let query = Interface.JSON.Parse.(find identity "query" json)
-            |> CCOpt.flat_map Sherlog.Query.of_json in
-        let program = Interface.JSON.Parse.(find identity "program" json)
-            |> CCOpt.flat_map Sherlog.Program.of_json in
-        (* get configuration *)
-        let depth = Interface.JSON.Parse.(find int "depth" json)
+        JSON.Parse.(find string "program" json)
+            |> CCOpt.map Sherlog.IO.parse
+            |> CCOpt.map Sherlog.Program.JSON.encode
+    | Some "query" -> let open CCOpt in
+        (* get core program and query *)
+        let* program = JSON.Parse.(find Sherlog.Program.JSON.decode "program" json) in
+        let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "query" json) 
+            |> CCOpt.map Sherlog.Evidence.to_fact in
+        (* get parameters for search *)
+        let search_length = JSON.Parse.(find int "depth" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
-        let width = Interface.JSON.Parse.(find int "width" json)
+        let search_width = JSON.Parse.(find int "width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
-        let seeds = Interface.JSON.Parse.(find int "seeds" json)
-            |> CCOpt.get_or ~default:1 in
-        let configuration = {Watson.Proof.Random.default_configuration with
-            depth = depth; width = width; seeds = seeds;
-        } in begin match query, program with
-            | Some query, Some program ->
-                let model = query
-                    |> Watson.Proof.Random.resolve configuration program
-                    |> CCList.flat_map Watson.Proof.Solution.of_proof
-                    |> Sherlog.Model.of_solutions in
-                Some (Sherlog.Model.to_json model)
-            | _ -> None
-        end
+        (* build filter from parameters *)
+        let filter = Sherlog.Program.Filter.(
+            width search_width >> length search_length
+        ) in
+        let models = query
+            |> Sherlog.Program.prove program filter
+            |> CCList.flat_map (fun proof ->
+                    let contradiction_proofs = Sherlog.Program.contradict program filter proof in
+                    let contradictions = if CCList.length contradiction_proofs > 0
+                        then contradiction_proofs |> CCList.map Sherlog.Explanation.of_proof
+                        else [Sherlog.Explanation.empty] in
+                    let justification = Sherlog.Explanation.of_proof proof in
+                    CCList.map (fun contradiction ->
+                        Sherlog.Model.of_explanation justification contradiction
+                    ) contradictions
+                )
+            |> CCList.map Sherlog.Model.JSON.encode in
+        return (`List models)
     | _ -> None
 
 (* main *)
 let _ =
-    let socket = Interface.Network.socket Interface.Network.local_address !port in
-    let server = Interface.Network.server handler socket in
-    Interface.Network.run server
+    let socket = Network.socket Network.local_address !port in
+    let server = Network.server handler socket in
+    Network.run server

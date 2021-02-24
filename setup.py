@@ -9,13 +9,13 @@ setup(name='sherlog',
       license='MIT',
       packages=find_packages(),
       install_requires=[
+          "networkx",
           "pyro-ppl",
           "torch",
-          "torchvision",
-          "altair",
-          "pandas",
-          "alive-progress",
+          "rich",
           "click",
-          "hashids"
+          "hashids",
+          "pandas",
+          "altair"
       ],
       zip_safe=False)

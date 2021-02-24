@@ -1,9 +1,10 @@
+# Sherlog.Interface
+
 from .socket import connect
 from ..config import PORT
+from . import io
 from time import sleep
 from . import server
-
-sleep(1)
 
 class CommunicationError(Exception): pass
 
@@ -50,7 +51,7 @@ def query(program, query, depth=None, width=None, seeds=None):
     CommunicationError
     """
     message = {
-        "command" : "sample",
+        "command" : "query",
         "program" : program,
         "query"   : query,
     }

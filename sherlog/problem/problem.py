@@ -1,6 +1,5 @@
 from .namespace import Namespace
 from .parameter import Parameter
-from .evidence import Evidence
 from .observation import Observation
 from .. import interface
 from ..engine import Model, value, Store
@@ -20,7 +19,7 @@ class Problem:
 
         namespaces : string iterable
 
-        evidence : Evidence iterable
+        evidence : JSON-like object iterable
 
         program : JSON-like object
         """
@@ -31,17 +30,6 @@ class Problem:
         # just record the rest
         self._evidence = evidence
         self.program = program
-        # build up the stories
-        self._stories = []
-        for evidence in self._evidence:
-            for context in evidence.concretize(self._namespace):
-                external = (context, self.parameter_map, self._namespace)
-                stories = []
-                for result in interface.query(self.program, evidence.atoms):
-                    model = Model.of_json(result["story"])
-                    observation = Observation.of_json(result["observation"])
-                    stories.append(Story(model, observation, external=external))
-                self._stories.append(stories)
 
     @classmethod
     def of_json(cls, json):
@@ -56,10 +44,10 @@ class Problem:
         Problem
         """
         parameters = [Parameter.of_json(p) for p in json["parameters"]]
-        namespaces = json["namespaces"]
-        evidence = [Evidence.of_json(e) for e in json["evidence"]]
-        program = json["program"]
-        return cls(parameters=parameters, namespaces=namespaces, evidence=evidence, program=program)
+        # namespaces = json["namespaces"]
+        evidence = json["evidence"]
+        program = json
+        return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
     def stories(self):
         """Construct all stories encoded by the problem.
@@ -68,15 +56,16 @@ class Problem:
         -------
         Story list iterable
         """
-        yield from self._stories
+        external = (self.parameter_map, self._namespace)
+        for evidence in self._evidence:
+            for model_json in interface.query(self.program, evidence):
+                model = Model.of_json(model_json["assignments"])
+                meet = Observation.of_json(model_json["meet"])
+                avoid = Observation.of_json(model_json["avoid"])
+                yield Story(model, meet, avoid, external=external)
 
-    def objective(self, stories, k=100):
-        # pick k stories proportional to the weight
-        weights = [story.weight for story in stories]
-        stories = random.choices(stories, weights, k=k)
-
-        # compute the loss of each
-        losses = [story.loss(index=i) for i, story in enumerate(stories)]
+    def objectives(self, stories):
+        return [story.objective(index=i) for i, story in enumerate(stories)]
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
@@ -134,9 +123,8 @@ class Problem:
 
     def log_likelihood(self, num_samples=1):
         total = torch.tensor(0.0)
-        for stories in self.stories():
-            for story in stories:
-                total += torch.log(story.likelihood(num_samples=num_samples))
+        for story in self.stories():
+            total += torch.log(story.likelihood(num_samples=num_samples))
         return total
 
 def load(filepath: str):

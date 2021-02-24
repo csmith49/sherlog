@@ -17,7 +17,10 @@ class Variable:
     def __str__(self):
         return self.name
 
-class Constant:
+    def __repr__(self):
+        return f"<Variable: {self.name}>"
+
+class Symbol:
     def __init__(self, name):
         """Symbolic constant from a Sherlog program.
 
@@ -44,19 +47,12 @@ def of_json(json):
     -------
     Python object
     """
-    # unit
-    if json["type"] == "unit": return None
-    # pair
-    elif json["type"] == "pair":
-        left = of_json(json["left"])
-        right = of_json(json["right"])
-        return (left, right)
     # variable
-    elif json["type"] == "variable":
+    if json["type"] == "variable":
         return Variable(json["value"])
     # constant
-    elif json["type"] == "constant":
-        return Constant(json["value"])
+    elif json["type"] == "symbol":
+        return Symbol(json["value"])
     # otherwise, just return the value
     else:
         return json["value"]

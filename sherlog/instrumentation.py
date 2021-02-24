@@ -1,5 +1,10 @@
 from time import perf_counter as current_time
 from json import dumps
+from hashids import Hashids
+from random import randint
+
+# set up the hashid conversion for seed generation
+hashids = Hashids()
 
 class Timer:
     __slots__ = ("_start_time", "_stop_time")
@@ -93,3 +98,6 @@ class Instrumenter:
     def __enter__(self): return self
 
     def __exit__(self, *args): self.flush()
+
+def seed():
+    return hashids.encode(randint(0, 100000))

@@ -1,14 +1,14 @@
 import networkx as nx
 from . import value
 
-class Statement:
-    def __init__(self, target, function, arguments):
+class Assignment:
+    def __init__(self, target, guard, arguments):
         """An assignment statement of the form `target = function(arguments)`.
 
         Parameters
         ----------
         target : Variable
-        function : string
+        guard : string
         arguments : list of values
 
         Returns
@@ -16,7 +16,7 @@ class Statement:
         Statement
         """
         self.target = target
-        self.function = function
+        self.guard = guard
         self.arguments = arguments
 
     def dependencies(self):
@@ -34,7 +34,7 @@ class Statement:
 
     def __str__(self):
         args = ", ".join(str(arg) for arg in self.arguments)
-        return f"{self.target} <- {self.function}({args})"
+        return f"{self.target} <- {self.guard}({args})"
 
     @classmethod
     def of_json(cls, json):
@@ -49,13 +49,13 @@ class Statement:
         Statement
         """
         target = value.Variable(json["target"])
-        semantics = json["semantics"]
+        guard = json["guard"]
         arguments = [value.of_json(p) for p in json["parameters"]]
-        return cls(target, semantics, arguments)
+        return cls(target, guard, arguments)
 
 class Model:
-    def __init__(self, statements):
-        """A collection of statements encoding a generative model.
+    def __init__(self, assignments):
+        """A collection of assignments encoding a generative model.
 
         Parameters
         ----------
@@ -65,29 +65,29 @@ class Model:
         -------
         Model
         """
-        self._statements = statements
+        self._assignments = assignments
 
         # build the target map
         self._target_map = {}
-        for statement in self._statements:
-            self._target_map[statement.target] = statement
+        for assignment in self._assignments:
+            self._target_map[assignment.target] = assignment
 
         # build the dataflow graph
         self._dataflow_graph = nx.DiGraph()
-        for statement in self._statements:
-            self._dataflow_graph.add_node(statement.target)
-            for dependency in statement.dependencies():
-                self._dataflow_graph.add_edge(dependency, statement.target)
+        for assignment in self._assignments:
+            self._dataflow_graph.add_node(assignment.target)
+            for dependency in assignment.dependencies():
+                self._dataflow_graph.add_edge(dependency, assignment.target)
  
     @property
-    def statements(self):
-        """An iterable of statements in the model in topological order.
+    def assignments(self):
+        """An iterable of assignments in the model in topological order.
 
         The order is determined by variable dependencies.
 
         Returns
         -------
-        Statement iterable
+        Assignment iterable
         """
         for node in nx.algorithms.dag.topological_sort(self._dataflow_graph):
             yield self._target_map[node]
@@ -104,5 +104,5 @@ class Model:
         -------
         Model
         """
-        statements = [Statement.of_json(line) for line in json]
-        return cls(statements)
+        assignments = [Assignment.of_json(line) for line in json]
+        return cls(assignments)

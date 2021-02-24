@@ -1,18 +1,15 @@
 import sherlog
 import click
-from hashids import Hashids
-from random import randint
 from torch.optim import SGD, Adam
-from alive_progress import alive_bar
 from time import sleep
-from sherlog.instrumentation import Instrumenter
-import storch
+from sherlog.instrumentation import Instrumenter, seed
+from sherlog.interface import io
 
-inst = Instrumenter("likelihood.jsonl", context={"problem" : "flip", "method" : "sgd"})
-hashids = Hashids()
+from rich.progress import track
 
 # delay to let the server spin up
-sleep(1)
+with io.status("Spinning up the server..."):
+    sleep(1)
 
 # load the problem
 problem = sherlog.problem.load("./flip.sl")
@@ -26,8 +23,6 @@ problem = sherlog.problem.load("./flip.sl")
 @click.option("--mcmc-size", default=50, help="The number of samples used to approximate a gradient")
 @click.option("--log/--no-log", default=False, help="Enables/disables recording of results")
 def train(epochs, optimizer, learning_rate, mcmc_size, log):
-    seed = hashids.encode(randint(0, 100000))
-
     optim = {
         "sgd" : SGD,
         "adam" : Adam
@@ -37,27 +32,22 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "optimizer" : optimizer,
         "learning-rate" : learning_rate,
         "mcmc-size" : mcmc_size,
-        "seed" : seed
+        "seed" : seed()
     })
 
-    with alive_bar(epochs) as bar:
-        for i in range(epochs):
-            for stories in problem.stories():
-                optim.zero_grad()
-                loss = problem.objective(stories)
-                storch.backward()
-                optim.step()
-                problem.clamp_parameters()
-            bar()
+    for i in track(range(epochs), description="Training..."):
+        with sherlog.inference.step(optim, problem):
+            for j, story in enumerate(problem.stories()):
+                story.objective(index=j).maximize()
 
-            if i % 100 == 0:
-                likelihood = problem.log_likelihood(num_samples=mcmc_size)
-                instrumenter.emit(
-                    likelihood=likelihood.item(),
-                    step=i,
-                    p=problem._parameters["p"].value.item(),
-                    q=problem._parameters["q"].value.item()
-                )
+        if i % 100 == 0:
+            likelihood = problem.log_likelihood(num_samples=mcmc_size)
+            instrumenter.emit(
+                likelihood=likelihood.item(),
+                step=i,
+                p=problem._parameters["p"].value.item(),
+                q=problem._parameters["q"].value.item()
+            )
 
     # print the final parameters
     print("Learned parameters:")

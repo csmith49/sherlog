@@ -15,6 +15,10 @@ class Observation:
         """
         self.mapping = mapping
 
+    @property
+    def size(self):
+        return len(self.mapping)
+
     @classmethod
     def of_json(cls, json):
         """Build an observation from a JSON representation.
@@ -57,3 +61,6 @@ class Observation:
         """
         for _, v in self.mapping.items():
             yield evaluate(v, store, algebra)
+
+    def __str__(self):
+        return str(self.mapping)
