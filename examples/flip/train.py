@@ -42,12 +42,11 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
 
     with alive_bar(epochs) as bar:
         for i in range(epochs):
-            for stories in problem.stories():
-                optim.zero_grad()
-                loss = problem.objective(stories)
-                storch.backward()
-                optim.step()
-                problem.clamp_parameters()
+            optim.zero_grad()
+            loss = problem.objective(problem.stories())
+            storch.backward()
+            optim.step()
+            problem.clamp_parameters()
             bar()
 
             if i % 100 == 0:

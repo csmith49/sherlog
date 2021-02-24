@@ -13,17 +13,13 @@ class Story:
         self._external = external
 
     @property
-    def weight(self):
-        return 1
-
-    @property
     def store(self):
         return Store(external=self._external)
 
     def run(self, algebra, parameters={}):
         store = self.store
-        for stmt in self.model.statements:
-            run(stmt, store, algebra, parameters=parameters)
+        for assignment in self.model.assignments:
+            run(assignment, store, algebra, parameters=parameters)
         return store
 
     def generative_model(self):
@@ -32,8 +28,8 @@ class Story:
         # build the site for the result
         result = value.Variable("sherlog:result")
         similarities = []
-        obs_t = torch.stack(list(self.observation.evaluate(store, stochastic.algebra)))
-        store_t = torch.stack([store[v] for v in self.observation.variables()])
+        obs_t = torch.stack(list(self.meet.evaluate(store, stochastic.algebra)))
+        store_t = torch.stack([store[v] for v in self.meet.variables()])
         similarities.append(torch.cosine_similarity(obs_t, store_t, dim=0))
         store[result] = stochastic.delta(result, max(similarities))
             
@@ -51,8 +47,8 @@ class Story:
         store = self.run(scg.algebra)
         
         # build the observation distances
-        obs_vec = self.observation.evaluate(store, scg.algebra)
-        store_vec = [store[v] for v in self.observation.variables()]
+        obs_vec = self.meet.evaluate(store, scg.algebra)
+        store_vec = [store[v] for v in self.meet.variables()]
     
         total = torch.tensor(0.0)
         for o, s in zip(obs_vec, store_vec):

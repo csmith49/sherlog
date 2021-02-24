@@ -64,11 +64,7 @@ class Problem:
                 avoid = Observation.of_json(model_json["avoid"])
                 yield Story(model, meet, avoid, external=external)
 
-    def objective(self, stories, k=100):
-        # pick k stories proportional to the weight
-        weights = [story.weight for story in stories]
-        stories = random.choices(stories, weights, k=k)
-
+    def objective(self, stories):
         # compute the loss of each
         losses = [story.loss(index=i) for i, story in enumerate(stories)]
 
@@ -128,9 +124,8 @@ class Problem:
 
     def log_likelihood(self, num_samples=1):
         total = torch.tensor(0.0)
-        for stories in self.stories():
-            for story in stories:
-                total += torch.log(story.likelihood(num_samples=num_samples))
+        for story in self.stories():
+            total += torch.log(story.likelihood(num_samples=num_samples))
         return total
 
 def load(filepath: str):

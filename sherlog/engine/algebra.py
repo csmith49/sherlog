@@ -21,7 +21,7 @@ def evaluate(obj, store, algebra):
     """
     if isinstance(obj, value.Variable):
         return store[obj]
-    elif isinstance(obj, value.Constant):
+    elif isinstance(obj, value.Symbol):
         return algebra.lift(store[obj])
     else:
         return algebra.lift(obj)
@@ -82,14 +82,14 @@ def evaluate_external(f, arguments, algebra):
     result = f(*unlifted_arguments)
     return algebra.lift(result)
 
-def run(statement, store, algebra, parameters={}):
-    """Run a statement, updating the store in-place and returning the result.
+def run(assignment, store, algebra, parameters={}):
+    """Run an assignment statement, updating the store in-place and returning the result.
 
     Parameters can be passed to a built-in `f` by including a `f : kwargs` key-value pair in the optional `parameters`.
 
     Parameters
     ----------
-    statement : Statement
+    assignment : Assignment
 
     store : Store
 
@@ -103,22 +103,22 @@ def run(statement, store, algebra, parameters={}):
     """
     # get kwargs for the function to be executed
     try:
-        kwargs = parameters[statement.function]
+        kwargs = parameters[assignment.guard]
     except KeyError:
         kwargs = {}
     # and add the target to them (helps with, e.g., pyro)
-    kwargs["target"] = statement.target
+    kwargs["target"] = assignment.target
 
     # evaluate the arguments real quick
-    arguments = evaluate_arguments(statement.arguments, store, algebra)
+    arguments = evaluate_arguments(assignment.arguments, store, algebra)
 
     # run the callable
     try:
-        callable = algebra.builtins[statement.function]
+        callable = algebra.builtins[assignment.guard]
         result = evaluate_builtin(callable, arguments, parameters=kwargs)
     except KeyError:
-        callable = store.lookup_callable(statement.function)
+        callable = store.lookup_callable(assignment.guard)
         result = evaluate_external(callable, arguments, algebra)
 
-    store[statement.target] = result
+    store[assignment.target] = result
     return result
