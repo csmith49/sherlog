@@ -3,10 +3,11 @@ import click
 from torch.optim import SGD, Adam
 from time import sleep
 from sherlog.instrumentation import Instrumenter, seed
-from rich.progress import track
+from sherlog.interface import io
 
 # delay to let the server spin up
-sleep(3)
+with io.status("Spinning up the server..."):
+    sleep(1)
 
 # load the problem
 problem = sherlog.problem.load("./flip.sl")
@@ -32,7 +33,7 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "seed" : seed()
     })
 
-    for i in track(range(epochs), description="Training..."):
+    for i in io.track(range(epochs), description="Training..."):
         with sherlog.inference.step(optim, problem):
             for i, story in enumerate(problem.stories()):
                 story.objective(index=i).maximize()
