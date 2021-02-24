@@ -3,16 +3,16 @@ import click
 from hashids import Hashids
 from random import randint
 from torch.optim import SGD, Adam
-from alive_progress import alive_bar
 from time import sleep
 from sherlog.instrumentation import Instrumenter
 import storch
+from rich.progress import track
 
 inst = Instrumenter("likelihood.jsonl", context={"problem" : "flip", "method" : "sgd"})
 hashids = Hashids()
 
 # delay to let the server spin up
-sleep(1)
+sleep(3)
 
 # load the problem
 problem = sherlog.problem.load("./flip.sl")
@@ -40,23 +40,21 @@ def train(epochs, optimizer, learning_rate, mcmc_size, log):
         "seed" : seed
     })
 
-    with alive_bar(epochs) as bar:
-        for i in range(epochs):
-            optim.zero_grad()
-            loss = problem.objective(problem.stories())
-            storch.backward()
-            optim.step()
-            problem.clamp_parameters()
-            bar()
+    for i in track(range(epochs), description="Training..."):
+        optim.zero_grad()
+        loss = problem.objective(problem.stories())
+        storch.backward()
+        optim.step()
+        problem.clamp_parameters()
 
-            if i % 100 == 0:
-                likelihood = problem.log_likelihood(num_samples=mcmc_size)
-                instrumenter.emit(
-                    likelihood=likelihood.item(),
-                    step=i,
-                    p=problem._parameters["p"].value.item(),
-                    q=problem._parameters["q"].value.item()
-                )
+        if i % 100 == 0:
+            likelihood = problem.log_likelihood(num_samples=mcmc_size)
+            instrumenter.emit(
+                likelihood=likelihood.item(),
+                step=i,
+                p=problem._parameters["p"].value.item(),
+                q=problem._parameters["q"].value.item()
+            )
 
     # print the final parameters
     print("Learned parameters:")

@@ -1,4 +1,5 @@
 from ..engine import Store, run, value
+from ..interface import io
 from . import stochastic
 from . import scg
 
@@ -43,19 +44,38 @@ class Story:
         results = model()["sherlog:result"]
         return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
 
-    def loss(self, p=2, index=0):
+    def objective(self, index=0):
         store = self.run(scg.algebra)
         
-        # build the observation distances
-        obs_vec = self.meet.evaluate(store, scg.algebra)
-        store_vec = [store[v] for v in self.meet.variables()]
-    
-        total = torch.tensor(0.0)
-        for o, s in zip(obs_vec, store_vec):
-            total += torch.dist(o, s, p=2)
+        # build the indexes for the nodes we'll add
+        p_meet = value.Variable(f"sherlog:p_meet:{index}")
+        p_avoid = value.Variable(f"sherlog:p_avoid:{index}")
+        p = value.Variable(f"sherlog:p:{index}")
 
-        result = value.Variable(f"sherlog:result:{index}")
-        store[result] = total
-        storch.add_cost(store[result], result.name)
+        # compute values for the nodes
+        store[p_meet] = observation_similarity(self.meet, store)
+        store[p_avoid] = observation_similarity(self.avoid, store)
+        store[p] = store[p_meet] * (1 - store[p_avoid])
+
+        # add the result node as a cost
+        storch.add_cost(-1 * store[p], p.name)
 
         return store
+
+def observation_similarity(observation, store, epsilon=0.1):
+    """Computes cosine similarity between a given observation and a store."""
+
+    if observation.size is 0: return torch.tensor(0.0)
+
+    obs_vec = observation.evaluate(store, scg.algebra)
+    str_vec = [store[v] for v in observation.variables()]
+
+    dot_prod = torch.tensor(epsilon)
+    mag_a, mag_b = torch.tensor(epsilon), torch.tensor(epsilon)
+
+    for a, b in zip(obs_vec, str_vec):
+        dot_prod += a * b
+        mag_a += torch.pow(a, 2)
+        mag_b += torch.pow(b, 2)
+    
+    return dot_prod / torch.sqrt(mag_a * mag_b)

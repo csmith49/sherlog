@@ -12,7 +12,7 @@ setup(name='sherlog',
           "networkx",
           "pyro-ppl",
           "torch",
-          "alive-progress",
+          "rich",
           "click",
           "hashids"
       ],

@@ -1,3 +1,10 @@
+# Sherlog.Interface.Server
+"""
+On import, starts an instance of `sherlog-server` on port `config.PORT`.
+
+Relies on `atexit` to terminate the server when this module goes out of scope.
+"""
+
 from ..logs import get
 from subprocess import Popen
 from ..config import PORT

@@ -1,9 +1,10 @@
+# Sherlog.Interface
+
 from .socket import connect
 from ..config import PORT
+from . import io
 from time import sleep
 from . import server
-
-sleep(1)
 
 class CommunicationError(Exception): pass
 

@@ -66,7 +66,7 @@ class Problem:
 
     def objective(self, stories):
         # compute the loss of each
-        losses = [story.loss(index=i) for i, story in enumerate(stories)]
+        losses = [story.objective(index=i) for i, story in enumerate(stories)]
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
