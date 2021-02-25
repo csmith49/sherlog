@@ -1,14 +1,10 @@
 .PHONY: all
-all: run server
+all: install
 
-# building the executables
-run: lib bin/run.ml
-	@dune build bin/run.exe
-	@mv _build/default/bin/run.exe run
-
-server: lib bin/server.ml
-	@dune build bin/server.exe
-	@mv _build/default/bin/server.exe server
+.PHONY: install
+install:
+	@opam install . --working-dir
+	@python3 -m pip install .
 
 # for entering interactive mode
 .PHONY: live
@@ -19,4 +15,3 @@ live: lib
 .PHONY: clean
 clean:
 	@dune clean
-	@rm -rf _build run server

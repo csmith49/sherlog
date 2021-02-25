@@ -2,9 +2,12 @@
 
 from .socket import connect
 from ..config import PORT
-from . import io
+from .io import console
 from time import sleep
 from . import server
+
+with console.status("Spinning up server..."):
+    sleep(1)
 
 class CommunicationError(Exception): pass
 

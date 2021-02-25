@@ -42,6 +42,7 @@
 // and colons for separating arguments and the like
 %token COLON
 %token DOUBLECOLON
+%token OR
 %token BLANK
 
 
@@ -104,6 +105,15 @@ intro_clause :
     }
     ;
 
+fuzzy_clause :
+    | w = term; DOUBLECOLON; head = atom; PERIOD {
+        Line.encode_fuzzy ~head:head ~body:[] ~weight:w
+    }
+    | w = term; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
+        Line.encode_fuzzy ~head:head ~body:body ~weight:w
+    }
+    ;
+
 // inference
 parameter :
     | PARAMETER; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
@@ -120,7 +130,9 @@ evidence :
     ;
 
 ontology_dependency :
-    | DEPENDENCY; clause = clause; PERIOD { clause }
+    | DEPENDENCY; head = separated_list(OR, atom); ARROW; body = atoms; PERIOD { 
+        head |> CCList.map (fun hd -> `Dependency (Rule.make hd body))
+    }
     ;
 
 ontology_constraint :
@@ -133,10 +145,12 @@ line :
     | clause = clause;              { [`Rule clause] }
     // generative logic programming
     | intro_clause = intro_clause;  { intro_clause }
+    // ala problog
+    | fuzzy_clause = fuzzy_clause;  { fuzzy_clause }
     // inference
     | parameter = parameter;        { [`Parameter parameter] }
     | evidence = evidence;          { [`Evidence evidence] }
-    | d = ontology_dependency;      { [`Dependency d] }
+    | d = ontology_dependency;      { d }
     | c = ontology_constraint;      { [`Constraint c] }
     ;
 
