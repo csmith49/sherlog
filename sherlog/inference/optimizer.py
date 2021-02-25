@@ -23,6 +23,7 @@ class Optimizer:
         logger.info("Clearing gradients and optimization goals.")
         self.optimizer.zero_grad()
         self._maximize, self._minimize = [], []
+        return self
 
     def __exit__(self, *args):
         # construct storch costs

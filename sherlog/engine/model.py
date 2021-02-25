@@ -1,4 +1,5 @@
 import networkx as nx
+from ..interface import console
 from . import value
 
 class Assignment:
@@ -48,7 +49,8 @@ class Assignment:
         -------
         Statement
         """
-        target = value.Variable(json["target"])
+
+        target = value.Variable(json["target"])        
         guard = json["guard"]
         arguments = [value.of_json(p) for p in json["parameters"]]
         return cls(target, guard, arguments)
@@ -106,3 +108,6 @@ class Model:
         """
         assignments = [Assignment.of_json(line) for line in json]
         return cls(assignments)
+
+    def __str__(self):
+        return str([str(assignment) for assignment in self.assignments])

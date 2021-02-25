@@ -59,17 +59,27 @@ def main(**kwargs):
 
     optimizer = sherlog.inference.Optimizer(problem, optim)
 
-    for i in track(range(kwargs["epochs"]), description="Training Sherlog"):
+    for epoch in track(range(kwargs["epochs"]), description="Training Sherlog"):
+        stories = list(problem.stories(depth=100, width=10))
         with optimizer as o:
-            for j, story in enumerate(problem.stories()):
-                o.maximize(story.objective(index=j))
+            for i, story in enumerate(stories):
+                o.maximize(story.objective(index=i))
+                output = {
+                    "model" : [str(ass) for ass in story.model.assignments],
+                    "meet" : story.meet.mapping,
+                    "avoid" : story.avoid.mapping
+                }
+                console.print(output)
 
-        if i % 100 == 0:
+        if epoch % 100 == 0:
+            console.rule(f"Epoch {epoch}")
+            console.print(len(stories))
+            console.print(problem._parameters.items())
             likelihood = problem.log_likelihood(num_samples=100)
             instrumenter.emit(
                 tool="sherlog",
                 likelihood=likelihood.item(),
-                step=i,
+                step=epoch,
                 stress=problem._parameters["stress"].value.item(),
                 influence=problem._parameters["influence"].value.item(),
                 spontaneous=problem._parameters["spontaneous"].value.item(),

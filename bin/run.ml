@@ -2,10 +2,12 @@
 let files = ref []
 let search_depth = ref CCInt.max_int
 let search_width = ref CCInt.max_int
+let echo = ref false
 
 let spec_list = [
     ("--depth", Arg.Set_int search_depth, "Sets proof search depth");
     ("--width", Arg.Set_int search_width, "Sets proof search width");
+    ("--echo", Arg.Set echo, "If enabled, prints the program before execution");
 ]
 let anon_fun arg = files := arg :: !files
 let usage_msg = "Sherlog Interpreter"
@@ -35,6 +37,7 @@ let operate filename =
         |> Sherlog.Program.evidence
         |> CCList.map Sherlog.Evidence.to_fact in
     let _ = print_endline ((facts |> CCList.length |> CCInt.to_string) ^ " facts found.") in
+    let _ = if !echo then CCList.iter (fun r -> print_endline (Watson.Rule.to_string r)) (Sherlog.Program.rules program) else () in
     CCList.iter (fun fact ->
         let _ = print_endline ("Fact: " ^ (Watson.Fact.to_string fact)) in
         let _ = print_string   "  Deriving proofs..." in
