@@ -24,15 +24,16 @@ from rich.progress import track
 def main(**kwargs):
 
     # build abstract problem to convert to sherlog / problog programs
-    abstract_problem = generation.problem(
-        kwargs["size"],
-        stress=kwargs["stress"],
-        influence=kwargs["influence"],
-        spontaneous=kwargs["spontaneous"],
-        comorbid=kwargs["comorbid"],
-        observed=kwargs["observed"],
-        evidence=kwargs["evidence"]
-    )
+    with console.status("Generating random social graph..."):
+        abstract_problem = generation.problem(
+            kwargs["size"],
+            stress=kwargs["stress"],
+            influence=kwargs["influence"],
+            spontaneous=kwargs["spontaneous"],
+            comorbid=kwargs["comorbid"],
+            observed=kwargs["observed"],
+            evidence=kwargs["evidence"]
+        )
     
     # instrumentation
     instrumenter = Instrumenter("classic-smokers-results.jsonl", context={
@@ -51,15 +52,17 @@ def main(**kwargs):
     # SHERLOG TRAINING
     problem = sherlog.problem.loads(generation.to_sherlog(abstract_problem))
 
-    optimizer = {
+    optim = {
         "sgd" : SGD,
         "adam" : Adam
     }[kwargs["optimizer"]](problem.parameters(), lr=kwargs["learning_rate"])
 
+    optimizer = sherlog.inference.Optimizer(problem, optim)
+
     for i in track(range(kwargs["epochs"]), description="Training Sherlog"):
-        with sherlog.inference.step(optimizer, problem):
+        with optimizer as o:
             for j, story in enumerate(problem.stories()):
-                story.objective(index=j).maximize()
+                o.maximize(story.objective(index=j))
 
         if i % 100 == 0:
             likelihood = problem.log_likelihood(num_samples=100)
@@ -69,7 +72,7 @@ def main(**kwargs):
                 step=i,
                 stress=problem._parameters["stress"].value.item(),
                 influence=problem._parameters["influence"].value.item(),
-                spontaneous=problem._paramters["spontaneous"].value.item(),
+                spontaneous=problem._parameters["spontaneous"].value.item(),
                 comorbid=problem._parameters["comorbid"].value.item()
             )
     
@@ -80,7 +83,7 @@ def main(**kwargs):
     likelihood = problem.log_likelihood(num_samples=100)
     print(f"Final log-likelihood: {likelihood:f}")
 
-    if log: instrumenter.flush()
+    if kwargs["log"]: instrumenter.flush()
 
 if __name__ == "__main__":
     main()

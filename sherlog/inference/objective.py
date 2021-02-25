@@ -12,13 +12,9 @@ class Objective:
     def value(self):
         return self.store[self.reference]
 
-    def maximize(self):
-        logger.info(f"Maximizing {self.reference}: {self.value}")
-        storch.add_cost(-1 * self.value, self.reference.name)
-
-    def minimize(self):
-        logger.info(f"Minimizing {self.reference}: {self.value}")
-        storch.add_cost(self.value, self.reference.name)
+    @property
+    def name(self):
+        return self.reference.name
 
     def __str__(self):
-        return f"{self.reference}: {self.value}"
+        return f"<Objective {self.name}: {self.value}>"

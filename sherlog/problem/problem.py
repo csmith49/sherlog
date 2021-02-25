@@ -49,7 +49,7 @@ class Problem:
         program = json
         return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
-    def stories(self):
+    def stories(self, width=None, depth=None):
         """Construct all stories encoded by the problem.
 
         Returns
@@ -58,7 +58,7 @@ class Problem:
         """
         external = (self.parameter_map, self._namespace)
         for evidence in self._evidence:
-            for model_json in interface.query(self.program, evidence):
+            for model_json in interface.query(self.program, evidence, width=width, depth=depth):
                 model = Model.of_json(model_json["assignments"])
                 meet = Observation.of_json(model_json["meet"])
                 avoid = Observation.of_json(model_json["avoid"])

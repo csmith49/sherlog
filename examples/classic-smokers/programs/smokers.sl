@@ -1,13 +1,13 @@
 # parameters
 !parameter stress : unit.
-!parameter asthma_smokes : unit.
-!parameter asthma_latent : unit.
+!parameter spontaneous : unit.
+!parameter comorbid : unit.
 !parameter influence : unit.
 
 # probabilistic rules
 stress :: stress(X) <- person(X).
-asthma_latent :: asthma_latent(X) <- person(X).
-asthma_smokes :: asthma_smokes(X) <- person(X).
+spontaneous :: asthma_latent(X) <- person(X).
+comorbid :: asthma_smokes(X) <- person(X).
 influence :: influence(X, Y) <- friend(X, Y).
 
 # logical rules

@@ -27,7 +27,7 @@ let position_to_string lexbuf =
     let lexbuf = Lexing.from_string string in
     let lines = try Parser.lines Lexer.read lexbuf with
         | Parser.Error ->
-            let _ = Printf.fprintf stderr "Parse Error @ %s" (position_to_string lexbuf) in
+            let _ = Printf.fprintf stderr "Parse Error: %s @ %s" (Lexing.lexeme lexbuf) (position_to_string lexbuf) in
             exit (-1)
         | Lexer.Error m ->
             let _ = Printf.fprintf stderr "Lexer Error @ %s: %s" (position_to_string lexbuf) m in

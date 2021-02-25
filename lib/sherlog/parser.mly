@@ -61,8 +61,6 @@ value :
     ;
 
 term :
-    | v = value; DOUBLECOLON; t = term { Term.Function ("cons", [v; t]) }
-    | BLANK; DOUBLECOLON; t = term { Term.Function ("cons", [Term.Wildcard; t]) }
     | v = value { v }
     | LBRACKET; RBRACKET { Term.Unit }
     | BLANK { Term.Wildcard }
@@ -106,11 +104,8 @@ intro_clause :
     ;
 
 fuzzy_clause :
-    | w = term; DOUBLECOLON; head = atom; PERIOD {
-        Line.encode_fuzzy ~head:head ~body:[] ~weight:w
-    }
     | w = term; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
-        Line.encode_fuzzy ~head:head ~body:body ~weight:w
+        Line.encode_fuzzy ~head:head ~body:[] ~weight:w
     }
     ;
 
