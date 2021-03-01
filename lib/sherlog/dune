@@ -1,6 +1,6 @@
 (library
     (name sherlog)
-    (libraries watson data JSON containers)
+    (libraries watson data JSON containers fmt)
 )
 (ocamllex lexer)
 (menhir (modules parser))

@@ -165,3 +165,42 @@ def to_problog(problem):
         evidence.append('\n'.join(lines))
 
     return source + "\n\n" + graph, "\n---\n".join(evidence)
+
+@click.command()
+@click.option("--size", default=10, help="Size of social graph")
+@click.option("--evidence", default=1, help="Number of i.i.d. observations to generate")
+@click.option("--observed", default=1.0, help="Ratio of observed extensional atoms")
+@click.option("--stress", default=0.2, help="Parameter: probability a person is stressed")
+@click.option("--influence", default=0.3, help="Parameter: probability of influence amongst friends")
+@click.option("--spontaneous", default=0.1, help="Parameter: probability of spontaneously developing asthma")
+@click.option("--comorbid", default=0.3, help="Parameter: probability of smoking-induced asthma")
+@click.option("--language", default="sherlog",
+    type=click.Choice(["sherlog", "problog"], case_sensitive=False),
+    help="The language to build the problem for")
+@click.option("--output", default="", help="Output file location")
+def generate(size, evidence, observed, stress, influence, spontaneous, comorbid, language, output):
+    # build the problem
+    p = problem(size,
+        stress=stress,
+        influence=influence,
+        spontaneous=spontaneous,
+        comorbid=comorbid,
+        evidence=evidence
+    )
+
+    # split on language
+    if language == "sherlog":
+        source = to_sherlog(p)
+    elif language == "problog":
+        source, evidence = to_problog(p)
+        source = source + "\n\n" + evidence
+    
+    # write to output
+    if output:
+        with open(output, "w") as f:
+            f.write(source)
+    else:
+        print(source)
+
+if __name__ == "__main__":
+    generate()

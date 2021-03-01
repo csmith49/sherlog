@@ -30,6 +30,13 @@ let domain_of_string = function
 	| "real" -> Some Real
 	| _ -> None
 
+let rec pp ppf param = let open Fmt in
+	pf ppf "%s : %a" param.name pp_domain param.domain
+and pp_domain ppf = function
+	| Unit -> Fmt.pf ppf "unit"
+	| Positive -> Fmt.pf ppf "pos"
+	| Real -> Fmt.pf ppf "real"
+
 module JSON = struct
 	let encode parameter = 
 		let domain = match domain parameter with

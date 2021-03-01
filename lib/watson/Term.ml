@@ -8,19 +8,6 @@ type t =
     | Function of string * t list
     | Wildcard
 
-let rec to_string = function
-    | Variable x -> x
-    | Symbol s -> s
-    | Integer i -> CCInt.to_string i
-    | Float f -> CCFloat.to_string f
-    | Boolean true -> "T"
-    | Boolean false -> "F"
-    | Unit -> "()"
-    | Function (f, args) ->
-        let args' = args |> CCList.map to_string |> CCString.concat ", " in
-        f ^ "(" ^ args' ^ ")"
-    | Wildcard -> "_"
-
 let compare l r = match l, r with
     | Wildcard, _ | _, Wildcard -> 0
     | _ -> Stdlib.compare l r
@@ -43,6 +30,18 @@ let rec variables = function
         |> CCList.uniq ~eq:CCString.equal
     | _ -> []
 
+let rec pp ppf term = let open Fmt in match term with
+    | Variable x -> (styled (`Fg `Red) string) ppf x
+    | Symbol s -> (styled (`Fg `Yellow) string) ppf s
+    | Integer i -> (styled (`Fg `Green) int) ppf i
+    | Float f -> (styled (`Fg `Green) float) ppf f
+    | Boolean b -> (styled (`Fg `Green) bool) ppf b
+    | Unit -> pf ppf "()"
+    | Wildcard -> (styled (`Faint) string) ppf "_"
+    | Function (f, args) ->
+        pf ppf "%s(@[<1>%a@])" f (list ~sep:comma pp) args
+
+let to_string = Fmt.to_to_string pp
 
 module JSON = struct
     let lift typ encoder value = `Assoc [

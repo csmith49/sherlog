@@ -40,14 +40,11 @@ module Filter = struct
 	(* TODO - fix this to ensure consistency wrt params and contexts *)
 	let rec intro_consistent proofs = CCList.filter is_intro_consistent proofs
 	and is_intro_consistent proof =
-		let size = proof
-			|> Watson.Proof.to_fact
-			|> Watson.Fact.atoms
-			|> CCList.length in
-		let unique_intros = proof
-			|> Watson.Proof.to_fact
-			|> Watson.Fact.atoms
-			|> CCList.filter_map Explanation.Introduction.of_atom
+		let intros = proof
+			|> Watson.Proof.to_atoms
+			|> CCList.filter_map Explanation.Introduction.of_atom in
+		let size = intros |> CCList.length in
+		let unique_intros = intros
 			|> CCList.map intro_hash
 			|> CCList.uniq ~eq:(CCList.equal Watson.Term.equal)
 			|> CCList.length in
@@ -59,26 +56,26 @@ module Filter = struct
 			mechanism :: (parameters @ context)
 	
 	let length l proofs = proofs
-		|> CCList.filter (fun p -> Watson.Proof.length p <= l)
+		|> CCList.filter (fun p -> (p |> Watson.Proof.witnesses |> CCList.length) <= l)
 	
 	let width w proofs =
 		if CCList.length proofs <= w then proofs else
 		let random_proofs = proofs
 			|> CCRandom.pick_list
-			|> CCRandom.sample_without_duplicates ~cmp:Watson.Proof.compare w in
+			|> CCRandom.sample_without_duplicates ~cmp:Stdlib.compare w in
 		CCRandom.run random_proofs
 
 	let compose f g proofs = proofs |> f |> g
 	let (>>) f g = compose f g
 end
 
-let rec prove program filter fact =
-	let worklist = [Watson.Proof.of_fact fact] in
+let rec prove program filter goal =
+	let worklist = [Watson.Proof.of_atoms goal] in
 		explore_tr program filter worklist []
 and explore_tr program filter worklist proven = match worklist with
 	| [] -> proven
 	| proof :: rest ->
-		if Watson.Proof.is_complete proof then
+		if Watson.Proof.is_resolved proof then
 			explore_tr program filter rest (proof :: proven)
 		else
 			let proofs = proof
@@ -86,23 +83,22 @@ and explore_tr program filter worklist proven = match worklist with
 				|> filter in
 			explore_tr program filter (proofs @ rest) proven
 
-let (|=) program fact = prove program Filter.total fact
+let (|=) program goal = prove program Filter.total goal
 
 let contradict program filter proof =
-	let state = match CCList.last_opt (Watson.Proof.resolutions proof) with
-		| Some (_, state) -> state
-		| None -> Watson.Proof.State.of_fact (Watson.Fact.empty) in
-	let atom = Watson.Atom.make "true" [] in 
+	let state = proof |> Watson.Proof.state in
 	let proofs = program
-		(* get the body of the constraints from the ontology *)
 		|> ontology
 		|> Ontology.constraints
-		(* build them into resolutions *)
-		|> CCList.map (fun atoms -> Watson.Proof.State.extend atoms state)
-		|> CCList.map (CCPair.make atom)
-		(* and tack them on to the original proof *)
-		|> CCList.map (Watson.Proof.extend proof) in
+		|> CCList.map (Watson.Proof.State.reset_goal state)
+		|> CCList.map (Watson.Proof.of_state) in
 	explore_tr program filter proofs []
+
+let pp ppf program = let open Fmt in
+	pf ppf "Parameters: %a@, Rules: %a@,%a"
+		(list ~sep:comma Parameter.pp) program.parameters
+		(list ~sep:comma Watson.Rule.pp) program.rules
+		Ontology.pp program.ontology
 
 module JSON = struct
 	let encode program = `Assoc [

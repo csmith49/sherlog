@@ -3,6 +3,7 @@ from . import problem
 from . import engine
 from . import inference
 from .interface import console
+from .logs import enable_verbose_output
 import itertools
 
 def batch(data, batch_size=1, magnification=1):

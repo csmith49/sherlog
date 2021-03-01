@@ -12,6 +12,8 @@ module Introduction : sig
     val of_atom : Watson.Atom.t -> t option
 
     val to_string : t -> string
+
+    val pp : t Fmt.t
 end
 
 type t
@@ -24,3 +26,5 @@ val of_proof : Watson.Proof.t -> t
 val join : t -> t -> t
 
 val to_string : t -> string
+
+val pp : t Fmt.t

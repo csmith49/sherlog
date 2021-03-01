@@ -37,12 +37,12 @@ let avoiding_rename vars rule =
     let sub = Substitution.of_list assoc in
         apply sub rule
 
-let to_string rule =
-    let head = Atom.to_string rule.head in
-    let body = rule.body
-        |> CCList.map Atom.to_string
-        |> CCString.concat ", " in
-    head ^ " <- " ^ body
+let pp ppf rule = let open Fmt in
+    if CCInt.equal (CCList.length rule.body) 0
+        then pf ppf "%a" Atom.pp rule.head
+        else pf ppf "%a <- %a" Atom.pp rule.head (list ~sep:comma Atom.pp) rule.body
+
+let to_string = Fmt.to_to_string pp
 
 module JSON = struct
     let encode rule = `Assoc [

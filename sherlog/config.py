@@ -22,11 +22,8 @@ LOG_CONFIG = {
         }
     },
     # configure the loggers
-    "loggers" : {
-        "pylog" : {
-            "handlers" : ["default"],
-            "level" : "INFO",
-            "propagate" : False
-        }
+    "root" : {
+        "handlers" : ["default"],
+        "level" : "WARNING"
     }
 }

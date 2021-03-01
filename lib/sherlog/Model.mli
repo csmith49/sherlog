@@ -11,16 +11,30 @@ module Assignment : sig
         val encode : t -> JSON.t
         val decode : JSON.t -> t option
     end
+
+    val pp : t Fmt.t
+    val to_string : t -> string
 end
 
-type observation = (string * Watson.Term.t) list
+module Observation : sig
+    type t = (string * Watson.Term.t) list
+
+    module JSON : sig
+        val encode : t -> JSON.t
+        val decode : JSON.t -> t option
+    end
+
+    val pp : t Fmt.t
+    val to_string : t -> string
+end
+
 type t
 
-val make : Assignment.t list -> observation -> observation -> t
+val make : Assignment.t list -> Observation.t -> Observation.t -> t
 
 val assignments : t -> Assignment.t list
-val meet : t -> observation
-val avoid : t -> observation
+val meet : t -> Observation.t
+val avoid : t -> Observation.t
 
 module JSON : sig
     val encode : t -> JSON.t
@@ -28,3 +42,6 @@ module JSON : sig
 end
 
 val of_explanation : Explanation.t -> Explanation.t -> t
+
+val pp : t Fmt.t
+val to_string : t -> string

@@ -8,7 +8,6 @@ import logging
 import logging.config
 from .config import LOG_CONFIG
 
-
 logging.config.dictConfig(LOG_CONFIG) # when first imported, check settings to see how how to enable
 
 def get(module_name):
@@ -22,7 +21,9 @@ def get(module_name):
     logger
         Logger object specialized for the provided module.
     """
-    return logging.getLogger(f"motel.{module_name}")
+    return logging.getLogger(f"sherlog.{module_name}")
 
-def enable_quiet_mode():
-    logging.disable(logging.WARNING)
+def enable_verbose_output():
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    for logger in loggers:
+        logger.setLevel(logging.INFO)

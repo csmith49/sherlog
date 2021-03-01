@@ -18,6 +18,8 @@ val occurs : string -> t -> bool
 
 val variables : t -> string list
 
+val pp : t Fmt.t
+
 module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option
