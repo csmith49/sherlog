@@ -82,6 +82,9 @@ def main(**kwargs):
                 o.maximize(story.objective(index=i))
 
         if epoch % 50 == 0:
+            console.print(story.model)
+            console.print(story.meet)
+            console.print(story.avoid)
             table = parameter_table(problem._parameters.items(), **kwargs)
             console.print(table)
             # for name, param in problem._parameters.items():
