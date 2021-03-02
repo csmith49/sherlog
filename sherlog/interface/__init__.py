@@ -2,16 +2,20 @@
 
 from .socket import connect
 from ..config import PORT
-from .io import console
 from time import sleep
 from . import server
+from rich.console import Console
 
-with console.status("Spinning up server..."):
-    sleep(1)
+console = Console(markup=False)
+
+SOCKET = None
+while not SOCKET:
+    try:
+        SOCKET = connect(PORT)
+    except:
+        pass
 
 class CommunicationError(Exception): pass
-
-SOCKET = connect(PORT)
 
 def parse(source: str):
     """Run a string through Sherlog's parser.

@@ -1,5 +1,4 @@
 from ..engine import Store, run, value
-from ..interface import io
 from ..inference import Objective
 from . import stochastic
 from . import scg
