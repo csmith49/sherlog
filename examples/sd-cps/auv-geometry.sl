@@ -1,3 +1,5 @@
+# AUV Sizing Spreadsheet Conversion
+
 # DRIVING VARIABLES -> PARAMETERS
 
 # geometry (in meters)
@@ -150,6 +152,8 @@ battery_weight_ok <- battery_weight(W), W > 0.
 fineness_ok <- fineness_ratio(R), R >= 5.5, R <= 7.5.
 depth_ok <- depth_rating < 11,030.
 
+all_ok <- pv_length_ok, battery_weight_ok, fineness_ok, depth_ok.
+
 # RANGE TABLE COMPUTATIONS
 
 # assume speed is given in m/s
@@ -177,3 +181,25 @@ most_efficient_speed(W, S) <-
 range_at_most_efficient_speed(W, R) <-
     battery_capacity(C), most_efficient_speed(W, S),
     R = C / (1.5 * W) * S * 3.6
+
+# EXAMPLE OPTIMIZATION TASK
+
+# encodes the following task:
+# 1. find values of the non-observed parameters
+# 2. such that the constraint is satisfied and
+# 3. the objective is maximized.
+
+!observe
+    depth_rating : 300,
+    safety_factor : 1.5,
+    battery_specific_energy : 360,
+    battery_bouyancy_fraction : 0.5,
+    hotel_power_draw : 20,
+    drag_coefficient : 0.0079,
+    appendage_added_area : 0.1,
+    propulsion_efficiency : 0.5,
+    density_of_seawater : 1027.
+
+!constrain all_ok.
+
+!optimize R : range_at_most_efficient_speed(8, R).
