@@ -32,7 +32,7 @@ class Optimizer:
     def __exit__(self, *args):
         # construct storch costs
         for objective in self._maximize:
-            storch.add_cost(torch.log(torch.tensor(1.0)) - objective.value, objective.name)
+            storch.add_cost(-1 * objective.value, objective.name)
         
         for objective in self._minimize:
             storch.add_cost(objective.value, objective.name)

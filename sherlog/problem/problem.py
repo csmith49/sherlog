@@ -98,18 +98,23 @@ class Problem:
         for evidence in self.evidence:
             yield from self.stories(evidence, **kwargs)
 
-    def log_likelihood(self, evidence, **kwargs):
+    def likelihood(self, evidence, **kwargs):
         total, count = torch.tensor(0.0), 0
         for story in self.stories(evidence, **kwargs):
-            total += story.log_likelihood()[0]
+            total += story.likelihood()[0]
             count += 1
         
         if count == 0:
-            value = torch.tensor(0.0)
+            return torch.tensor(0.0)
         else:
-            value = total / count
+            return total / count
 
-        return Objective("log_likelihood", value)
+    def log_likelihood(self, **kwargs):
+        total = torch.tensor(0.0)
+        for evidence in self.evidence:
+            total += torch.log(self.likelihood(evidence, **kwargs))
+        
+        return Objective("log_likelihood", total)
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.

@@ -1,6 +1,9 @@
 from ..engine import value, evaluate
+from ..logs import get
 from . import scg
 import torch
+
+logger = get("story.observation")
 
 class Observation:
     def __init__(self, mapping):
@@ -68,14 +71,12 @@ class Observation:
     def __str__(self):
         return str(self.mapping)
 
-    def similarity(self, store, epsilon=1.0, default=1.0):
-        """Computes cosine similarity between a given observation and a store.
+    def similarity(self, store, default=1.0, temperature=0.01):
+        """Computes similarity between a given observation and a store.
         
         Parameters
         ----------
         store : Store
-
-        epsilon : float option
 
         default : float option
         
@@ -85,21 +86,24 @@ class Observation:
         """
 
         # undefined for empty vectors, so use the relevant provided value
-        if self.size == 0: return torch.tensor(default)
+        if self.size == 0: 
+            logger.info(f"Similarity computation with empty observation. Returning default {default}.")
+            return torch.tensor(default)
 
         # evaluate the obs and store to get tensors
         obs_vec = self.evaluate(store, scg.algebra)
         str_vec = [store[v] for v in self.variables]
 
-        # cant stack in storch (yet), so manually compute cosine similarity
-        # epsilon ensures we don't divide by 0
-        # equivalent to extending each vector with 1 extra index w/ value epsilon
-        dot_prod = torch.tensor(epsilon)
-        mag_a, mag_b = torch.tensor(epsilon ** 2), torch.tensor(epsilon ** 2)
 
+        # compute the l2 metric distance b/t obs and str
+        distance = torch.tensor(0.0)
         for a, b in zip(obs_vec, str_vec):
-            dot_prod += a * b
-            mag_a += torch.pow(a, 2)
-            mag_b += torch.pow(b, 2)
+            distance += torch.pow(a - b, 2)
+        distance = torch.sqrt(distance)
 
-        return dot_prod / torch.sqrt(mag_a * mag_b)
+        # pass through gaussian rbf
+        result = torch.exp(- torch.pow(distance, 2) / (2 * torch.tensor(temperature)))
+        
+        logger.info(f"Similarity between {self} and {store}: {result}")
+
+        return result
