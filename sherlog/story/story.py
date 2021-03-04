@@ -1,5 +1,7 @@
 from ..engine import Store, run, value
 from ..inference import Objective
+from .observation import Observation
+from ..engine import Model
 from . import stochastic
 from . import scg
 
@@ -12,6 +14,13 @@ class Story:
         self.meet = meet
         self.avoid = avoid
         self._external = external
+
+    @classmethod
+    def of_json(cls, json, external=()):
+        model = Model.of_json(json["assignments"])
+        meet = Observation.of_json(json["meet"])
+        avoid = Observation.of_json(json["avoid"])
+        return cls(model, meet, avoid, external=external)
 
     @property
     def store(self):
@@ -50,40 +59,17 @@ class Story:
         results = model()["sherlog:p"]
         return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
 
-    def objective(self, index=0):
+    def log_likelihood(self, index=0):
         store = self.run(scg.algebra)
         
         # build the indexes for the nodes we'll add
-        p_meet = value.Variable(f"sherlog:p_meet:{index}")
-        p_avoid = value.Variable(f"sherlog:p_avoid:{index}")
-        p = value.Variable(f"sherlog:p:{index}")
+        p_meet = value.Variable("sherlog:p_meet")
+        p_avoid = value.Variable("sherlog:p_avoid")
+        log_p = value.Variable("sherlog:log_p")
 
         # compute values for the nodes
-        store[p_meet] = observation_similarity(self.meet, store)
-        store[p_avoid] = observation_similarity(self.avoid, store)
-        store[p] = store[p_meet] * (1 - store[p_avoid])
+        store[p_meet] = self.meet.similarity(store, default=1.0)
+        store[p_avoid] = self.avoid.similarity(store, default=0.0)
+        store[log_p] = torch.log(store[p_meet]) + torch.log(1 - store[p_avoid])
 
-        return Objective(p, store)
-
-def observation_similarity(observation, store, epsilon=1.0):
-    """Computes cosine similarity between a given observation and a store."""
-
-    # undefined for empty vectors, so pick a number that makes the rest of the math correct
-    if observation.size == 0: return torch.tensor(0.0)
-
-    # evaluate the observation and store to get tensors
-    obs_vec = observation.evaluate(store, scg.algebra)
-    str_vec = [store[v] for v in observation.variables()]
-
-    # can't stack in storch (yet), so manually compute cosine similarity
-    # epsilon ensures we don't divide by zero
-    # equivalent to extending each vector with 1 extra item
-    dot_prod = torch.tensor(epsilon)
-    mag_a, mag_b = torch.tensor(epsilon ** 2), torch.tensor(epsilon ** 2)
-
-    for a, b in zip(obs_vec, str_vec):
-        dot_prod += a * b
-        mag_a += torch.pow(a, 2)
-        mag_b += torch.pow(b, 2)
-    
-    return dot_prod / torch.sqrt(mag_a * mag_b)
+        return store[log_p], store

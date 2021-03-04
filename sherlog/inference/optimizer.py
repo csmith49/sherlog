@@ -13,10 +13,14 @@ class Optimizer:
 
     def maximize(self, objective):
         logger.info(f"Registering {objective} for maximization.")
+        if objective.is_nan():
+            logger.warning(f"{objective} is NaN.")
         self._maximize.append(objective)
     
     def minimize(self, objective):
         logger.info(f"Registering {objective} for minimization.")
+        if objective.is_nan():
+            logger.warning(f"{objective} is NaN.")
         self._minimize.append(objective)
 
     def __enter__(self):
@@ -28,7 +32,7 @@ class Optimizer:
     def __exit__(self, *args):
         # construct storch costs
         for objective in self._maximize:
-            storch.add_cost(-1 * objective.value, objective.name)
+            storch.add_cost(torch.log(torch.tensor(1.0)) - objective.value, objective.name)
         
         for objective in self._minimize:
             storch.add_cost(objective.value, objective.name)
@@ -36,6 +40,8 @@ class Optimizer:
         # compute gradients
         if self._maximize or self._minimize:
             storch.backward()
+        else:
+            logger.warning("No objectives registered.")
         
         # then update
         logger.info("Propagating gradients.")
