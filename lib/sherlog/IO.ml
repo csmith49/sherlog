@@ -22,15 +22,17 @@ let position_to_string lexbuf =
     let line = pos.Lexing.pos_lnum in
     let start = pos.Lexing.pos_cnum - pos.Lexing.pos_bol + 1 in
         Printf.sprintf "Line %d, Char. %d" line start
-    
-    let parse string =
-    let lexbuf = Lexing.from_string string in
+
+exception Sherlog_IO of string
+
+let parse st = let open Fmt in
+    let lexbuf = Lexing.from_string st in
     let lines = try Parser.lines Lexer.read lexbuf with
         | Parser.Error ->
-            let _ = Printf.fprintf stderr "Parse Error @ %s" (position_to_string lexbuf) in
-            exit (-1)
+            let message = Fmt.str "Cannot parse %s @ %s" (Lexing.lexeme lexbuf) (position_to_string lexbuf) in
+                raise (Sherlog_IO message)
         | Lexer.Error m ->
-            let _ = Printf.fprintf stderr "Lexer Error @ %s: %s" (position_to_string lexbuf) m in
-            exit (-1)
+            let message = Fmt.str "Cannot lex @ %s: %s" (position_to_string lexbuf) m in
+                raise (Sherlog_IO message)
     in program_of_lines lines
     

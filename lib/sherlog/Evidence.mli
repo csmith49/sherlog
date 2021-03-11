@@ -2,7 +2,7 @@ type t
 
 val make : Watson.Atom.t list -> t
 
-val to_fact : t -> Watson.Fact.t
+val to_atoms : t -> Watson.Atom.t list
 
 module JSON : sig
     val encode : t -> JSON.t

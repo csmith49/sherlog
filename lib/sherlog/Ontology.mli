@@ -9,6 +9,8 @@ val constraints : t -> (Watson.Atom.t list) list
 val add_dependency : Watson.Rule.t -> t -> t
 val add_constraint : Watson.Atom.t list -> t -> t
 
+val pp : t Fmt.t
+
 module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option

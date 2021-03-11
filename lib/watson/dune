@@ -1,4 +1,4 @@
 (library
     (name watson)
-    (libraries containers JSON)
+    (libraries containers JSON fmt)
 )

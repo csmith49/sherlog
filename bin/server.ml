@@ -19,7 +19,7 @@ let handler json = match JSON.Parse.(find string "command" json) with
         (* get core program and query *)
         let* program = JSON.Parse.(find Sherlog.Program.JSON.decode "program" json) in
         let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "query" json) 
-            |> CCOpt.map Sherlog.Evidence.to_fact in
+            |> CCOpt.map Sherlog.Evidence.to_atoms in
         (* get parameters for search *)
         let search_length = JSON.Parse.(find int "depth" json)
             |> CCOpt.get_or ~default:CCInt.max_int in

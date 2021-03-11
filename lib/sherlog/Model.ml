@@ -27,14 +27,41 @@ module Assignment = struct
             let* parameters = JSON.Parse.(find (list Watson.Term.JSON.decode) "parameters" json) in
                 return (make target guard parameters)
     end
+
+    let pp ppf a = let open Fmt in
+        pf ppf "%s <- %s(%a)"
+        (target a)
+        (guard a)
+        (list ~sep:comma Watson.Term.pp) (parameters a)
+
+    let to_string = Fmt.to_to_string pp
 end
 
-type observation = (string * Watson.Term.t) list
+module Observation = struct
+    type t = (string * Watson.Term.t) list
+
+    let rec pp ppf o = let open Fmt in
+        pf ppf "[%a]" (list ~sep:comma pp_pair) o
+    and pp_pair ppf = function (k, v) -> let open Fmt in
+        pf ppf "%s : %a"
+            k 
+            Watson.Term.pp v
+
+    let to_string = Fmt.to_to_string pp
+
+    module JSON = struct
+        let encode o = o
+            |> CCList.map (CCPair.map_snd Watson.Term.JSON.encode)
+            |> JSON.Make.assoc
+
+        let decode = JSON.Parse.assoc Watson.Term.JSON.decode
+    end
+end
 
 type t = {
     assignments : Assignment.t list;
-    meet : observation;
-    avoid : observation;
+    meet : Observation.t;
+    avoid : Observation.t;
 }
 
 let make assignments meet avoid = {
@@ -49,14 +76,14 @@ module JSON = struct
     let encode model = `Assoc [
         ("type", `String "model");
         ("assignments", `List (model |> assignments |> CCList.map Assignment.JSON.encode));
-        ("meet", `Assoc (model |> meet |> CCList.map (CCPair.map_snd Watson.Term.JSON.encode)));
-        ("avoid", `Assoc (model |> avoid |> CCList.map (CCPair.map_snd Watson.Term.JSON.encode)));
+        ("meet",  model |> meet |> Observation.JSON.encode);
+        ("avoid", model |> avoid |> Observation.JSON.encode);
     ]
 
     let decode json = let open CCOpt in
         let* assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
-        let* meet = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "meet" json) in
-        let* avoid = JSON.Parse.(find (assoc Watson.Term.JSON.decode) "avoid" json) in
+        let* meet = JSON.Parse.(find Observation.JSON.decode "meet" json) in
+        let* avoid = JSON.Parse.(find Observation.JSON.decode "avoid" json) in
             return (make assignments meet avoid)
 end
 
@@ -118,7 +145,7 @@ module Compile = struct
             (assignment, intro)
     
     (* get observation *)
-    let observation (intros : Assignment.t taglist) : observation =
+    let observation (intros : Assignment.t taglist) : Observation.t =
         let f (assignment, intro) = match Explanation.Introduction.target intro with
             | Watson.Term.Variable _ -> (None, intro)
             | (_ as term) ->
@@ -144,3 +171,11 @@ let of_explanation positive negative =
         meet = pa |> Compile.observation;
         avoid = na |> Compile.observation;
     }
+
+let pp ppf model = let open Fmt in
+    pf ppf "{%a@,; +: %a@,; -: %a}"
+    (list ~sep:comma Assignment.pp) (model |> assignments)
+    Observation.pp (model |> meet)
+    Observation.pp (model |> avoid)
+
+let to_string = Fmt.to_to_string pp

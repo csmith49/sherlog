@@ -18,6 +18,11 @@ let constraints ontology = ontology.constraints
 let add_dependency dep ontology = { ontology with dependencies = dep :: (dependencies ontology) }
 let add_constraint con ontology = { ontology with constraints = con :: (constraints ontology) }
 
+let pp ppf ontology = let open Fmt in
+	pf ppf "Deps.: %a@ Cons.: %a"
+		(box @@ list ~sep:sp Watson.Rule.pp) ontology.dependencies
+		(box @@ list ~sep:sp (list ~sep:comma Watson.Atom.pp)) ontology.constraints
+
 module JSON = struct
 	let encode_constraint atoms = `List (atoms |> CCList.map Atom.JSON.encode)
 

@@ -17,6 +17,7 @@
         (menhir (>= 20200624))
         (yojson (>= 1.7))
         (lwt (>= 5.3))
+        (fmt (>= 0.8))
     )
 )
 (using menhir 2.1)

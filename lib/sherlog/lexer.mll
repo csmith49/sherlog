@@ -45,6 +45,7 @@ rule read = parse
     | "@" { AT }
     | "." { PERIOD }
     | "," { COMMA }
+    | "|" { OR }
     (* inference tokens *)
     | "!parameter" { PARAMETER }
     | "!evidence" { EVIDENCE }

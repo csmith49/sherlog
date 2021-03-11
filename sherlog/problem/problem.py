@@ -1,13 +1,18 @@
 from .namespace import Namespace
 from .parameter import Parameter
-from .observation import Observation
+from ..inference import Objective
 from .. import interface
 from ..engine import Model, value, Store
 from ..story import Story
+from ..logs import get
+
+from itertools import islice
 
 import torch
 import pickle
 import random
+
+logger = get("problem")
 
 class Problem:
     def __init__(self, parameters, namespaces=None, evidence=None, program=None):
@@ -31,6 +36,10 @@ class Problem:
         self._evidence = evidence
         self.program = program
 
+    @property
+    def evidence(self):
+        yield from self._evidence
+
     @classmethod
     def of_json(cls, json):
         """Build a problem from a JSON-like object.
@@ -49,23 +58,63 @@ class Problem:
         program = json
         return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
-    def stories(self):
+    def stories(self, evidence, samples=1, attempts=100, width=None, depth=None):
         """Construct all stories encoded by the problem.
+
+        Parameters
+        ----------
+        evidence : JSON-like object
+
+        samples : int
+
+        attempts : int
+        
+        width : int option
+        
+        depth : int option
 
         Returns
         -------
         Story list iterable
         """
-        external = (self.parameter_map, self._namespace)
-        for evidence in self._evidence:
-            for model_json in interface.query(self.program, evidence):
-                model = Model.of_json(model_json["assignments"])
-                meet = Observation.of_json(model_json["meet"])
-                avoid = Observation.of_json(model_json["avoid"])
-                yield Story(model, meet, avoid, external=external)
 
-    def objectives(self, stories):
-        return [story.objective(index=i) for i, story in enumerate(stories)]
+        logger.info(f"Sampling stories for evidence {evidence}...")
+
+        # build the external evaluation context with the namespace
+        external = (self.parameter_map, self._namespace)
+
+        # build the generator
+        def gen():
+            for attempt in range(attempts):
+                logger.info(f"Starting story generation attempt {attempt}...")
+                for json in interface.query(self.program, evidence, width=width, depth=depth):
+                    logger.info("Story found.")
+                    yield Story.of_json(json, external=external)
+        
+        # and grab only the number of samples desired
+        yield from islice(gen(), samples)
+
+    def all_stories(self, **kwargs):
+        for evidence in self.evidence:
+            yield from self.stories(evidence, **kwargs)
+
+    def likelihood(self, evidence, **kwargs):
+        total, count = torch.tensor(0.0), 0
+        for story in self.stories(evidence, **kwargs):
+            total += story.likelihood()[0]
+            count += 1
+        
+        if count == 0:
+            return torch.tensor(0.0)
+        else:
+            return total / count
+
+    def log_likelihood(self, **kwargs):
+        total = torch.tensor(0.0)
+        for evidence in self.evidence:
+            total += torch.log(self.likelihood(evidence, **kwargs))
+        
+        return Objective("log_likelihood", total)
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
@@ -121,38 +170,8 @@ class Problem:
     def parameter_map(self):
         return {n : p.value for n, p in self._parameters.items()}
 
-    def log_likelihood(self, num_samples=1):
-        total = torch.tensor(0.0)
-        for story in self.stories():
-            total += torch.log(story.likelihood(num_samples=num_samples))
-        return total
-
-def load(filepath: str):
-    """Load a problem from a filepath.
-
-    Parameters
-    ----------
-    filepath : str
-
-    Returns
-    -------
-    Problem
-    """
-    with open(filepath, "r") as f:
-        contents = f.read()
-    json = interface.parse(contents)
-    return Problem.of_json(json)
-
-def loads(contents: str):
-    """Load a problem from a string.
-
-    Parameters
-    ----------
-    contents : str
-
-    Returns
-    -------
-    Problem
-    """
-    json = interface.parse(contents)
-    return Problem.of_json(json)
+    # def log_likelihood(self, num_samples=1):
+    #     total = torch.tensor(0.0)
+    #     for story in self.stories():
+    #         total += torch.log(story.likelihood(num_samples=num_samples))
+    #     return total

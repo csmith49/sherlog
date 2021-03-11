@@ -4,21 +4,12 @@ from ..logs import get
 logger = get("inference.objective")
 
 class Objective:
-    def __init__(self, reference, store):
-        self.reference = reference
-        self.store = store
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
 
-    @property
-    def value(self):
-        return self.store[self.reference]
-
-    def maximize(self):
-        logger.info(f"Maximizing {self.reference}: {self.value}")
-        storch.add_cost(-1 * self.value, self.reference.name)
-
-    def minimize(self):
-        logger.info(f"Minimizing {self.reference}: {self.value}")
-        storch.add_cost(self.value, self.reference.name)
-
+    def is_nan(self):
+        return self.value._tensor.isnan().any()
+    
     def __str__(self):
-        return f"{self.reference}: {self.value}"
+        return f"Obj<{self.name}, {self.value._tensor}>"

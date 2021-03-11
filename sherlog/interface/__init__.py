@@ -2,13 +2,20 @@
 
 from .socket import connect
 from ..config import PORT
-from . import io
 from time import sleep
 from . import server
+from rich.console import Console
+
+console = Console(markup=False)
+
+SOCKET = None
+while not SOCKET:
+    try:
+        SOCKET = connect(PORT)
+    except:
+        pass
 
 class CommunicationError(Exception): pass
-
-SOCKET = connect(PORT)
 
 def parse(source: str):
     """Run a string through Sherlog's parser.

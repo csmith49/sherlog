@@ -16,6 +16,8 @@ val apply : Substitution.t -> t -> t
 
 val unify : t -> t -> Substitution.t option
 
+val pp : t Fmt.t
+
 module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option

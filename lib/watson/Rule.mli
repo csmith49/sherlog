@@ -13,6 +13,8 @@ val avoiding_rename : string list -> t -> t
 
 val to_string : t -> string
 
+val pp : t Fmt.t
+
 module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option

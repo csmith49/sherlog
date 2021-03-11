@@ -44,6 +44,9 @@ let unify left right =
     else 
         None
 
+let pp ppf atom = let open Fmt in
+    pf ppf "%s(@[<0>%a@])" atom.relation (list ~sep:comma Term.pp) atom.terms
+
 module JSON = struct
     let encode atom = `Assoc [
         ("type", `String "atom");

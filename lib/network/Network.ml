@@ -17,19 +17,18 @@ let connection_of_socket socket =
         (ic, oc)
 
 let safe_parse string = try Some (Yojson.Basic.from_string string) with _ -> None
+let safe_handle handler json = try handler json with _ -> None
 
 (* applies a handler to a connection *)
-let rec handle_connection handler (ic, oc) () = Lwt_io.read_line_opt ic >>=
-    (fun msg -> 
-        match msg with
-        | Some msg -> begin match msg |> safe_parse |> CCOpt.flat_map handler with
-            | Some result ->
-                let reply = Yojson.Basic.to_string result in
-                Lwt_io.write_line oc reply >>= handle_connection handler (ic, oc)
-            | None ->
-                let reply = Yojson.Basic.to_string (`String "failure") in
-                Lwt_io.write_line oc reply >>= handle_connection handler (ic, oc) end
-        | _ -> return_unit)
+let rec handle_connection handler (ic, oc) () = Lwt_io.read_line_opt ic >>= fun msg ->
+    (* attempt to parse and handle the message *)
+    let result = msg
+        |> CCOpt.flat_map safe_parse
+        |> CCOpt.flat_map (safe_handle handler) in
+    let reply = match result with
+        | Some result -> Yojson.Basic.to_string result
+        | None -> Yojson.Basic.to_string (`String "failure") in
+    Lwt_io.write_line oc reply >>= handle_connection handler (ic, oc)
 
 (* constructs a handler for the output of lwt_unix.accept *)
 let handle_socket handler (socket, _) =

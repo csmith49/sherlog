@@ -1,86 +1,115 @@
 module State = struct
     type t = {
-        goal : Fact.t;
-        cache : Fact.t;
+        goal : Atom.t list;
+        cache : Atom.t list;
     }
 
-    let compare left right = match Fact.compare left.goal right.goal with
-        | 0 -> Fact.compare left.cache right.cache
-        | (_ as c) -> c
-    
-    let equal left right = (compare left right) == 0
+    let goal state = state.goal
+    let cache state = state.cache
 
-    let of_fact fact = {
-        goal = fact;
-        cache = Fact.empty;
+    let of_atoms goal = {
+        goal = goal; cache = [];
     }
 
-    let rec discharge state = match Fact.discharge state.goal with
-        | Some (atom, fact) -> let state = { state with goal = fact } in
-            if Fact.mem atom state.cache then discharge state
-            else let state = { state with cache = Fact.add atom state.cache } in
-                Some (atom, state)
-        | _ -> None
-    
+    let rec discharge state = match goal state with
+        | [] -> None
+        | atom :: rest -> if CCList.mem ~eq:Atom.equal atom (cache state)
+            then discharge { state with goal = rest }
+            else let state = {
+                goal = rest;
+                cache = atom :: (cache state);
+            } in Some (atom, state)
+
+    let apply sub state = {
+        goal = state |> goal |> CCList.map (Atom.apply sub);
+        cache = state |> cache |> CCList.map (Atom.apply sub);
+    }
+
+    let extend atoms state = {
+        state with goal = atoms @ (goal state);
+    }
+
+    let variables state = state
+        |> goal
+        |> CCList.flat_map Atom.variables
+        |> CCList.uniq ~eq:CCString.equal
+
     let is_empty state = match discharge state with
         | Some _ -> false
         | None -> true
 
-    let variables state = Fact.variables state.goal
+    let reset_goal state goal = {
+        state with goal = goal;
+    }
 
-    let apply h state = { state with goal = state.goal |> Fact.apply h }
+    let pp ppf state = let open Fmt in
+        pf ppf "%a" (list ~sep:comma Atom.pp) (goal state)
 
-    let extend atoms state = let atoms = Fact.of_atoms atoms in
-        { state with goal = state.goal |> Fact.conjoin atoms}
-
-    let resolve state rule = match discharge state with
-        | Some (atom, state) ->
-            let rule = Rule.avoiding_rename (variables state) rule in
-            begin match Atom.unify (Rule.head rule) atom with
-                | Some sub ->
-                    let state = state
-                        |> extend (Rule.body rule)
-                        |> apply sub in
-                    let atom = Atom.apply sub atom in
-                        Some (atom, state)
-                | None -> None
-            end
-        | None -> None
+    let to_string = Fmt.to_to_string pp
 end
 
-type resolution = Atom.t * State.t
-type t = resolution list
+module Witness = struct
+    type t = {
+        atom : Atom.t;
+        rule : Rule.t;
+        substitution : Substitution.t;
+    }
 
-let compare = CCList.compare (CCPair.compare Atom.compare State.compare)
-let equal = CCList.equal (CCPair.equal Atom.equal State.equal)
+    let atom w = w.atom
+    let rule w = w.rule
+    let substitution w = w.substitution
 
-let resolutions proof = proof
-let extend proof resolution = proof @ [resolution]
+    let pp ppf w = let open Fmt in
+        pf ppf "%a" Atom.pp (atom w)
 
-let of_fact fact =
-    let atom = Atom.make "true" [] in
-    let state = State.of_fact fact in
-    let resolution = (atom, state) in
-        [resolution]
-        
-let to_fact proof = proof
-    |> resolutions
-    |> CCList.map fst
-    |> Fact.of_atoms
+    let to_string = Fmt.to_to_string pp
+end
 
-let is_complete proof = match CCList.last_opt proof with
-    | Some (_, state) -> State.is_empty state
-    | _ -> false
+type t = O of State.t * (resolution option)
+and resolution = R of Witness.t * t
 
-let remaining_obligation proof = match CCList.last_opt proof with
-    | Some (_, state) -> state.State.goal
-    | _ -> Fact.empty
+let of_atoms goal =
+    let state = State.of_atoms goal in
+        O (state, None)
 
-let length = CCList.length
+let rec rev_witnesses = function
+    | O (_, None) -> []
+    | O (_, Some R (w, o)) ->
+        w :: (rev_witnesses o)
+and witnesses proof = proof
+    |> rev_witnesses
+    |> CCList.rev
 
-let resolve proof rule = match CCList.last_opt proof with
-    | Some (_, state) -> begin match State.resolve state rule with
-        | Some resolution -> Some (extend proof resolution)
-        | None -> None
-    end
-    | _ -> None
+let to_atoms proof = proof
+    |> witnesses
+    |> CCList.map Witness.atom
+
+let is_resolved = function  O (state, _) -> State.is_empty state
+
+let state = function O (state, _) -> state
+
+let of_state state = O (state, None)
+
+let resolve proof rule = let open CCOpt in
+    (* change the rule variables to avoid those in the state *)
+    let state = proof |> state in
+    let rule = rule |> Rule.avoiding_rename (State.variables state) in
+    (* unify a discharged atom with the rule head *)
+    let* (atom, state) = state |> State.discharge in
+    let* sub = Atom.unify (Rule.head rule) atom in
+    (* build the witness with the sub, etc. *)
+    let witness = {
+        Witness.atom = atom |> Atom.apply sub;
+        rule = rule;
+        substitution = sub;
+    } in
+    (* rebuild the new state *)
+    let state = state
+        |> State.extend (Rule.body rule)
+        |> State.apply sub in
+    (* and extend the proof *)
+    let resolution = R (witness, proof) in
+        O (state, Some resolution) |> return
+
+let pp ppf proof = let open Fmt in
+    pf ppf "%a" (list ~sep:(any "@ => ") Witness.pp) (witnesses proof)

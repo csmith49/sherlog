@@ -17,7 +17,7 @@ def _beta(p, q, target=None, method=Reparameterization, method_kwargs={}, **kwar
 
 def _bernoulli(p, target=None, method=GumbelSoftmax, method_kwargs={}, **kwargs):
     dist = dists.Bernoulli(probs=p)
-    return method(target.name, **method_kwargs)(dist)
+    return method(target.name, initial_temperature=1.0, **method_kwargs)(dist)
 
 def _normal(m, s, target=None, method=Reparameterization, method_kwargs={}, **kwargs):
     dist = dists.Normal(m, s)
