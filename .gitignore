@@ -8,3 +8,5 @@ lib/interface/.merlin
 lib/data/.merlin
 run
 server
+
+.vscode

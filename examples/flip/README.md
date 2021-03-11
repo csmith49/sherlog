@@ -4,7 +4,7 @@ A simple program that flips a coin with beta-distributed weight. The goal is to 
 
 ## Structure
 
-By default, this directory consists of 4 experiment files:
+This directory comprises 4 experiment files:
 
 1. `flip.sl` encodes the Sherlog program and provides evidence,
 2. `train.py` optimizes the parameters given in `flip.sl`,
