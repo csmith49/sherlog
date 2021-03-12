@@ -1,4 +1,3 @@
-import storch
 import torch
 from ..logs import get
 
@@ -30,19 +29,14 @@ class Optimizer:
         return self
 
     def __exit__(self, *args):
-        # construct storch costs
+        cost = torch.tensor(0.0)
+
         for objective in self._maximize:
-            storch.add_cost(-1 * objective.value, objective.name)
+            cost -= objective.value
         
         for objective in self._minimize:
-            storch.add_cost(objective.value, objective.name)
+            cost += objective.value
 
-        # compute gradients
-        if self._maximize or self._minimize:
-            storch.backward()
-        else:
-            logger.warning("No objectives registered.")
-        
         # then update
         logger.info("Propagating gradients.")
         self.optimizer.step()

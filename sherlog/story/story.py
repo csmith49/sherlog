@@ -1,10 +1,9 @@
-from ..engine import Store, run, value
+from ..engine import Store, value
 from ..inference import Objective
 from .observation import Observation
 from ..engine import Model
 from ..logs import get
-from . import stochastic
-from . import scg
+from . import semantics
 
 import torch
 import storch
@@ -31,41 +30,14 @@ class Story:
     def store(self):
         return Store(external=self._external)
 
-    def run(self, algebra, parameters={}):
+    def run(self, functor, wrap_args={}, fmap_args={}, parameters={}):
         store = self.store
         for assignment in self.model.assignments:
-            run(assignment, store, algebra, parameters=parameters)
+            functor.run(assignment, store, wrap_args=wrap_args, fmap_args=fmap_args, parameters=parameters)
         return store
 
-    # def generative_model(self):
-    #     store = self.run(stochastic.algebra)
-
-    #     # build the indexes for the nodes we'll add
-    #     p_meet = value.Variable("sherlog:p_meet")
-    #     p_avoid = value.Variable("sherlog:p_avoid")
-    #     p = value.Variable("sherlog:p")
-
-    #     # compute values for the nodes
-    #     store[p_meet] = observation_similarity(self.meet, store)
-    #     store[p_avoid] = observation_similarity(self.avoid, store)
-        
-    #     store[p] = stochastic.delta(
-    #         p,
-    #         store[p_meet] * (1 - store[p_avoid])
-    #     )
-
-    #     return store
-
-    # def likelihood(self, offset=1, num_samples=100):
-    #     model = stochastic.Predictive(
-    #         self.generative_model,
-    #         num_samples=num_samples,
-    #         return_sites=("sherlog:p",))
-    #     results = model()["sherlog:p"]
-    #     return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
-
     def likelihood(self):
-        store = self.run(scg.algebra)
+        store = self.run(semantics.tensor)
         
         # build the indexes for the nodes we'll add
         p_meet = value.Variable("sherlog:p_meet")
@@ -77,6 +49,6 @@ class Story:
         store[p_avoid] = self.avoid.similarity(store, default=0.0)
         store[p] = store[p_meet] * (1 - store[p_avoid])
 
-        logger.info(f"{self} likelihood: {store[p]._tensor:f}.")
+        logger.info(f"{self} likelihood: {store[p]:f}.")
 
-        return store[p], store
+        return store[p]

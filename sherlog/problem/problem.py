@@ -99,21 +99,12 @@ class Problem:
             yield from self.stories(evidence, **kwargs)
 
     def likelihood(self, evidence, **kwargs):
-        total, count = torch.tensor(0.0), 0
-        for story in self.stories(evidence, **kwargs):
-            total += story.likelihood()[0]
-            count += 1
-        
-        if count == 0:
-            return torch.tensor(0.0)
-        else:
-            return total / count
+        lls = torch.tensor([story.likelihood() for story in self.stories(evidence, **kwargs)])
+        return torch.mean(lls)
 
     def log_likelihood(self, **kwargs):
-        total = torch.tensor(0.0)
-        for evidence in self.evidence:
-            total += torch.log(self.likelihood(evidence, **kwargs))
-        
+        lls = torch.tensor([self.likelihood(evidence, **kwargs) for evidence in self.evidence])
+        total = torch.sum(torch.log(lls))
         return Objective("log_likelihood", total)
 
     def save_parameters(self, filepath):

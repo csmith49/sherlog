@@ -1,9 +1,10 @@
-# making an engine requires three things:
-# 1. what to do with constants
-# 2. what to do with built-ins
-# 3. how to wrap/unwrap external functions
+"""An engine requires three pieces of information:
+1. What to do with constants,
+2. what to do with built-in functions, and
+3. how to apply external functions.
+"""
 
-from .model import Assignment, Model
+from .model import Model
 from .store import Store
+from .functor import Functor
 from . import value
-from .algebra import Algebra, run, evaluate

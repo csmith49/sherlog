@@ -9,7 +9,7 @@ class Objective:
         self.value = value
 
     def is_nan(self):
-        return self.value._tensor.isnan().any()
+        return self.value.isnan().any()
     
     def __str__(self):
-        return f"Obj<{self.name}, {self.value._tensor}>"
+        return f"Obj<{self.name}, {self.value}>"
