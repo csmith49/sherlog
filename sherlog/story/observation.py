@@ -1,6 +1,6 @@
-from ..engine import value, evaluate
+from ..engine import value
 from ..logs import get
-from . import scg
+from . import semantics
 import torch
 
 logger = get("story.observation")
@@ -52,26 +52,26 @@ class Observation:
         for k, _ in self.mapping.items():
             yield value.Variable(k)
 
-    def evaluate(self, store, algebra):
+    def evaluate(self, store, functor, wrap_args={}):
         """Evaluate the observation.
 
         Parameters
         ----------
         store : Store
 
-        algebra : Algebra
+        functor : Functor
 
         Returns
         -------
         value
         """
         for _, v in self.mapping.items():
-            yield evaluate(v, store, algebra)
+            yield functor.evaluate(v, store, wrap_args=wrap_args)
 
     def __str__(self):
         return str(self.mapping)
 
-    def similarity(self, store, default=1.0, temperature=0.01):
+    def similarity(self, store, default=1.0, temperature=0.001):
         """Computes similarity between a given observation and a store.
         
         Parameters
@@ -90,16 +90,10 @@ class Observation:
             logger.info(f"Similarity computation with empty observation. Returning default {default}.")
             return torch.tensor(default)
 
-        # evaluate the obs and store to get tensors
-        obs_vec = self.evaluate(store, scg.algebra)
-        str_vec = [store[v] for v in self.variables]
+        obs_vec = torch.tensor(list(self.evaluate(store, semantics.tensor)))
+        str_vec = torch.tensor([store[v] for v in self.variables])
 
-
-        # compute the l2 metric distance b/t obs and str
-        distance = torch.tensor(0.0)
-        for a, b in zip(obs_vec, str_vec):
-            distance += torch.pow(a - b, 2)
-        distance = torch.sqrt(distance)
+        distance = torch.dist(obs_vec, str_vec)
 
         # pass through gaussian rbf
         result = torch.exp(- torch.pow(distance, 2) / (2 * torch.tensor(temperature)))
