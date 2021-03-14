@@ -20,7 +20,8 @@ def main(verbose):
     type=click.Choice(["sgd", "adam"], case_sensitive=False), 
     help="Torch optimizer used to train parameters")
 @click.option("-l", "--learning-rate", default=0.01, help="Optimizer learning rate")
-def train(filename, epochs, optimizer, learning_rate):
+@click.option("-s", "--samples", default=100, help="Samples per gradient estimate")
+def train(filename, epochs, optimizer, learning_rate, samples):
     """Train FILENAME with the provided parameters."""
     
     # load the problem and build the optimizer
@@ -36,8 +37,7 @@ def train(filename, epochs, optimizer, learning_rate):
 
     for epoch in track(range(epochs), description="Training"):
         with optimizer as o:
-            ll = problem.log_likelihood(samples=1000)
-            print(ll)
+            ll = problem.log_likelihood(samples=samples)
             o.maximize(ll)
 
     # print the values of the learned parameters
