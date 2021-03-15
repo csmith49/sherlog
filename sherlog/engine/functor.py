@@ -49,3 +49,25 @@ class Functor:
         
         store[assignment.target] = result
         return result
+
+    def run_callable(self, callable, arguments, store, wrap_args={}, fmap_args={}):
+        """Run a callable.
+
+        Parameters
+        ----------
+        callable : callable
+
+        arguments : value list
+
+        store : Store
+
+        wrap_args : dict option
+
+        fmap_args : dict option
+
+        Returns
+        -------
+        F value
+        """
+        args = [self.evaluate(arg, store, wrap_args=wrap_args) for arg in arguments]
+        return self._fmap(callable, args, {}, **fmap_args)

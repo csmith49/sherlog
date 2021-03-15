@@ -36,6 +36,17 @@ class Story:
             functor.run(assignment, store, wrap_args=wrap_args, fmap_args=fmap_args, parameters=parameters)
         return store
 
+    def dice_objective(self):
+        # get values and sample dependencies
+        store = self.run(semantics.dice.functor)
+        values, samples = semantics.dice.unwrap(store)
+
+        meet = self.meet.equality(values)
+        avoid = self.avoid.equality(values)
+        objective = meet * (1 - avoid)
+
+        return objective * semantics.dice.magic_box(samples)
+
     def likelihood(self):
         store = self.run(semantics.tensor)
         
