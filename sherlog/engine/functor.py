@@ -33,8 +33,8 @@ class Functor:
             kwargs = parameters[assignment.guard]
         except KeyError:
             kwargs = {}
-        # and add the target to them (helps with, e.g., pyro)
-        kwargs["target"] = assignment.target
+        # and add the assignment object to them (helps with, e.g., pyro)
+        kwargs["assignment"] = assignment
 
         # evaluate arguments
         args = [self.evaluate(arg, store, wrap_args=wrap_args) for arg in assignment.arguments]
