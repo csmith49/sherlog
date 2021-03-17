@@ -8,6 +8,7 @@ authors: ["Calvin Smith"]
 homepage: "https://github.com/csmith49/sherlog"
 bug-reports: "https://github.com/csmith49/sherlog/issues"
 depends: [
+  "ocaml" {>= "4.11"}
   "containers" {>= "3.0"}
   "dune" {>= "2.6" & >= "2.6"}
   "menhir" {>= "20200624"}

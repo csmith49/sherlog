@@ -12,6 +12,7 @@
     (name sherlog)
     (synopsis "An OCaml library for deep, probabilistic, generative logic programming")
     (depends
+        (ocaml (>= 4.11))
         (containers (>= 3.0))
         (dune (>= 2.6))
         (menhir (>= 20200624))

@@ -71,6 +71,34 @@ class Observation:
     def __str__(self):
         return str(self.mapping)
 
+    def equality(self, store, epsilon=0.0005, **kwargs):
+        """Returns 1 if the store equals the observation, 0 otherwise.
+
+        Parameters
+        ----------
+        store : Store
+
+        epsilon : float option
+
+        Returns
+        -------
+        tensor
+        """
+
+        # if there's no vector, we're equal by convention
+        if self.size == 0:
+            return torch.tensor(1.0)
+        
+        # otherwise build the vecs
+        obs_vec = torch.tensor(list(self.evaluate(store, semantics.tensor)))
+        str_vec = torch.tensor([store[v] for v in self.variables])
+
+        # check if distance is sufficiently small
+        if torch.dist(obs_vec, str_vec) < epsilon:
+            return torch.tensor(1.0)
+        else:
+            return torch.tensor(0.0)
+
     def similarity(self, store, default=1.0, temperature=0.001):
         """Computes similarity between a given observation and a store.
         

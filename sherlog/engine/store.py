@@ -62,3 +62,6 @@ class Store:
 
     def __str__(self):
         return str(self._internal)
+
+    def items(self):
+        return self._internal.items()

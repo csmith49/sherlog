@@ -25,7 +25,7 @@ let position_to_string lexbuf =
 
 exception Sherlog_IO of string
 
-let parse st = let open Fmt in
+let parse st =
     let lexbuf = Lexing.from_string st in
     let lines = try Parser.lines Lexer.read lexbuf with
         | Parser.Error ->
