@@ -4,7 +4,7 @@ from .observation import Observation
 from ..engine import Model
 from ..logs import get
 from . import stochastic
-from . import scg
+from . import pure
 
 import torch
 import storch
@@ -65,7 +65,7 @@ class Story:
     #     return (offset + torch.sum(results, dim=0)) / (offset + num_samples)
 
     def likelihood(self):
-        store = self.run(scg.algebra)
+        store = self.run(pure.algebra)
         
         # build the indexes for the nodes we'll add
         p_meet = value.Variable("sherlog:p_meet")
@@ -77,6 +77,6 @@ class Story:
         store[p_avoid] = self.avoid.similarity(store, default=0.0)
         store[p] = store[p_meet] * (1 - store[p_avoid])
 
-        logger.info(f"{self} likelihood: {store[p]._tensor:f}.")
+        logger.info(f"{self} likelihood: {store[p]:f}.")
 
-        return store[p], store
+        return store[p]

@@ -36,13 +36,13 @@ def train(filename, epochs, optimizer, learning_rate):
 
     for epoch in track(range(epochs), description="Training"):
         with optimizer as o:
-            ll = problem.log_likelihood(samples=1000)
+            ll = problem.log_likelihood(samples=1000, attempts=1000)
             print(ll)
             o.maximize(ll)
 
     # print the values of the learned parameters
-    for name, parameter in problem._parameters.items():
-        print(f"{name}: {parameter.value:f}")
+        for name, parameter in problem._parameters.items():
+            print(f"{name}: {parameter.value:f}")
 
 if __name__ == "__main__":
     main()

@@ -71,7 +71,7 @@ class Observation:
     def __str__(self):
         return str(self.mapping)
 
-    def similarity(self, store, default=1.0, temperature=0.01):
+    def similarity(self, store, default=1.0, temperature=0.001):
         """Computes similarity between a given observation and a store.
         
         Parameters
@@ -91,18 +91,12 @@ class Observation:
             return torch.tensor(default)
 
         # evaluate the obs and store to get tensors
-        obs_vec = self.evaluate(store, scg.algebra)
-        str_vec = [store[v] for v in self.variables]
+        obs_vec = torch.tensor(list(self.evaluate(store, scg.algebra)))
+        str_vec = torch.stack([store[v] for v in self.variables])
 
-
-        # compute the l2 metric distance b/t obs and str
-        distance = torch.tensor(0.0)
-        for a, b in zip(obs_vec, str_vec):
-            distance += torch.pow(a - b, 2)
-        distance = torch.sqrt(distance)
-
-        # pass through gaussian rbf
-        result = torch.exp(- torch.pow(distance, 2) / (2 * torch.tensor(temperature)))
+        result = torch.exp(
+            -torch.pow(torch.dist(obs_vec, str_vec), 2) / torch.tensor(temperature)
+        )
         
         logger.info(f"Similarity between {self} and {store}: {result}")
 
