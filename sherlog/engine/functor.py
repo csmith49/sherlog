@@ -1,6 +1,7 @@
 """Sherlog evaluation follows a functor design pattern."""
 
 from .value import Symbol, Variable
+from .assignment import Assignment
 
 class Functor:
     def __init__(self, wrap, fmap, builtins):
@@ -27,7 +28,7 @@ class Functor:
         else:
             return self._wrap(obj, **wrap_args)
 
-    def run(self, assignment, store, wrap_args={}, fmap_args={}, parameters={}):
+    def run_assignment(self, assignment, store, wrap_args={}, fmap_args={}, parameters={}):
         # get kwargs for the function being executed
         try:
             kwargs = parameters[assignment.guard]
@@ -50,24 +51,12 @@ class Functor:
         store[assignment.target] = result
         return result
 
-    def run_callable(self, callable, arguments, store, wrap_args={}, fmap_args={}):
-        """Run a callable.
-
-        Parameters
-        ----------
-        callable : callable
-
-        arguments : value list
-
-        store : Store
-
-        wrap_args : dict option
-
-        fmap_args : dict option
-
-        Returns
-        -------
-        F value
-        """
-        args = [self.evaluate(arg, store, wrap_args=wrap_args) for arg in arguments]
-        return self._fmap(callable, args, {}, **fmap_args)
+    def run(self, target, guard, arguments, store, wrap_args={}, fmap_args={}, parameters={}):
+        assignment = Assignment(target, guard, arguments)
+        return self.run_assignment(
+            assignment,
+            store,
+            wrap_args=wrap_args,
+            fmap_args=fmap_args,
+            parameters=parameters
+        )

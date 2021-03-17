@@ -1,2 +1,2 @@
-from .tensor import functor as tensor
+from . import tensor
 from . import dice

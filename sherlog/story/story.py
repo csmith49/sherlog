@@ -33,33 +33,33 @@ class Story:
     def run(self, functor, wrap_args={}, fmap_args={}, parameters={}):
         store = self.store
         for assignment in self.model.assignments:
-            functor.run(assignment, store, wrap_args=wrap_args, fmap_args=fmap_args, parameters=parameters)
+            functor.run_assignment(
+                assignment, 
+                store, 
+                wrap_args=wrap_args, 
+                fmap_args=fmap_args, 
+                parameters=parameters)
         return store
 
-    def dice_objective(self):
-        # get values and sample dependencies
-        store = self.run(semantics.dice.functor)
-        values, samples = semantics.dice.unwrap(store)
+    def objective(self, functor):
+        # get values
+        store = self.run(functor)
 
-        meet = self.meet.equality(values)
-        avoid = self.avoid.equality(values)
-        objective = meet * (1 - avoid)
+        # build meet and avoid
+        meet = self.meet.equality(store, functor, prefix="sherlog:meet")
+        avoid = self.avoid.equality(store, functor, prefix="sherlog:avoid")
 
-        return objective * semantics.dice.magic_box(samples)
+        # build objective
+        objective = value.Variable("sherlog:objective")
+        functor.run(objective, "satisfy", [meet, avoid], store)
+
+        # just return the computed objective - functor should track all relevant info
+        return store[objective]
+
+    def dice(self):
+        objective = self.objective(semantics.dice.functor)
+        return objective.value * semantics.dice.magic_box(objective.dependencies())
 
     def likelihood(self):
-        store = self.run(semantics.tensor)
-        
-        # build the indexes for the nodes we'll add
-        p_meet = value.Variable("sherlog:p_meet")
-        p_avoid = value.Variable("sherlog:p_avoid")
-        p = value.Variable("sherlog:p")
-
-        # compute values for the nodes
-        store[p_meet] = self.meet.similarity(store, default=1.0)
-        store[p_avoid] = self.avoid.similarity(store, default=0.0)
-        store[p] = store[p_meet] * (1 - store[p_avoid])
-
-        logger.info(f"{self} likelihood: {store[p]:f}.")
-
-        return store[p]
+        objective = self.objective(semantics.tensor.functor)
+        return objective

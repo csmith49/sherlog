@@ -99,7 +99,7 @@ class Problem:
             yield from self.stories(evidence, **kwargs)
 
     def likelihood(self, evidence, **kwargs):
-        lls = torch.tensor([story.likelihood() for story in self.stories(evidence, **kwargs)])
+        lls = torch.tensor([story.dice() for story in self.stories(evidence, **kwargs)])
         return torch.mean(lls)
 
     def log_likelihood(self, **kwargs):

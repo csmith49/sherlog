@@ -52,6 +52,17 @@ class Observation:
         for k, _ in self.mapping.items():
             yield value.Variable(k)
 
+    @property
+    def values(self):
+        """Compute the codomain of the observation.
+
+        Returns
+        -------
+        Value iterable
+        """
+        for _, v in self.mapping.items():
+            yield v
+
     def evaluate(self, store, functor, wrap_args={}):
         """Evaluate the observation.
 
@@ -71,61 +82,16 @@ class Observation:
     def __str__(self):
         return str(self.mapping)
 
-    def equality(self, store, epsilon=0.0005, **kwargs):
-        """Returns 1 if the store equals the observation, 0 otherwise.
+    def equality(self, store, functor, prefix=""):
+        # build variables
+        keys = value.Variable(f"{prefix}:keys")
+        vals = value.Variable(f"{prefix}:vals")
+        result = value.Variable(f"{prefix}:is_equal")
 
-        Parameters
-        ----------
-        store : Store
+        # convert to tensors and evaluate
+        functor.run(keys, "tensorize", self.variables, store)
+        functor.run(vals, "tensorize", self.values, store)
+        functor.run(result, "equal", [keys, vals], store)
 
-        epsilon : float option
-
-        Returns
-        -------
-        tensor
-        """
-
-        # if there's no vector, we're equal by convention
-        if self.size == 0:
-            return torch.tensor(1.0)
-        
-        # otherwise build the vecs
-        obs_vec = torch.tensor(list(self.evaluate(store, semantics.tensor)))
-        str_vec = torch.tensor([store[v] for v in self.variables])
-
-        # check if distance is sufficiently small
-        if torch.dist(obs_vec, str_vec) < epsilon:
-            return torch.tensor(1.0)
-        else:
-            return torch.tensor(0.0)
-
-    def similarity(self, store, default=1.0, temperature=0.001):
-        """Computes similarity between a given observation and a store.
-        
-        Parameters
-        ----------
-        store : Store
-
-        default : float option
-        
-        Returns
-        -------
-        tensor
-        """
-
-        # undefined for empty vectors, so use the relevant provided value
-        if self.size == 0: 
-            logger.info(f"Similarity computation with empty observation. Returning default {default}.")
-            return torch.tensor(default)
-
-        obs_vec = torch.tensor(list(self.evaluate(store, semantics.tensor)))
-        str_vec = torch.tensor([store[v] for v in self.variables])
-
-        distance = torch.dist(obs_vec, str_vec)
-
-        # pass through gaussian rbf
-        result = torch.exp(- torch.pow(distance, 2) / (2 * torch.tensor(temperature)))
-        
-        logger.info(f"Similarity between {self} and {store}: {result}")
-
+        # return the variable storing the result
         return result

@@ -3,65 +3,88 @@ import torch as t
 import torch.distributions as td
 from itertools import chain
 
-# samples hold generated values with their source distribution
-class Sample:
-    def __init__(self, value, distribution):
+class DiCE:
+    def __init__(self, value, log_prob=None, dependencies=None):
         self.value = value
-        self.distribution = distribution
-    
-    def log_prob(self):
-        return self.distribution.log_prob(self.value)
+        self.log_prob = log_prob
+        print(log_prob)
+        self._dependencies = dependencies
 
-# magic box operator for a set of samples
-def magic_box(samples):
-    tau = t.sum([s.log_prob() for s in samples])
-    return t.exp(t - t.detach())
+    @property
+    def is_stochastic(self):
+        if self.log_prob:
+            return True
+        return False
 
-# unwraps the generated store
-def unwrap(store):
-    values, samples = {}, {}
-    for k, v in store.items():
-        value, sample = v
-        values[k] = value
-        samples[k] = sample
-    return values, samples
+    # TODO - filter by unique deps
+    def dependencies(self):
+        yield self
+        if self._dependencies:
+            for dep in self._dependencies:
+                yield from dep.dependencies()
 
-# FUNCTOR SEMANTICS
+def magic_box(values):
+    tau = t.sum(t.tensor([v.log_prob for v in values if v.is_stochastic]))
+    return t.exp(tau - tau.detach())
 
 def wrap(obj, **kwargs):
-    # wrap the value
-    if isinstance(obj, (t.Tensor,)):
+    if t.is_tensor(obj):
         value = obj
     else:
         value = t.tensor(obj)
-    
-    # return paired with empty generator
-    return (value, [])
+    return DiCE(value)
 
 def fmap(callable, args, kwargs, **fmap_args):
-    args, samples = zip(*args)
-    value = callable(*args, **kwargs)
-    return (value, chain.from_iterable(samples))
+    value = callable(*[arg.value for arg in args], **kwargs)
+    return DiCE(value, dependencies=args)
 
 def _beta(p, q, **kwargs):
-    dist = td.Beta(p[0], q[0])
+    dist = td.Beta(p.value, q.value)
     value = dist.rsample()
-    return (value, chain([Sample(value, dist)], p[1], q[1]))
-
-def _bernoulli(p, **kwargs):
-    dist = td.Bernoulli(p[0])
-    value = dist.sample()
-    return (value, chain([Sample(value, dist)], p[1]))
+    return DiCE(value, log_prob=dist.log_prob(value), dependencies=[p, q])
 
 def _normal(m, s, **kwargs):
-    dist = td.Normal(m[0], s[0])
+    dist = td.Normal(m.value, s.value)
     value = dist.rsample()
-    return (value, chain([Sample(value, dist)], m[1], s[1]))
+    return DiCE(value, log_prob=dist.log_prob(value), dependencies=[m, s])
+
+def _bernoulli(p, **kwargs):
+    dist = td.Bernoulli(p.value)
+    value = dist.sample()
+    return DiCE(value, log_prob=dist.log_prob(value), dependencies=[p])
+
+def _random(distribution, *args, **kwargs):
+    parameters = [arg.value for arg in args]
+    dist = distribution(*parameters)
+    try:
+        value = dist.rsample()
+    except:
+        value = dist.sample()
+    log_prob = dist.log_prob(value)
+    return DiCE(value, log_prob=log_prob, dependencies=list(args))
+
+def _tensorize(*args, **kwargs):
+    value = t.tensor([arg.value for arg in args])
+    return DiCE(value, dependencies=list(args))
+
+def _equal(v1, v2, **kwargs):
+    if t.equal(v1.value, v2.value):
+        value = t.tensor(1.0)
+    else:
+        value = t.tensor(0.0)
+    return DiCE(value, dependencies=[v1, v2])
+
+def _satisfy(meet, avoid, **kwargs):
+    value = meet.value * (1 - avoid.value)
+    return DiCE(value, dependencies=[meet, avoid])
 
 builtins = {
     "beta" : _beta,
     "bernoulli" : _bernoulli,
-    "normal" : _normal
+    "normal" : _normal,
+    "tensorize" : _tensorize,
+    "equal" : _equal,
+    "satisfy" : _satisfy
 }
 
 functor = Functor(wrap, fmap, builtins)
