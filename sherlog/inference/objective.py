@@ -1,4 +1,4 @@
-import storch
+import torch
 from ..logs import get
 
 logger = get("inference.objective")
@@ -9,7 +9,7 @@ class Objective:
         self.value = value
 
     def is_nan(self):
-        return self.value.isnan().any()
+        return torch.isnan(self.value).any()
     
     def __str__(self):
         return f"Obj<{self.name}, {self.value}>"

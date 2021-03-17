@@ -7,7 +7,6 @@ class DiCE:
     def __init__(self, value, log_prob=None, dependencies=None):
         self.value = value
         self.log_prob = log_prob
-        print(log_prob)
         self._dependencies = dependencies
 
     @property
@@ -24,7 +23,10 @@ class DiCE:
                 yield from dep.dependencies()
 
 def magic_box(values):
-    tau = t.sum(t.tensor([v.log_prob for v in values if v.is_stochastic]))
+    tau = t.tensor(0.0)
+    for v in values:
+        if v.is_stochastic:
+            tau += v.log_prob
     return t.exp(tau - tau.detach())
 
 def wrap(obj, **kwargs):
@@ -78,13 +80,17 @@ def _satisfy(meet, avoid, **kwargs):
     value = meet.value * (1 - avoid.value)
     return DiCE(value, dependencies=[meet, avoid])
 
+def _set(value, **kwargs):
+    return value
+
 builtins = {
     "beta" : _beta,
     "bernoulli" : _bernoulli,
     "normal" : _normal,
     "tensorize" : _tensorize,
     "equal" : _equal,
-    "satisfy" : _satisfy
+    "satisfy" : _satisfy,
+    "set" : _set
 }
 
 functor = Functor(wrap, fmap, builtins)

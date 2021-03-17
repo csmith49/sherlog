@@ -46,8 +46,8 @@ class Story:
         store = self.run(functor)
 
         # build meet and avoid
-        meet = self.meet.equality(store, functor, prefix="sherlog:meet")
-        avoid = self.avoid.equality(store, functor, prefix="sherlog:avoid")
+        meet = self.meet.equality(store, functor, prefix="sherlog:meet", default=1.0)
+        avoid = self.avoid.equality(store, functor, prefix="sherlog:avoid", default=0.0)
 
         # build objective
         objective = value.Variable("sherlog:objective")
@@ -58,7 +58,10 @@ class Story:
 
     def dice(self):
         objective = self.objective(semantics.dice.functor)
-        return objective.value * semantics.dice.magic_box(objective.dependencies())
+        score = semantics.dice.magic_box(objective.dependencies())
+        result = objective.value * score
+        
+        return result
 
     def likelihood(self):
         objective = self.objective(semantics.tensor.functor)

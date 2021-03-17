@@ -39,5 +39,7 @@ class Optimizer:
 
         # then update
         logger.info("Propagating gradients.")
+        for p, v in self.problem.parameter_map.items():
+            logger.info(f"Gradient for {p}: {v.grad}.")
         self.optimizer.step()
         self.problem.clamp_parameters()

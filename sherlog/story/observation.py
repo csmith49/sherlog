@@ -24,6 +24,10 @@ class Observation:
     def size(self):
         return len(self.mapping)
 
+    @property
+    def is_empty(self):
+        return self.size == 0
+
     @classmethod
     def of_json(cls, json):
         """Build an observation from a JSON representation.
@@ -82,7 +86,7 @@ class Observation:
     def __str__(self):
         return str(self.mapping)
 
-    def equality(self, store, functor, prefix=""):
+    def equality(self, store, functor, prefix="", default=1.0):
         # build variables
         keys = value.Variable(f"{prefix}:keys")
         vals = value.Variable(f"{prefix}:vals")
@@ -91,7 +95,12 @@ class Observation:
         # convert to tensors and evaluate
         functor.run(keys, "tensorize", self.variables, store)
         functor.run(vals, "tensorize", self.values, store)
-        functor.run(result, "equal", [keys, vals], store)
+
+        # if we don't have any observations, default
+        if self.is_empty:
+            functor.run(result, "set", [default], store)
+        else:
+            functor.run(result, "equal", [keys, vals], store)
 
         # return the variable storing the result
         return result

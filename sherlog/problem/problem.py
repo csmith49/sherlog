@@ -104,8 +104,8 @@ class Problem:
 
     def log_likelihood(self, **kwargs):
         lls = torch.tensor([self.likelihood(evidence, **kwargs) for evidence in self.evidence])
-        total = torch.sum(torch.log(lls))
-        return Objective("log_likelihood", total)
+        total = torch.sum(lls)
+        return Objective("log_likelihood", total)    
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.

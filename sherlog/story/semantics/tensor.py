@@ -32,13 +32,17 @@ def _equal(v1, v2, **kwargs):
 def _satisfy(meet, avoid, **kwargs):
     return meet * (1 - avoid)
 
+def _set(value, **kwargs):
+    return value
+
 builtins = {
     "beta" : _beta,
     "bernoulli" : _bernoulli,
     "normal" : _normal,
     "tensorize" : _tensorize,
     "equal" : _equal,
-    "satisfy" : _satisfy
+    "satisfy" : _satisfy,
+    "set" : _set
 }
 
 functor = Functor(wrap, fmap, builtins)
