@@ -42,8 +42,9 @@ def train(filename, epochs, optimizer, learning_rate, samples):
                 o.maximize(obj)
 
     # print the values of the learned parameters
+    console.print("MLE Results")
     for name, parameter in problem._parameters.items():
-        print(f"{name}: {parameter.value:f}")
+        console.print(f"{name}: {parameter.value:f}")
 
 if __name__ == "__main__":
     main()

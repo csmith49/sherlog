@@ -120,7 +120,20 @@ class Problem:
         sample_iter = [story.dice() for story in chain.from_iterable(repeat(tuple(story_iter), samples))]
 
         # build likelihood with mean
-        return torch.mean(torch.tensor(list(sample_iter)))
+        # likelihood = torch.mean(torch.tensor(list(sample_iter)))
+        likelihood = torch.tensor(0.0)
+        count = 0
+
+        for sample in sample_iter:
+            likelihood += sample
+            count += 1
+
+        likelihood /= count
+
+        if likelihood.grad_fn is None:
+            logger.warning(f"Evidence {evidence} has likelihood {likelihood} with no gradient.")
+
+        return likelihood
 
     def objectives(self, epoch=None, stories=1, samples=1):
         """Generates log-likelihood objectives for all evidence.

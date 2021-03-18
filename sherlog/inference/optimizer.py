@@ -5,6 +5,14 @@ logger = get("optimizer")
 
 class Optimizer:
     def __init__(self, problem, optimizer):
+        """Context manager for optimizing registered objectives.
+
+        Parameters
+        ----------
+        problem : Problem
+
+        optimizer : torch.optim.Optimizer
+        """
         self.problem = problem
         self.optimizer = optimizer
 
@@ -59,8 +67,10 @@ class Optimizer:
 
         # then update
         logger.info("Propagating gradients.")
+        cost.backward()
         self.optimizer.step()
-        self.problem.clamp_parameters()
 
         for p, v in self.problem.parameter_map.items():
             logger.info(f"Gradient for {p}: {v.grad}.")
+
+        self.problem.clamp_parameters()
