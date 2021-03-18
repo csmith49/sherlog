@@ -2,6 +2,7 @@ from time import perf_counter as current_time
 from json import dumps
 from hashids import Hashids
 from random import randint
+import torch
 
 # set up the hashid conversion for seed generation
 hashids = Hashids()
@@ -70,21 +71,29 @@ class Timer:
         self.stop()
 
 class Instrumenter:
-    def __init__(self, filepath, context={}):
+    def __init__(self, filepath, context=None):
         '''An instrumenter that writes observations to `filepath` in JSONL format.
 
         Parameters
         ----------
-        filepath : string
+        filepath : str
 
-        context : dict (default {})
+        context : Optional[Dict[str, Any]]
         '''
         self._filepath = filepath
-        self._context = context
+        if context:
+            self._context = context
+        else:
+            self._context = {}
         self._cache = []
 
     def emit(self, **kwargs):
-        entry = kwargs
+        entry = {}
+        for k, v in kwargs.items():
+            if torch.is_tensor(v):
+                entry[k] = v.item()
+            else:
+                entry[k] = v
         entry.update(self._context)
         self._cache.append(entry)
 
