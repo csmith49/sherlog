@@ -10,6 +10,7 @@ setup(name='sherlog',
       packages=find_packages(),
       install_requires=[
           "networkx",
+          "matplotlib",
           "pyro-ppl",
           "torch",
           "rich",
