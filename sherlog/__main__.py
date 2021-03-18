@@ -1,17 +1,18 @@
 import click
 from .interface import console
-from .logs import enable_verbose_output
+from . import logs
 from .problem import load
 from .inference import Optimizer
 from torch.optim import SGD, Adam
 from rich.progress import track
 
 @click.group()
-@click.option("-v", "--verbose", is_flag=True,
-    envvar="SHERLOG_VERBOSE", help="Enable/disable verbose output via logging")
+@click.option("-v", "--verbose", multiple=True,
+    type=click.Choice(logs.logged_modules(), case_sensitive=False),
+    help="Enable/disable verbose output via logging")
 def main(verbose): 
     """Simple wrapper around common manipulations of Sherlog programs."""
-    if verbose: enable_verbose_output()
+    if verbose: logs.enable(*verbose)
 
 @main.command()
 @click.argument("filename", type=click.Path(exists=True))
@@ -37,8 +38,8 @@ def train(filename, epochs, optimizer, learning_rate, samples):
 
     for epoch in track(range(epochs), description="Training"):
         with optimizer as o:
-            obj = problem.log_likelihood(samples=samples)
-            o.maximize(obj)
+            for obj in problem.objectives(epoch=epoch, samples=samples):
+                o.maximize(obj)
 
     # print the values of the learned parameters
     for name, parameter in problem._parameters.items():

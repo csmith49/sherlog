@@ -18,6 +18,9 @@ logging.basicConfig(
     handlers=[HANDLER]
 )
 
+PREFIX = "sherlog"
+LOGGERS = {}
+
 def get(module_name):
     """Acquires a logger for a module.
     
@@ -31,10 +34,32 @@ def get(module_name):
     logger
         Logger object specialized for the provided module.
     """
-    return logging.getLogger(f"sherlog.{module_name}")
+    logger = logging.getLogger(f"{PREFIX}.{module_name}")
+    LOGGERS[module_name] = logger
+    return logger
 
-def enable_verbose_output():
-    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-    for logger in loggers:
-        if logger.name.startswith("sherlog."):
-            logger.setLevel(logging.INFO)
+def logged_modules():
+    """A list of all module names used to acquire a logger.
+
+    Returns
+    -------
+    list[str]
+    """
+    return list(LOGGERS.keys())
+
+def enable(*args):
+    """Enables verbose output for all loggers from the provided module names.
+
+    Parameters
+    ----------
+    *args : list[str]
+
+    Notes
+    -----
+    Operates by setting the relevant logger's level to INFO.
+    """
+    for module_name in args:
+        try:
+            LOGGERS[module_name].setLevel(logging.INFO)
+        except KeyError:
+            pass

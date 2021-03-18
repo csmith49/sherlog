@@ -10,7 +10,7 @@ from subprocess import Popen
 from ..config import PORT
 import atexit
 
-logger = get("engine.server")
+logger = get("interface.server")
 
 SERVER_ARGS = ["sherlog-server", "--port", f"{PORT}"]
 logger.info(f"Starting translation server on port {PORT}...")
