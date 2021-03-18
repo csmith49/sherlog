@@ -34,7 +34,6 @@ class DiCE:
             return True
         return False
 
-    # TODO - filter by unique deps
     def dependencies(self):
         """Recursively computes all dependencies.
 
@@ -43,9 +42,13 @@ class DiCE:
         Iterable[DiCE]
         """
         yield self
+        seen = set()
         if self._dependencies:
             for dep in self._dependencies:
-                yield from dep.dependencies()
+                for dice in dep.dependencies():
+                    if not dice in seen:
+                        yield dice
+                    seen.add(dice)
 
 def magic_box(*args):
     """Computes the magic box of the provided values.
