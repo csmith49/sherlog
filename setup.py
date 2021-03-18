@@ -17,6 +17,7 @@ setup(name='sherlog',
           "click",
           "hashids",
           "pandas",
-          "altair"
+          "altair",
+          "altair_viewer"
       ],
       zip_safe=False)
