@@ -1,96 +1,136 @@
 from ...engine import Functor
-import torch as t
-import torch.distributions as td
+from ...logs import get
+import torch
+from torch.distributions import Bernoulli, Normal, Beta
 from itertools import chain
+
+logger = get("story.semantics.dice")
 
 class DiCE:
     def __init__(self, value, log_prob=None, dependencies=None):
+        """A value wrapped by the DiCE functor.
+
+        Parameters
+        ----------
+        value : Tensor
+
+        log_prob : Optional[Tensor]
+
+        dependencies : Iterable[DiCE]
+        """
         self.value = value
         self.log_prob = log_prob
         self._dependencies = dependencies
 
     @property
     def is_stochastic(self):
+        """True if a log-probability is defined.
+
+        Returns
+        -------
+        bool
+        """
         if self.log_prob:
             return True
         return False
 
     # TODO - filter by unique deps
     def dependencies(self):
+        """Recursively computes all dependencies.
+
+        Returns
+        -------
+        Iterable[DiCE]
+        """
         yield self
         if self._dependencies:
             for dep in self._dependencies:
                 yield from dep.dependencies()
 
-def magic_box(values):
-    tau = t.tensor(0.0)
-    for v in values:
-        if v.is_stochastic:
-            tau += v.log_prob
-    return t.exp(tau - tau.detach())
+def magic_box(*args):
+    """Computes the magic box of the provided values.
+
+    Parameters
+    ----------
+    *args : Iterable[DiCE]
+
+    Returns
+    -------
+    Tensor
+    """
+    tau = torch.tensor(0.0)
+    for dice in args:
+        if dice.is_stochastic:
+            tau += dice.log_prob
+    result = torch.exp(tau - tau.detach())
+    
+    # a quick check to ensure we're getting gradients
+    if result.grad_fn is None:
+        logger.warning(f"Magic box of {values} has no gradient.")
+
+    return result
 
 def wrap(obj, **kwargs):
-    if t.is_tensor(obj):
+    if torch.is_tensor(obj):
         value = obj
     else:
-        value = t.tensor(obj)
+        value = torch.tensor(obj)
     return DiCE(value)
 
 def fmap(callable, args, kwargs, **fmap_args):
+    logger.info(f"Calling {callable} on {args}.")
     value = callable(*[arg.value for arg in args], **kwargs)
     return DiCE(value, dependencies=args)
 
-def _beta(p, q, **kwargs):
-    dist = td.Beta(p.value, q.value)
-    value = dist.rsample()
-    return DiCE(value, log_prob=dist.log_prob(value), dependencies=[p, q])
+def random_factory(distribution):
+    """Builds a DiCE builtin (F v -> F v) from a distribution class.
 
-def _normal(m, s, **kwargs):
-    dist = td.Normal(m.value, s.value)
-    value = dist.rsample()
-    return DiCE(value, log_prob=dist.log_prob(value), dependencies=[m, s])
+    Parameters
+    ----------
+    distribution : distribution.Distribution
 
-def _bernoulli(p, **kwargs):
-    dist = td.Bernoulli(p.value)
-    value = dist.sample()
-    return DiCE(value, log_prob=dist.log_prob(value), dependencies=[p])
+    Returns
+    -------
+    Functor builtin
+    """
+    def builtin(*args, **kwargs):
+        parameters = [arg.value for arg in args]
+        dist = distribution(*[arg.value for arg in args])
+        try:
+            value = dist.rsample()
+        except:
+            value = dist.sample()
+        log_prob = dist.log_prob(value)
+        logger.info(f"Sampling: {value} ~ {distribution.__name__}{parameters} with log-prob {log_prob}.")
+        return DiCE(value, log_prob=log_prob, dependencies=list(args))
+    return builtin
 
-def _random(distribution, *args, **kwargs):
-    parameters = [arg.value for arg in args]
-    dist = distribution(*parameters)
-    try:
-        value = dist.rsample()
-    except:
-        value = dist.sample()
-    log_prob = dist.log_prob(value)
-    return DiCE(value, log_prob=log_prob, dependencies=list(args))
+def lift(callable):
+    def builtin(*args, **kwargs):
+        value = callable(*[arg.value for arg in args])
+        return DiCE(value, dependencies=list(args))
+    return builtin
 
-def _tensorize(*args, **kwargs):
-    value = t.tensor([arg.value for arg in args])
-    return DiCE(value, dependencies=list(args))
+def _tensorize(*args):
+    return torch.tensor(list(args))
 
-def _equal(v1, v2, **kwargs):
-    if t.equal(v1.value, v2.value):
-        value = t.tensor(1.0)
+def _equal(v1, v2):
+    if torch.equal(v1, v2):
+        return torch.tensor(1.0)
     else:
-        value = t.tensor(0.0)
-    return DiCE(value, dependencies=[v1, v2])
+        return torch.tensor(0.0)
 
-def _satisfy(meet, avoid, **kwargs):
-    value = meet.value * (1 - avoid.value)
-    return DiCE(value, dependencies=[meet, avoid])
-
-def _set(value, **kwargs):
-    return value
+def _satisfy(meet, avoid):
+    return meet * (1 - avoid)
 
 builtins = {
-    "beta" : _beta,
-    "bernoulli" : _bernoulli,
-    "normal" : _normal,
-    "tensorize" : _tensorize,
-    "equal" : _equal,
-    "satisfy" : _satisfy,
-    "set" : _set
+    "beta" : random_factory(Beta),
+    "bernoulli" : random_factory(Bernoulli),
+    "normal" : random_factory(Normal),
+    "tensorize" : lift(_tensorize),
+    "equal" : lift(_equal),
+    "satisfy" : lift(_satisfy),
+    "set" : lift(lambda x: x)
 }
 
 functor = Functor(wrap, fmap, builtins)

@@ -31,6 +31,23 @@ class Story:
         return Store(external=self._external)
 
     def run(self, functor, wrap_args={}, fmap_args={}, parameters={}):
+        """Evaluate the story in the given functor.
+
+        Parameters
+        ----------
+        functor : Functor
+
+        wrap_args : Optional[Dict[string, Any]]
+
+        fmap_args : Optional[Dict[string, Any]]
+
+        parameters : Optional[Dict[string, Dict[string, Any]]]
+
+        Returns
+        -------
+        Store[Functor.t]
+
+        """
         store = self.store
         for assignment in self.model.assignments:
             functor.run_assignment(
@@ -42,6 +59,16 @@ class Story:
         return store
 
     def objective(self, functor):
+        """Use provided functor to evaluate the story and build optimization objective.
+
+        Parameters
+        ----------
+        functor : Functor
+
+        Returns
+        -------
+        Functor.t
+        """
         # get values
         store = self.run(functor)
 
@@ -57,12 +84,34 @@ class Story:
         return store[objective]
 
     def dice(self):
-        objective = self.objective(semantics.dice.functor)
-        score = semantics.dice.magic_box(objective.dependencies())
-        result = objective.value * score
-        
-        return result
+        """Build DiCE surrogate objective for a single execution of the story.
 
-    def likelihood(self):
-        objective = self.objective(semantics.tensor.functor)
-        return objective
+        Returns
+        -------
+        Tensor
+        """
+        # use dice functor to build surrogate objective
+        objective = self.objective(semantics.dice.functor)
+        score = semantics.dice.magic_box(*objective.dependencies())
+        surrogate = objective.value * score
+
+        # check to make sure gradients are being passed appropriately
+        if surrogate.grad_fn is None:
+            logger.warning(f"DiCE objective {surrogate} has no gradient.")
+
+        return surrogate
+
+    def likelihood(self, samples=1):
+        """Estimate the likelihood."
+
+        Parameters
+        ----------
+        samples : int
+            Defaults to 1.
+
+        Returns
+        -------
+        Tensor
+        """
+        scores = [self.objective(semantics.tensor.functor) for _ in range(samples)]
+        return torch.mean(torch.tensor(scores))

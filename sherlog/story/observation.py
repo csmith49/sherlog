@@ -62,7 +62,7 @@ class Observation:
 
         Returns
         -------
-        Value iterable
+        Iterable[Value]
         """
         for _, v in self.mapping.items():
             yield v
@@ -78,7 +78,7 @@ class Observation:
 
         Returns
         -------
-        value
+        Functor.t
         """
         for _, v in self.mapping.items():
             yield functor.evaluate(v, store, wrap_args=wrap_args)
