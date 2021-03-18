@@ -24,6 +24,10 @@ class Observation:
     def size(self):
         return len(self.mapping)
 
+    @property
+    def is_empty(self):
+        return self.size == 0
+
     @classmethod
     def of_json(cls, json):
         """Build an observation from a JSON representation.
@@ -52,6 +56,17 @@ class Observation:
         for k, _ in self.mapping.items():
             yield value.Variable(k)
 
+    @property
+    def values(self):
+        """Compute the codomain of the observation.
+
+        Returns
+        -------
+        Iterable[Value]
+        """
+        for _, v in self.mapping.items():
+            yield v
+
     def evaluate(self, store, functor, wrap_args={}):
         """Evaluate the observation.
 
@@ -63,7 +78,7 @@ class Observation:
 
         Returns
         -------
-        value
+        Functor.t
         """
         for _, v in self.mapping.items():
             yield functor.evaluate(v, store, wrap_args=wrap_args)
@@ -71,33 +86,21 @@ class Observation:
     def __str__(self):
         return str(self.mapping)
 
-    def similarity(self, store, default=1.0, temperature=0.001):
-        """Computes similarity between a given observation and a store.
-        
-        Parameters
-        ----------
-        store : Store
+    def equality(self, store, functor, prefix="", default=1.0):
+        # build variables
+        keys = value.Variable(f"{prefix}:keys")
+        vals = value.Variable(f"{prefix}:vals")
+        result = value.Variable(f"{prefix}:is_equal")
 
-        default : float option
-        
-        Returns
-        -------
-        tensor
-        """
+        # convert to tensors and evaluate
+        functor.run(keys, "tensorize", self.variables, store)
+        functor.run(vals, "tensorize", self.values, store)
 
-        # undefined for empty vectors, so use the relevant provided value
-        if self.size == 0: 
-            logger.info(f"Similarity computation with empty observation. Returning default {default}.")
-            return torch.tensor(default)
+        # if we don't have any observations, default
+        if self.is_empty:
+            functor.run(result, "set", [default], store)
+        else:
+            functor.run(result, "equal", [keys, vals], store)
 
-        obs_vec = torch.tensor(list(self.evaluate(store, semantics.tensor)))
-        str_vec = torch.tensor([store[v] for v in self.variables])
-
-        distance = torch.dist(obs_vec, str_vec)
-
-        # pass through gaussian rbf
-        result = torch.exp(- torch.pow(distance, 2) / (2 * torch.tensor(temperature)))
-        
-        logger.info(f"Similarity between {self} and {store}: {result}")
-
+        # return the variable storing the result
         return result

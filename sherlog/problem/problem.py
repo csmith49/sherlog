@@ -1,12 +1,13 @@
 from .namespace import Namespace
 from .parameter import Parameter
+from .evidence import Evidence
 from ..inference import Objective
 from .. import interface
 from ..engine import Model, value, Store
 from ..story import Story
 from ..logs import get
 
-from itertools import islice
+from itertools import islice, chain, repeat
 
 import torch
 import pickle
@@ -20,13 +21,13 @@ class Problem:
 
         Parameters
         ----------
-        parameters : Parameter iterable
+        parameters : Iterable[Parameter]
 
-        namespaces : string iterable
+        namespaces : Iterable[str]
 
-        evidence : JSON-like object iterable
+        evidence : Iterable[Evidence]
 
-        program : JSON-like object
+        program : JSON
         """
         # convert params to name-param map
         self._parameters = {p.name : p for p in parameters}
@@ -46,7 +47,7 @@ class Problem:
 
         Parameters
         ----------
-        json : JSON-like object
+        json : JSON
         
         Returns
         -------
@@ -54,7 +55,7 @@ class Problem:
         """
         parameters = [Parameter.of_json(p) for p in json["parameters"]]
         # namespaces = json["namespaces"]
-        evidence = json["evidence"]
+        evidence = [Evidence.of_json(e) for e in json["evidence"]]
         program = json
         return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
@@ -63,19 +64,23 @@ class Problem:
 
         Parameters
         ----------
-        evidence : JSON-like object
+        evidence : Evidence
 
         samples : int
+            Number of samples desired (defaults to 1).
 
         attempts : int
+            Maximum number of queries to logic server (defaults to 100).
+
+        width : Optional[int]
+            Maximum beam width during stochastic resolution.
         
-        width : int option
-        
-        depth : int option
+        depth : Optional[int]
+            Maximum proof depth.
 
         Returns
         -------
-        Story list iterable
+        Iterable[List[Story]]
         """
 
         logger.info(f"Sampling stories for evidence {evidence}...")
@@ -87,25 +92,76 @@ class Problem:
         def gen():
             for attempt in range(attempts):
                 logger.info(f"Starting story generation attempt {attempt}...")
-                for json in interface.query(self.program, evidence, width=width, depth=depth):
+                for json in interface.query(self.program, evidence.json, width=width, depth=depth):
                     logger.info("Story found.")
                     yield Story.of_json(json, external=external)
         
         # and grab only the number of samples desired
         yield from islice(gen(), samples)
 
-    def all_stories(self, **kwargs):
+    def likelihood(self, evidence, stories=1, samples=1):
+        """
+        Parameters
+        ----------
+        evidence : Evidence
+
+        stories : int
+            Number of stories to sample (defaults to 1).
+
+        samples : int
+            Number of samples of likelihood to compute per-story (defaults to 1).
+
+        Returns
+        -------
+        Tensor
+        """
+        # construct iterables for samples
+        story_iter = self.stories(evidence, samples=stories)
+        sample_iter = [story.dice() for story in chain.from_iterable(repeat(tuple(story_iter), samples))]
+
+        # build likelihood with mean
+        # likelihood = torch.mean(torch.tensor(list(sample_iter)))
+        likelihood = torch.tensor(0.0)
+        count = 0
+
+        for sample in sample_iter:
+            likelihood += sample
+            count += 1
+
+        likelihood /= count
+
+        if likelihood.grad_fn is None:
+            logger.warning(f"Evidence {evidence} has likelihood {likelihood} with no gradient.")
+
+        return likelihood
+
+    def objectives(self, epoch=None, stories=1, samples=1):
+        """Generates log-likelihood objectives for all evidence.
+
+        Parameters
+        ----------
+        epoch : Optional[int]
+            Current epoch.
+
+        stories : int
+
+        samples : int
+
+        Returns
+        -------
+        Iterable[Objective]
+        """
+        # build the objective header using kwargs
+        if epoch is not None:
+            HEADER = f"{epoch}:ll"
+        else:
+            HEADER = "ll"
+
+        # yield objective per-evidence
         for evidence in self.evidence:
-            yield from self.stories(evidence, **kwargs)
-
-    def likelihood(self, evidence, **kwargs):
-        lls = torch.tensor([story.likelihood() for story in self.stories(evidence, **kwargs)])
-        return torch.mean(lls)
-
-    def log_likelihood(self, **kwargs):
-        lls = torch.tensor([self.likelihood(evidence, **kwargs) for evidence in self.evidence])
-        total = torch.sum(torch.log(lls))
-        return Objective("log_likelihood", total)
+            likelihood = self.likelihood(evidence, stories=stories, samples=samples)
+            obj = Objective(f"{HEADER}:{evidence}", torch.log(likelihood))
+            yield obj
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
@@ -149,7 +205,7 @@ class Problem:
 
         Returns
         -------
-        tensor iterable
+        Iterable[Tensor]
         """
         for _, parameter in self._parameters.items():
             yield parameter.value
@@ -160,9 +216,3 @@ class Problem:
     @property
     def parameter_map(self):
         return {n : p.value for n, p in self._parameters.items()}
-
-    # def log_likelihood(self, num_samples=1):
-    #     total = torch.tensor(0.0)
-    #     for story in self.stories():
-    #         total += torch.log(story.likelihood(num_samples=num_samples))
-    #     return total

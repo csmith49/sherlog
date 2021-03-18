@@ -1,6 +1,7 @@
 """Sherlog evaluation follows a functor design pattern."""
 
 from .value import Symbol, Variable
+from .assignment import Assignment
 
 class Functor:
     def __init__(self, wrap, fmap, builtins):
@@ -27,14 +28,14 @@ class Functor:
         else:
             return self._wrap(obj, **wrap_args)
 
-    def run(self, assignment, store, wrap_args={}, fmap_args={}, parameters={}):
+    def run_assignment(self, assignment, store, wrap_args={}, fmap_args={}, parameters={}):
         # get kwargs for the function being executed
         try:
             kwargs = parameters[assignment.guard]
         except KeyError:
             kwargs = {}
-        # and add the target to them (helps with, e.g., pyro)
-        kwargs["target"] = assignment.target
+        # and add the assignment object to them (helps with, e.g., pyro)
+        kwargs["assignment"] = assignment
 
         # evaluate arguments
         args = [self.evaluate(arg, store, wrap_args=wrap_args) for arg in assignment.arguments]
@@ -49,3 +50,13 @@ class Functor:
         
         store[assignment.target] = result
         return result
+
+    def run(self, target, guard, arguments, store, wrap_args={}, fmap_args={}, parameters={}):
+        assignment = Assignment(target, guard, arguments)
+        return self.run_assignment(
+            assignment,
+            store,
+            wrap_args=wrap_args,
+            fmap_args=fmap_args,
+            parameters=parameters
+        )
