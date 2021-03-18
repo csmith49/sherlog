@@ -101,6 +101,16 @@ class Story:
 
         return surrogate
 
+    def graph(self):
+        """Build a graph representation of the story.
+
+        Returns
+        -------
+        networkx.DiGraph
+        """
+        objective = self.objective(semantics.graph.functor)
+        return semantics.graph.to_graph(objective)
+
     def likelihood(self, samples=1):
         """Estimate the likelihood."
 
