@@ -1,6 +1,6 @@
 (executables
     (names run server)
-    (public_names sherlog sherlog-server)
+    (public_names sherlog-interpreter sherlog-server)
     (libraries lib containers fmt)
     (package sherlog)
 )
