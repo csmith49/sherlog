@@ -17,7 +17,7 @@ logger = get("problem")
 
 class Problem:
     def __init__(self, parameters, namespaces=None, evidence=None, program=None):
-        """Object representing a SherLog problem file.
+        """Object representing a Sherlog problem file.
 
         Parameters
         ----------
@@ -115,20 +115,16 @@ class Problem:
         -------
         Tensor
         """
+
         # construct iterables for samples
         story_iter = self.stories(evidence, samples=stories)
         sample_iter = [story.dice() for story in chain.from_iterable(repeat(tuple(story_iter), samples))]
 
         # build likelihood with mean
-        # likelihood = torch.mean(torch.tensor(list(sample_iter)))
-        likelihood = torch.tensor(0.0)
-        count = 0
+        samples = torch.stack(sample_iter)
+        likelihood = torch.mean(samples)
 
-        for sample in sample_iter:
-            likelihood += sample
-            count += 1
-
-        likelihood /= count
+        logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
 
         if likelihood.grad_fn is None:
             logger.warning(f"Evidence {evidence} has likelihood {likelihood} with no gradient.")
@@ -168,7 +164,7 @@ class Problem:
 
         Parameters
         ----------
-        filepath : string
+        filepath : str
         """
         output = { "parameters" : {}, "models" : {} }
         for p, parameter in self._parameters.items():
@@ -184,7 +180,7 @@ class Problem:
 
         Paramters
         ---------
-        filepath : string
+        filepath : str
         """
         with open(filepath, "rb") as f:
             params = pickle.load(f)
