@@ -42,7 +42,7 @@ def main(**kwargs):
     # build abstract problem to convert to sherlog / problog programs
     with console.status("Generating random social graph..."):
         abstract_problem = generation.problem(
-            kwargs["size"],
+            size=kwargs["size"],
             stress=kwargs["stress"],
             influence=kwargs["influence"],
             spontaneous=kwargs["spontaneous"],
