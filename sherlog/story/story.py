@@ -126,11 +126,29 @@ class Story:
         -------
         Tensor
         """
-        # use dice functor to build surrogate objective
         functor = semantics.forced.functor(self.meet)
-        objective = self.objective(functor)
-        score = semantics.forced.magic_box(*objective.dependencies())
-        surrogate = objective.value * score
+        store = self.run(functor)
+
+        # build meet and avoid
+        meet = self.meet.equality(store, functor, prefix="sherlog:meet", default=1.0)
+        avoid = self.avoid.equality(store, functor, prefix="sherlog:avoid", default=0.0)
+
+        # build objective
+        objective = value.Variable("sherlog:objective")
+        functor.run(objective, "satisfy", [meet, avoid], store)
+
+        # also need to build scale from forced observations
+        if self.meet.is_empty:
+            scale = torch.tensor(1.0)
+        else:
+            probs = torch.stack([store[f].log_prob for f in self.meet.variables])
+            scale = torch.exp(torch.sum(probs))
+        
+        # build the score - likelihood of execution
+        score = semantics.forced.magic_box(*store[objective].dependencies())
+        
+        # and construct the surrogate
+        surrogate = torch.log(store[objective].value * scale * score)
 
         # check to make sure gradients are being passed appropriately
         if surrogate.grad_fn is None:

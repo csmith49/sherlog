@@ -30,7 +30,7 @@ class DiCE:
         -------
         bool
         """
-        if self.log_prob:
+        if self.log_prob is not None:
             return True
         return False
 
@@ -61,10 +61,8 @@ def magic_box(*args):
     -------
     Tensor
     """
-    tau = torch.tensor(0.0)
-    for dice in args:
-        if dice.is_stochastic:
-            tau += dice.log_prob
+
+    tau = torch.sum(torch.stack([n.log_prob for n in args if n.is_stochastic]))
     result = torch.exp(tau - tau.detach())
     
     # a quick check to ensure we're getting gradients
@@ -110,7 +108,7 @@ def random_factory(distribution, observation):
                 value = dist.rsample()
             except:
                 value = dist.sample()
-        
+
         log_prob = dist.log_prob(value)
         logger.info(f"Sampling: {value} ~ {distribution.__name__}{parameters} with log-prob {log_prob}.")
         return DiCE(value, log_prob=log_prob, dependencies=list(args))
@@ -123,7 +121,7 @@ def lift(callable):
     return builtin
 
 def _tensorize(*args):
-    return torch.tensor(list(args))
+    return torch.tensor(args)
 
 def _equal(v1, v2):
     if torch.equal(v1, v2):
