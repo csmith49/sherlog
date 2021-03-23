@@ -73,6 +73,63 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
 
 @main.command()
 @click.argument("filename", type=click.Path(exists=True))
+@click.option("-e", "--epochs", default=300, help="Number of training epochs.")
+@click.option("-o", "--optimizer", default="sgd",
+    type=click.Choice(["sgd", "adam"], case_sensitive=False), show_default=True,
+    help="Optimization strategy for training parameters.")
+@click.option("-l", "--learning-rate", default=0.01, show_default=True,
+    help="Optimizer learning rate.")
+@click.option("-s", "--samples", default=100, show_default=True,
+    help="Samples-per-explanation in gradient estimation.")
+@click.option("-i", "--instrument", type=click.Path(),
+    help="Output file for instrumentation logs.")
+@click.option("-r", "--resolution", default=50, help="Instrumentation resolution (in epochs).")
+def shaped(filename, epochs, optimizer, learning_rate, samples, instrument, resolution):
+    """Train FILENAME with the provided parameters using a shaped reward function."""
+    
+    # load the problem and build the optimizer
+    problem = load(filename)
+
+    opt = {
+        "sgd" : SGD,
+        "adam" : Adam
+    }[optimizer](problem.parameters(), lr=learning_rate)
+
+    # build the instrumenter
+    instrumenter = instrumentation.Instrumenter(instrument, context={
+        "seed" : instrumentation.seed(),
+        "benchmark" : filename,
+        "epochs" : epochs,
+        "optimizer" : optimizer,
+        "learning rate" : learning_rate,
+        "samples" : samples
+    })
+
+    # construct the optimization loop
+    optimizer = Optimizer(problem, opt)
+
+    for epoch in track(range(epochs), description="Training"):
+        for evidence in problem.evidence:
+            with optimizer as o:
+                    obj = problem.reward(evidence, samples=samples)
+                    o.maximize(obj)
+
+        if epoch % resolution == 0:
+            log = {"epoch" : epoch}
+            for k, v in problem.parameter_map.items():
+                log[k] = v
+                log[f"{k} grad"] = v.grad
+            instrumenter.emit(**log)
+
+    if instrument: instrumenter.flush()
+
+    # print the values of the learned parameters
+    console.print("MLE Results")
+    for name, parameter in problem.parameter_map.items():
+        console.print(f"{name}: {parameter:f}")
+
+@main.command()
+@click.argument("filename", type=click.Path(exists=True))
 @click.option("-f", "--format", default="matplotlib",
     type=click.Choice(["dot", "matplotlib"], case_sensitive=False),
     help="Output format to render graph in")

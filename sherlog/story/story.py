@@ -101,6 +101,24 @@ class Story:
 
         return surrogate
 
+    def shaped(self):
+        """Build shaped reward for a single execution of the story.
+
+        Returns
+        -------
+        Tensor
+        """
+        # use dice functor to build surrogate objective
+        objective = self.objective(semantics.shaped.functor)
+        score = semantics.shaped.magic_box(*objective.dependencies())
+        surrogate = objective.value * score
+
+        # check to make sure gradients are being passed appropriately
+        if surrogate.grad_fn is None:
+            logger.warning(f"SHaped reward objective {surrogate} has no gradient.")
+
+        return surrogate
+
     def graph(self):
         """Build a graph representation of the story.
 

@@ -159,6 +159,34 @@ class Problem:
             obj = Objective(f"{HEADER}:{evidence}", torch.log(likelihood))
             yield obj
 
+    def reward(self, evidence, epoch=None, stories=1, samples=1):
+        """Generates reward for piece of evidence.
+
+        Parameters
+        ----------
+        epoch : Optional[int]
+            Current epoch.
+
+        stories : int
+
+        samples : int
+
+        Returns
+        -------
+        Iterable[Objective]
+        """
+        if epoch is not None:
+            HEADER = f"{epoch}:ll"
+        else:
+            HEADER = "ll"
+
+        story_iter = self.stories(evidence, samples=stories)
+        sample_iter = chain.from_iterable(repeat(tuple(story_iter), samples))
+        samples = torch.stack([story.shaped() for story in sample_iter])
+        reward = torch.mean(samples)
+
+        return Objective(f"{HEADER}:{evidence}", reward)
+
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
 
