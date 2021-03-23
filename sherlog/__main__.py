@@ -84,7 +84,7 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
 @click.option("-i", "--instrument", type=click.Path(),
     help="Output file for instrumentation logs.")
 @click.option("-r", "--resolution", default=50, help="Instrumentation resolution (in epochs).")
-def shaped(filename, epochs, optimizer, learning_rate, samples, instrument, resolution):
+def forced(filename, epochs, optimizer, learning_rate, samples, instrument, resolution):
     """Train FILENAME with the provided parameters using a shaped reward function."""
     
     # load the problem and build the optimizer

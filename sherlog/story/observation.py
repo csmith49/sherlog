@@ -11,14 +11,17 @@ class Observation:
 
         Parameters
         ----------
-        mapping : dict
-            Each key-value pair maps a string to a value
-
-        Returns
-        -------
-        Observation
+        mapping : Dict[str, Value]
         """
         self.mapping = mapping
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return self.mapping[key]
+        elif isinstance(key, value.Variable):
+            return self.mapping[key.name]
+        else:
+            raise KeyError()
 
     @property
     def size(self):

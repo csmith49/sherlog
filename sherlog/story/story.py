@@ -119,6 +119,25 @@ class Story:
 
         return surrogate
 
+    def forced(self):
+        """Build build objective for a forced execution of the story.
+
+        Returns
+        -------
+        Tensor
+        """
+        # use dice functor to build surrogate objective
+        functor = semantics.forced.functor(self.meet)
+        objective = self.objective(functor)
+        score = semantics.forced.magic_box(*objective.dependencies())
+        surrogate = objective.value * score
+
+        # check to make sure gradients are being passed appropriately
+        if surrogate.grad_fn is None:
+            logger.warning(f"SHaped reward objective {surrogate} has no gradient.")
+
+        return surrogate
+
     def graph(self):
         """Build a graph representation of the story.
 
