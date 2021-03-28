@@ -156,6 +156,36 @@ class Story:
 
         return surrogate
 
+    def rejection(self):
+        """Build objective using a forced execution via rejection sampling.
+
+        Returns
+        -------
+        Tensor
+        """
+
+        functor = semantics.rejection.functor
+
+        while True:
+            store = self.run(functor)
+
+            # build meet and avoid
+            meet = self.meet.equality(store, functor, prefix="sherlog:meet", default=1.0)
+            avoid = self.avoid.equality(store, functor, prefix="sherlog:avoid", default=0.0)
+
+            # build objective
+            objective = value.Variable("sherlog:objective")
+            functor.run(objective, "satisfy", [meet, avoid], store)
+
+            # build lother factors
+            lr = semantics.rejection.likelihood_ratio(self.meet, store)
+            dice = semantics.rejection.magic_box(*store[objective].dependencies())
+
+            surrogate = store[objective].value * lr * dice
+
+            if surrogate > 0:
+                return torch.log(surrogate)
+
     def graph(self):
         """Build a graph representation of the story.
 

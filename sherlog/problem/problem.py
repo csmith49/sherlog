@@ -182,7 +182,7 @@ class Problem:
 
         story_iter = self.stories(evidence, samples=stories)
         sample_iter = chain.from_iterable(repeat(tuple(story_iter), samples))
-        samples = torch.stack([story.forced() for story in sample_iter])
+        samples = torch.stack([story.rejection() for story in sample_iter])
         reward = torch.mean(samples)
 
         return Objective(f"{HEADER}:{evidence}", reward)
