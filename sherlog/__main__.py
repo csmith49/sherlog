@@ -58,7 +58,10 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
                 o.maximize(obj)
 
         if epoch % resolution == 0:
-            log = {"epoch" : epoch}
+            log = {
+                "epoch" : epoch,
+                "log likelihood" : problem.log_likelihood(samples=samples)
+            }
             for k, v in problem.parameter_map.items():
                 log[k] = v
                 log[f"{k} grad"] = v.grad

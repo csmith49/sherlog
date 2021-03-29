@@ -1,4 +1,5 @@
 from ..engine import value
+from ..engine.value import Variable
 from ..logs import get
 from . import semantics
 import torch
@@ -83,10 +84,23 @@ class Observation:
         for _, v in self.mapping.items():
             yield functor.evaluate(v, store, wrap_args=wrap_args)
 
-    def __str__(self):
-        return str(self.mapping)
-
     def equality(self, store, functor, prefix="", default=1.0):
+        """Check if the store matches the observation in the given functor.
+
+        Parameters
+        ----------
+        store : Store
+
+        functor : Functor
+
+        prefix : str (default="")
+
+        default : float (default=1.0)
+
+        Returns
+        -------
+        Variable
+        """
         # build variables
         keys = value.Variable(f"{prefix}:keys")
         vals = value.Variable(f"{prefix}:vals")
@@ -104,3 +118,22 @@ class Observation:
 
         # return the variable storing the result
         return result
+
+    # MAGIC METHODS ------------------------------------------------------
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return self.mapping[key]
+        elif isinstance(key, Variable):
+            return self.mapping[key.name]
+        else:
+            raise KeyError(key)
+
+    def __contains__(self, key):
+        if isinstance(key, Variable):
+            return key.name in self.mapping.keys()
+        else:
+            return False
+
+    def __str__(self):
+        return str(self.mapping)

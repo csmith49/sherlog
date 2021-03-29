@@ -99,8 +99,9 @@ class Problem:
         # and grab only the number of samples desired
         yield from islice(gen(), samples)
 
-    def likelihood(self, evidence, stories=1, samples=1):
-        """
+    def marginal_likelihood(self, evidence, stories=1, samples=1):
+        """Compute the marginal likelihood of a piece of evidence.
+
         Parameters
         ----------
         evidence : Evidence
@@ -115,17 +116,14 @@ class Problem:
         -------
         Tensor
         """
-
-        # construct iterables for samples
         story_iter = self.stories(evidence, samples=stories)
-        sample_iter = [story.dice(samples=samples) for story in story_iter]
+        samples = torch.cat([story.miser(samples=samples) for story in story_iter])
 
-        # build likelihood with mean
-        samples = torch.cat(sample_iter)
         likelihood = torch.mean(samples)
 
         logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
 
+        # give a warning if we've somehow constructed value with no gradient
         if likelihood.grad_fn is None:
             logger.warning(f"Evidence {evidence} has likelihood {likelihood} with no gradient.")
 
@@ -155,9 +153,25 @@ class Problem:
 
         # yield objective per-evidence
         for evidence in self.evidence:
-            likelihood = self.likelihood(evidence, stories=stories, samples=samples)
+            likelihood = self.marginal_likelihood(evidence, stories=stories, samples=samples)
             obj = Objective(f"{HEADER}:{evidence}", torch.log(likelihood))
             yield obj
+
+    def log_likelihood(self, stories=1, samples=1):
+        """Compute the log-likelihood of the problem.
+
+        Parameters
+        ----------
+        stories : int (default=1)
+        samples : int (default=1)
+
+        Returns
+        -------
+        Tensor
+        """
+        marginal = lambda e: self.marginal_likelihood(e, stories=stories, samples=samples)
+        marginals = torch.stack([marginal(evidence) for evidence in self.evidence])
+        return marginals.log().sum()
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
