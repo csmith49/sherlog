@@ -16,17 +16,19 @@ class Miser:
         ----------
         value : Tensor
 
-        dependencies : Iterable[Miser]
+        dependencies : Iterable[Miser] (default=())
 
-        distribution : Distribution
+        distribution : Optional[Distribution]
 
-        forced : bool
+        forced : bool (default=False)
         """
         self.value = value
-        # we'll add some extra checks instead of revealing dependencies outright
-        self._dependencies = dependencies
         self.distribution = distribution
         self.forced = forced
+        
+        # we'll add some extra checks instead of revealing dependencies outright
+        self._dependencies = dependencies
+        
 
     @property
     def is_stochastic(self):
@@ -42,6 +44,16 @@ class Miser:
 
     @property
     def forced_log_prob(self):
+        """Computes the log-probability of the forcing.
+
+        If the value is not forced, assume the 'forcing' always holds (hence the forced log-prob is 0).
+
+        See also `Miser.log_prob`.
+
+        Returns
+        -------
+        Tensor
+        """
         if self.distribution and self.forced:
             return self.distribution.log_prob(self.value)
         else:
@@ -104,16 +116,42 @@ def magic_box(values):
     
     return result
 
-def sample_scale(values, forcing):
+def forcing_scale(values):
+    """Computes the likelihood of the forcing on all provided values.
+
+    Parameters
+    ----------
+    values : Iterable[Miser]
+
+    Returns
+    -------
+    Tensor
+    """
     tau = torch.stack([v.forced_log_prob for v in values]).sum(0)
     return torch.exp(tau)
 
+# FUNCTOR OPS -----------------------------------------------------------
+
 def wrap(obj, batches=1, **kwargs):
+    """Wraps a value in the Miser functor.
+
+    Parameters
+    ----------
+    obj : Any
+
+    batches : int (default=1)
+
+    kwargs : ignored
+
+    Returns
+    -------
+    Miser
+    """
     if torch.is_tensor(obj):
         value = obj
     else:
         value = torch.tensor(obj)
-
+    # make sure we've expanded!
     return Miser(batch.expand(value, batches))
 
 def fmap(callable, args, kwargs, **fmap_args):
@@ -121,14 +159,16 @@ def fmap(callable, args, kwargs, **fmap_args):
     value = batch.batch_map(callable, *[arg.value for arg in args])
     return Miser(value, dependencies=args)
 
-def random_factory(distribution, forcing={}):
+def random_factory(distribution, batches=1, forcing=None):
     """Builds a Miser builtin (F v -> F v) from a distribution class.
 
     Parameters
     ----------
     distribution : distribution.Distribution
 
-    forcing : Dict[str, Tensor]
+    batches : int (default=1)
+
+    forcing : Optional[Observation]
 
     Returns
     -------
@@ -140,16 +180,22 @@ def random_factory(distribution, forcing={}):
 
         # check if the assignment is forced
         assignment = kwargs["assignment"]
-        try:
-            value = forcing[assignment.target.name].value
-            return Miser(value, dependencies=list(args), distribution=dist, forced=True)
-        except: pass
+        if forcing and assignment.target in forcing:
+            # this is a fresh value, so we have to lift first
+            value = wrap(forcing[assignment.target], batches=batches).value
+
+            logger.info(f"Forcing: {value} ~ {distribution.__name__}{parameters}.")
+            # build as normal, but mark as forced            
+            return Miser(
+                value,
+                dependencies=list(args),
+                distribution=dist,
+                forced=True
+            )
         
-        # build the value normally
-        try:
-            value = dist.rsample()
-        except:
-            value = dist.sample()
+        # if the distribution supports reparameterization, use it
+        if dist.has_rsample: value = dist.rsample()
+        else: value = dist.sample()
     
         logger.info(f"Sampling: {value} ~ {distribution.__name__}{parameters}.")
         return Miser(value, dependencies=list(args), distribution=dist)
@@ -180,14 +226,14 @@ def _set(x):
 
 # FACTORY ------------------------------------------------------------------------
 
-def factory(samples, forcing={}):
+def factory(samples, forcing=None):
     """Builds a Miser execution functor.
 
     Parameters
     ----------
     samples : int
 
-    forcing : Dict[str, Tensor]
+    forcing : Optional[Observation]
 
     Returns
     -------
@@ -196,14 +242,13 @@ def factory(samples, forcing={}):
     # encode the samples parameter in the wrap function
     batched_wrap = partial(wrap, batches=samples)
 
-    # construct the builtins with the appropriate forcing
-    wrapped_forcing = {k : batched_wrap(v) for k, v in forcing.items()}
-    forced_factory = partial(random_factory, forcing=wrapped_forcing)
+    # construct the builtins with the appropriate forcing (if provided)
+    batched_random_factory = partial(random_factory, batches=samples, forcing=forcing)
     
     builtins = {
-        "beta" : forced_factory(Beta),
-        "bernoulli" : forced_factory(Bernoulli),
-        "normal" : forced_factory(Normal),
+        "beta" : batched_random_factory(Beta),
+        "bernoulli" : batched_random_factory(Bernoulli),
+        "normal" : batched_random_factory(Normal),
         "tensorize" : lift(_tensorize),
         "equal" : lift(_equal),
         "satisfy" : lift(_satisfy),

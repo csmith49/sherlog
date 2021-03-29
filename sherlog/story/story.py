@@ -113,18 +113,14 @@ class Story:
         # build the functor
         functor = semantics.miser.factory(
             samples,
-            forcing=self.meet.mapping
+            forcing=self.meet
         )
-        
         objective = self.objective(functor)
 
-        # build scale
-        scale = semantics.miser.sample_scale(objective.dependencies(), self.meet.mapping)
-        
+        # build surrogate
+        scale = semantics.miser.forcing_scale(objective.dependencies())
         score = semantics.miser.magic_box(objective.dependencies())
-        print("scale", scale)
-        surrogate = objective.value * score * scale
-
+        surrogate = objective.value * scale * score
 
         # check to make sure gradients are being passed appropriately
         if surrogate.grad_fn is None:
