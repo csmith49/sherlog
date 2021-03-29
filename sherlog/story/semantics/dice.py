@@ -159,4 +159,9 @@ builtins = {
     "set" : lift(_set)
 }
 
+def factory(samples):
+    def synthetic_wrap(obj):
+        return wrap(obj, batches=samples)
+    return Functor(synthetic_wrap, fmap, builtins)
+
 functor = Functor(wrap, fmap, builtins)
