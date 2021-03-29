@@ -1,5 +1,6 @@
 from ...engine import Functor
 from ...logs import get
+from . import batch
 import torch
 from torch.distributions import Bernoulli, Normal, Beta
 from itertools import chain
@@ -7,82 +8,102 @@ from itertools import chain
 logger = get("story.semantics.dice")
 
 class DiCE:
-    def __init__(self, value, log_prob=None, dependencies=None):
+    def __init__ (self, value, dependencies=(), distribution=None):
         """A value wrapped by the DiCE functor.
 
         Parameters
         ----------
         value : Tensor
 
-        log_prob : Optional[Tensor]
-
         dependencies : Iterable[DiCE]
+
+        distribution : Distribution
         """
         self.value = value
-        self.log_prob = log_prob
+        # we'll add some extra checks instead of revealing dependencies outright
         self._dependencies = dependencies
+        self.distribution = distribution
 
     @property
     def is_stochastic(self):
-        """True if a log-probability is defined.
+        """True if a distribution has been provided.
 
         Returns
         -------
         bool
         """
-        if self.log_prob:
+        if self.distribution:
             return True
         return False
 
+    @property
+    def log_prob(self):
+        """Computes the log-probability of having sampled the value from the provided distribution.
+
+        If no distribution is provided, assume the value is deterministic (hence the log-prob is 0).
+
+        Returns
+        -------
+        Tensor
+        """
+        if self.distribution:
+            return self.distribution.log_prob(self.value)
+        else:
+            return torch.zeros(batch.batches(self.value))
+
     def dependencies(self):
-        """Recursively computes all dependencies.
+        """Recursively compute all dependencies.
 
         Returns
         -------
         Iterable[DiCE]
         """
+        # using pre-order, so yield current node first
         yield self
-        seen = set()
-        if self._dependencies:
-            for dep in self._dependencies:
-                for dice in dep.dependencies():
-                    if not dice in seen:
-                        yield dice
-                    seen.add(dice)
 
-def magic_box(*args):
+        # track all nodes already seen to avoid duplicates
+        seen = set()
+        for dependency in self._dependencies:
+            # iterate over all dependencies of dependencies
+            for dice in dependency.dependencies():
+                if not dice in seen:
+                    yield dice
+                seen.add(dice)
+
+    def batch_values(self):
+        yield from self.value.unbind()
+
+def magic_box(values):
     """Computes the magic box of the provided values.
 
     Parameters
     ----------
-    *args : Iterable[DiCE]
+    values : Iterable[DiCE]
 
     Returns
     -------
     Tensor
     """
-    tau = torch.tensor(0.0)
-    for dice in args:
-        if dice.is_stochastic:
-            tau += dice.log_prob
+    tau = torch.stack([v.log_prob for v in values]).sum(0)
     result = torch.exp(tau - tau.detach())
-    
-    # a quick check to ensure we're getting gradients
+
+    # a check to ensure gradients are being propagated
     if result.grad_fn is None:
         logger.warning(f"Magic box of {values} has no gradient.")
-
+    
     return result
 
-def wrap(obj, **kwargs):
+def wrap(obj, batches=1, **kwargs):
     if torch.is_tensor(obj):
         value = obj
     else:
         value = torch.tensor(obj)
-    return DiCE(value)
+
+    return DiCE(batch.expand(value, batches))
 
 def fmap(callable, args, kwargs, **fmap_args):
     logger.info(f"Calling {callable} on {args}.")
-    value = callable(*[arg.value for arg in args], **kwargs)
+    value = batch.batch_map(callable, *[arg.value for arg in args])
     return DiCE(value, dependencies=args)
 
 def random_factory(distribution):
@@ -98,19 +119,18 @@ def random_factory(distribution):
     """
     def builtin(*args, **kwargs):
         parameters = [arg.value for arg in args]
-        dist = distribution(*[arg.value for arg in args])
+        dist = distribution(*parameters)
         try:
             value = dist.rsample()
         except:
             value = dist.sample()
-        log_prob = dist.log_prob(value)
-        logger.info(f"Sampling: {value} ~ {distribution.__name__}{parameters} with log-prob {log_prob}.")
-        return DiCE(value, log_prob=log_prob, dependencies=list(args))
+        logger.info(f"Sampling: {value} ~ {distribution.__name__}{parameters}.")
+        return DiCE(value, dependencies=list(args), distribution=dist)
     return builtin
 
 def lift(callable):
     def builtin(*args, **kwargs):
-        value = callable(*[arg.value for arg in args])
+        value = batch.batch_map(callable, *[arg.value for arg in args])
         return DiCE(value, dependencies=list(args))
     return builtin
 
@@ -126,6 +146,9 @@ def _equal(v1, v2):
 def _satisfy(meet, avoid):
     return meet * (1 - avoid)
 
+def _set(x):
+    return x
+
 builtins = {
     "beta" : random_factory(Beta),
     "bernoulli" : random_factory(Bernoulli),
@@ -133,7 +156,12 @@ builtins = {
     "tensorize" : lift(_tensorize),
     "equal" : lift(_equal),
     "satisfy" : lift(_satisfy),
-    "set" : lift(lambda x: x)
+    "set" : lift(_set)
 }
+
+def factory(samples):
+    def synthetic_wrap(obj):
+        return wrap(obj, batches=samples)
+    return Functor(synthetic_wrap, fmap, builtins)
 
 functor = Functor(wrap, fmap, builtins)

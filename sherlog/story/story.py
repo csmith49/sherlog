@@ -83,16 +83,18 @@ class Story:
         # just return the computed objective - functor should track all relevant info
         return store[objective]
 
-    def dice(self):
-        """Build DiCE surrogate objective for a single execution of the story.
+    def dice(self, samples=1):
+        """Build DiCE surrogate objective for a story.
 
         Returns
         -------
         Tensor
         """
         # use dice functor to build surrogate objective
-        objective = self.objective(semantics.dice.functor)
-        score = semantics.dice.magic_box(*objective.dependencies())
+        functor = semantics.dice.factory(samples)
+
+        objective = self.objective(functor)
+        score = semantics.dice.magic_box(objective.dependencies())
         surrogate = objective.value * score
 
         # check to make sure gradients are being passed appropriately

@@ -92,14 +92,14 @@ class Observation:
         vals = value.Variable(f"{prefix}:vals")
         result = value.Variable(f"{prefix}:is_equal")
 
-        # convert to tensors and evaluate
-        functor.run(keys, "tensorize", self.variables, store)
-        functor.run(vals, "tensorize", self.values, store)
-
         # if we don't have any observations, default
         if self.is_empty:
             functor.run(result, "set", [default], store)
         else:
+            # convert to tensors and evaluate
+            functor.run(keys, "tensorize", self.variables, store)
+            functor.run(vals, "tensorize", self.values, store)
+
             functor.run(result, "equal", [keys, vals], store)
 
         # return the variable storing the result

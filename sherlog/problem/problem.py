@@ -118,10 +118,10 @@ class Problem:
 
         # construct iterables for samples
         story_iter = self.stories(evidence, samples=stories)
-        sample_iter = [story.dice() for story in chain.from_iterable(repeat(tuple(story_iter), samples))]
+        sample_iter = [story.dice(samples=samples) for story in story_iter]
 
         # build likelihood with mean
-        samples = torch.stack(sample_iter)
+        samples = torch.cat(sample_iter)
         likelihood = torch.mean(samples)
 
         logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
