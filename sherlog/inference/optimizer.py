@@ -67,10 +67,13 @@ class Optimizer:
 
         # then update
         logger.info("Propagating gradients.")
-        cost.backward()
-        self.optimizer.step()
+
+        if cost.grad_fn is None:
+            logger.warning(f"Cost {cost} has no gradient.")
+        else:
+            cost.backward()
+            self.optimizer.step()
+            self.problem.clamp_parameters()
 
         for p, v in self.problem.parameter_map.items():
             logger.info(f"Gradient for {p}: {v.grad}.")
-
-        self.problem.clamp_parameters()

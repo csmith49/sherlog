@@ -92,7 +92,7 @@ class Story:
         """
         # use dice functor to build surrogate objective
         objective = self.objective(semantics.dice.functor)
-        score = semantics.dice.magic_box(*objective.dependencies())
+        score = semantics.dice.magic_box(objective.dependencies())
         surrogate = objective.value * score
 
         # check to make sure gradients are being passed appropriately
