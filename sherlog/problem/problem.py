@@ -118,7 +118,7 @@ class Problem:
 
         # construct iterables for samples
         story_iter = self.stories(evidence, samples=stories)
-        sample_iter = [story.dice(samples=samples) for story in story_iter]
+        sample_iter = [story.miser(samples=samples) for story in story_iter]
 
         # build likelihood with mean
         samples = torch.cat(sample_iter)

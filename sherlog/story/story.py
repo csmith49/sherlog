@@ -103,6 +103,36 @@ class Story:
 
         return surrogate
 
+    def miser(self, samples=1):
+        """Build a Miser surrogate objective for the story.
+
+        Returns
+        -------
+        Tensor
+        """
+        # build the functor
+        functor = semantics.miser.factory(
+            samples,
+            forcing=self.meet.mapping
+        )
+        
+        objective = self.objective(functor)
+
+        # build scale
+        scale = semantics.miser.sample_scale(objective.dependencies(), self.meet.mapping)
+        
+        score = semantics.miser.magic_box(objective.dependencies())
+        print("scale", scale)
+        surrogate = objective.value * score * scale
+
+
+        # check to make sure gradients are being passed appropriately
+        if surrogate.grad_fn is None:
+            logger.warning(f"DiCE objective {surrogate} has no gradient.")
+
+        return surrogate
+
+
     def graph(self):
         """Build a graph representation of the story.
 
