@@ -99,8 +99,9 @@ class Problem:
         # and grab only the number of samples desired
         yield from islice(gen(), samples)
 
-    def likelihood(self, evidence, stories=1, samples=1):
-        """
+    def marginal_likelihood(self, evidence, stories=1, samples=1):
+        """Compute the marginal likelihood of a piece of evidence.
+
         Parameters
         ----------
         evidence : Evidence
@@ -152,9 +153,25 @@ class Problem:
 
         # yield objective per-evidence
         for evidence in self.evidence:
-            likelihood = self.likelihood(evidence, stories=stories, samples=samples)
+            likelihood = self.marginal_likelihood(evidence, stories=stories, samples=samples)
             obj = Objective(f"{HEADER}:{evidence}", torch.log(likelihood))
             yield obj
+
+    def log_likelihood(self, stories=1, samples=1):
+        """Compute the log-likelihood of the problem.
+
+        Parameters
+        ----------
+        stories : int (default=1)
+        samples : int (default=1)
+
+        Returns
+        -------
+        Tensor
+        """
+        marginal = lambda e: self.marginal_likelihood(e, stories=stories, samples=samples)
+        marginals = torch.stack([marginal(evidence) for evidence in self.evidence])
+        return marginals.log().sum()
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
