@@ -115,17 +115,14 @@ class Problem:
         -------
         Tensor
         """
-
-        # construct iterables for samples
         story_iter = self.stories(evidence, samples=stories)
-        sample_iter = [story.miser(samples=samples) for story in story_iter]
+        samples = torch.cat([story.miser(samples=samples) for story in story_iter])
 
-        # build likelihood with mean
-        samples = torch.cat(sample_iter)
         likelihood = torch.mean(samples)
 
         logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
 
+        # give a warning if we've somehow constructed value with no gradient
         if likelihood.grad_fn is None:
             logger.warning(f"Evidence {evidence} has likelihood {likelihood} with no gradient.")
 

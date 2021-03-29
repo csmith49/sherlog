@@ -184,7 +184,12 @@ def random_factory(distribution, batches=1, forcing=None):
             # this is a fresh value, so we have to lift first
             value = wrap(forcing[assignment.target], batches=batches).value
 
+            # give a warning if we're forcing a reparameterizable distribution
+            if dist.has_rsample:
+                logger.warning(f"Forcing a value from reparameterizable distribution {distribution.__name__}.")
+            
             logger.info(f"Forcing: {value} ~ {distribution.__name__}{parameters}.")
+
             # build as normal, but mark as forced            
             return Miser(
                 value,
