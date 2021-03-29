@@ -1,5 +1,6 @@
 from ...engine import Functor
 from ...logs import get
+from . import batch
 import torch
 from torch.distributions import Bernoulli, Normal, Beta
 from itertools import chain
@@ -48,7 +49,7 @@ class DiCE:
         if self.distribution:
             return self.distribution.log_prob(self.value)
         else:
-            return torch.zeros(self.value.shape[0])
+            return torch.zeros(batch.batches(self.value))
 
     def dependencies(self):
         """Recursively compute all dependencies.
@@ -83,7 +84,6 @@ def magic_box(values):
     -------
     Tensor
     """
-    values = list(values)
     tau = torch.stack([v.log_prob for v in values]).sum(0)
     result = torch.exp(tau - tau.detach())
 
@@ -93,22 +93,17 @@ def magic_box(values):
     
     return result
 
-def bmap(callable, iterable):
-    batches = zip(*(t.unbind() for t in iterable))
-    return torch.stack([callable(*batch) for batch in batches])
-
-def wrap(obj, batch=1, **kwargs):
+def wrap(obj, batches=1, **kwargs):
     if torch.is_tensor(obj):
         value = obj
     else:
         value = torch.tensor(obj)
 
-    batched = value.unsqueeze(0).repeat(batch, *([1] * value.dim()))
-    return DiCE(batched)
+    return DiCE(batch.expand(value, batches))
 
 def fmap(callable, args, kwargs, **fmap_args):
     logger.info(f"Calling {callable} on {args}.")
-    value = bmap(callable, [arg.value for arg in args])
+    value = batch.batch_map(callable, *[arg.value for arg in args])
     return DiCE(value, dependencies=args)
 
 def random_factory(distribution):
@@ -135,7 +130,7 @@ def random_factory(distribution):
 
 def lift(callable):
     def builtin(*args, **kwargs):
-        value = bmap(callable, [arg.value for arg in args])
+        value = batch.batch_map(callable, *[arg.value for arg in args])
         return DiCE(value, dependencies=list(args))
     return builtin
 
