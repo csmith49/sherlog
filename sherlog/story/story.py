@@ -110,11 +110,23 @@ class Story:
         -------
         Tensor
         """
-        # build the functor
-        functor = semantics.miser.factory(
-            samples,
-            forcing=self.meet
-        )
+        # build type info for the forcing
+        types = self.run(semantics.types.functor) 
+        forcing = {}
+        
+        # add the values from meet
+        for x in self.meet.variables:
+            forcing[x] = self.meet[x]
+
+        # and, if possible, add values from avoid
+        for x in self.avoid.variables:
+            if types[x] == semantics.types.Discrete(2):
+                forcing[x] = 1 - self.avoid[x]
+
+        logger.info(f"Forcing with observations: {forcing}")
+
+        # build the miser functor with the computed forcings
+        functor = semantics.miser.factory(samples, forcing=forcing)
         objective = self.objective(functor)
 
         # build surrogate
@@ -124,7 +136,7 @@ class Story:
 
         # check to make sure gradients are being passed appropriately
         if surrogate.grad_fn is None:
-            logger.warning(f"DiCE objective {surrogate} has no gradient.")
+            logger.warning(f"Miser objective {surrogate} has no gradient.")
 
         return surrogate
 

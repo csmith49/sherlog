@@ -188,7 +188,7 @@ def random_factory(distribution, batches=1, forcing=None):
             if dist.has_rsample:
                 logger.warning(f"Forcing a value from reparameterizable distribution {distribution.__name__}.")
             
-            logger.info(f"Forcing: {value} ~ {distribution.__name__}{parameters}.")
+            logger.info(f"Forcing for {assignment.target}: {value} ~ {distribution.__name__}{parameters}.")
 
             # build as normal, but mark as forced            
             return Miser(
