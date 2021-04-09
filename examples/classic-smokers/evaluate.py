@@ -91,7 +91,7 @@ def evaluate(instrument, resolution, epochs, optimizer, learning_rate, samples, 
     # now start training
     for epoch in track(range(epochs), description="Training"):
         with optimizer as o:
-            for obj in problem.objectives(epoch=epoch, samples=samples, stories=100):
+            for obj in problem.objectives(epoch=epoch, samples=samples, stories=15):
                 o.maximize(obj)
 
         if epoch % resolution == 0:
@@ -99,6 +99,7 @@ def evaluate(instrument, resolution, epochs, optimizer, learning_rate, samples, 
                 "epoch" : epoch,
                 "log likelihood" : problem.log_likelihood(samples=samples)
             }
+            print(log)
             for k, v in problem.parameter_map.items():
                 log[k] = v
                 log[f"{k} grad"] = v.grad
@@ -112,6 +113,6 @@ def evaluate(instrument, resolution, epochs, optimizer, learning_rate, samples, 
         print(f"{name}: {parameter:f}")
 
 if __name__ == "__main__":
-    sherlog.logs.enable("examples.smokers", "story")
+    # sherlog.logs.enable("examples.smokers", "story")
 
     evaluate()
