@@ -12,7 +12,7 @@ class Observation:
 
         Parameters
         ----------
-        mapping : dict
+        mapping : Dict[str, Value]
             Each key-value pair maps a string to a value
 
         Returns
@@ -128,6 +128,12 @@ class Observation:
             return self.mapping[key.name]
         else:
             raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        if isinstance(key, Variable):
+            self.mapping[key.name] = value
+        else:
+            raise KeyError() # this isn't quite semantic, is it?
 
     def __contains__(self, key):
         if isinstance(key, Variable):
