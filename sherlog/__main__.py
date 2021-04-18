@@ -1,7 +1,7 @@
 import click
 from .interface import console
 from . import logs
-from . import instrumentation
+from .tooling import instrumentation
 from .problem import load
 from .inference import Optimizer
 from torch.optim import SGD, Adam

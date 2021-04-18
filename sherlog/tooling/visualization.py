@@ -1,4 +1,4 @@
-from .logs import get
+from ..logs import get
 
 import altair as alt
 import pandas as pd

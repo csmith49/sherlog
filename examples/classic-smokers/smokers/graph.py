@@ -58,16 +58,18 @@ class Parameterization:
 # SOCIAL GRAPH
 
 class Graph:
-    def __init__(self, size : int, parameterization : Parameterization):
+    def __init__(self, size : int, parameterization : Parameterization, classification_target : int = 0):
         """A directed scale-free graph of the indicated size (in terms of nodes).
 
         Parameters
         ----------
         size : int
         parameterization : Parameterization
+        classification_target : int (default=0)
         """
         self._size = size
         self._parameterization = parameterization
+        self._classification_target = classification_target
         self._graph = scale_free_graph(size)
 
         mapping = parameterization.label(self.nodes(), self.edges())
@@ -127,37 +129,60 @@ class Graph:
                 self._symbol(d, index=index)
             )
 
-    def smokes(self, value : bool, index : Optional[int] = None) -> Iterable[str]:
+    def smokes(self, value : bool, index : Optional[int] = None, avoid_classification_target : bool = False) -> Iterable[str]:
         """Yields all symbols whose smoking truthiness matches the provided value.
 
         Parameters
         ----------
         value : bool
         index : Optional[int]
-
+        avoid_classification_target : bool (default=False)
+        
         Returns
         -------
         Iterable[str]
         """
         for node in self.nodes():
             if (node in self._smokes) == value:
-                yield self._symbol(node, index=index)
+                if not avoid_classification_target or node != self._classification_target:
+                    yield self._symbol(node, index=index)
 
-    def asthma(self, value : bool, index : Optional[int] = None) -> Iterable[str]:
+    def asthma(self, value : bool, index : Optional[int] = None, avoid_classification_target : bool = False) -> Iterable[str]:
         """Yields all symbols whose asthma truthiness matches the provided value.
 
         Parameters
         ----------
         value : bool
         index : Optional[int]
+        avoid_classification_target : bool (default=False)
 
         Returns
         -------
-        Itearble[str]
+        Iterable[str]
         """
         for node in self.nodes():
             if (node in self._asthma) == value:
-                yield self._symbol(node, index=index)
+                if not avoid_classification_target or node != self._classification_target:
+                    yield self._symbol(node, index=index)
+
+    def classification_target_symbol(self, index : Optional[int] = None) -> str:
+        """The symbol for the classification target (with optional index).
+
+        Parameters
+        ----------
+        index : Optional[int]
+
+        Returns
+        -------
+        str
+        """
+        return self._symbol(self._classification_target, index=index)
+
+    def classification_target_smoke(self) -> bool:
+        return self._classification_target in self._smokes
+    
+    def classification_target_asthma(self) -> bool:
+        return self._classification_target in self._asthma
 
 def reference_implementation(graph, mapping):
     """Reference implementation for deriving extensional labels for a social graph.
