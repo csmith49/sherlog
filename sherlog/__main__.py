@@ -124,7 +124,7 @@ def analyze(filename, show, output, plot):
     """Analyze instrumentation logs."""
 
     # import the relevant analysis tools
-    from .visualization import load, confidence_interval, dump
+    from .tooling.visualization import load, confidence_interval, dump
 
     # load the data
     data = load(filename)
