@@ -2,7 +2,7 @@ from .graph import Graph, Parameterization
 from typing import Iterable, Optional
 from itertools import chain
 from subprocess import run
-from math import log
+from math import log, exp
 from sherlog.logs import get_external
 
 logger = get_external("smokers.problog")
@@ -34,7 +34,7 @@ FIT_TEMPLATE = [
     "asthma(X) :- smokes(X), asthma_smokes(X)."   
 ]
 
-def program(p : Parameterization) -> Iterable[str]:
+def marginal_program(p : Parameterization) -> Iterable[str]:
     yield from [
         f"{p.stress} :: stress(X) :- person(X).",
         f"{p.spontaneous} :: asthma_latent(X) :- person(X).",
@@ -68,16 +68,16 @@ def combine(*evidences, separator="---") -> Iterable[str]:
         yield separator
         yield from evidence
 
-def query(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
+def query(graph : Graph, index : Optional[int] = None, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> Iterable[str]:
     # get the atoms for the hypothesis
     def atoms():
-        for p in graph.smokes(True, index=index):
+        for p in graph.smokes(True, index=index, avoid_classification_target=avoid_target_smokes):
             yield f"smokes({p})"
-        for p in graph.smokes(False, index=index):
+        for p in graph.smokes(False, index=index, avoid_classification_target=avoid_target_smokes):
             yield f"\\+smokes({p})"
-        for p in graph.asthma(True, index=index):
+        for p in graph.asthma(True, index=index, avoid_classification_target=avoid_target_asthma):
             yield f"asthma({p})"
-        for p in graph.asthma(False, index=index):
+        for p in graph.asthma(False, index=index, avoid_classification_target=avoid_target_asthma):
             yield f"\\+asthma({p})"
     
     yield f"q <- {', '.join(atoms())}."
@@ -158,7 +158,7 @@ def fit(*graphs : Graph) -> Parameterization:
 
     return parameters
 
-def log_likelihood(p : Parameterization, graph : Graph) -> float:
+def log_likelihood(p : Parameterization, graph : Graph, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> float:
     """Compute log-likelihood of provided observation.
 
     Parameters
@@ -174,9 +174,9 @@ def log_likelihood(p : Parameterization, graph : Graph) -> float:
 
     # construct the program from p
     write(PROGRAM, chain(
-        program(p),
+        marginal_program(p),
         structure(graph),
-        query(graph)
+        query(graph, avoid_target_smokes=avoid_target_smokes, avoid_target_asthma=avoid_target_asthma)
     ))
 
     # run the program
@@ -198,6 +198,8 @@ def log_likelihood(p : Parameterization, graph : Graph) -> float:
 def classify_asthma(p : Parameterization, graph : Graph):
     """Compute confidence that the classification target in the provided graph has asthma.
 
+    Problog has limited support for conditionals, so we use Bayes Rule to compute p(x | y)  = p(x, y) / p(y).
+
     Parameters
     ----------
     p : Parameterization
@@ -205,76 +207,25 @@ def classify_asthma(p : Parameterization, graph : Graph):
 
     Returns
     -------
-    ???
+    Tuple[float, float]
     """
     logger.info(f"Evaluating asthma classification confidence of {graph} with parameters {p}.")
 
-    # construct the program from p
-    write(PROGRAM, chain(
-        program(p),
-        structure(graph),
-        asthma_conditional(graph)
-    ))
+    # evaluate the joint first
+    logger.info("Computing the joint.")
+    joint_log_likelihood = log_likelihood(p, graph)
+    logger.info(f"Joint log-likelihood: {joint_log_likelihood}")
 
-    # run the program
-    logger.info(f"Starting external Problog in inference mode.")
-    args = ["problog", PROGRAM, "--knowledge", "sdd"]
-    result = run(args, capture_output=True, text=True)
+    # then the prior
+    logger.info("Computing the prior.")
+    prior_log_likelihood = log_likelihood(p, graph, avoid_target_asthma=True)
+    logger.info(f"Prior log-likelihood: {prior_log_likelihood}")
 
-    print(result)
+    # gt class confidence easily deduced
+    confidence = exp(joint_log_likelihood - prior_log_likelihood)
 
-    # make sure nothing went wrong
-    if result.stderr:
-        logger.warning(f"Problog run failed with output: {result.stderr}")
-
-    # capture raw results
-    confidence = float(result.stdout.split()[-1])
-    
-    # and get gt
-    if graph.classification_target_asthma(): gt = 1.0
-    else: gt = 0.0
-
-    logger.info(f"Classification/GT: {confidence}/{gt}")
-
-    return (confidence, gt)
-
-def classify_smoking(p : Parameterization, graph : Graph):
-    """Compute confidence that the classification target in the provided graph smokes.
-
-    Parameters
-    ----------
-    p : Parameterization
-    graph : Graph
-
-    Returns
-    -------
-    ???
-    """
-    logger.info(f"Evaluating smoking classification confidence of {graph} with parameters {p}.")
-
-    # construct the program from p
-    write(PROGRAM, chain(
-        program(p),
-        structure(graph),
-        smoking_conditional(graph)
-    ))
-
-    # run the program
-    logger.info(f"Starting external Problog in inference mode.")
-    args = ["problog", PROGRAM, "--knowledge", "sdd"]
-    result = run(args, capture_output=True, text=True)
-
-    # make sure nothing went wrong
-    if result.stderr:
-        logger.warning(f"Problog run failed with output: {result.stderr}")
-
-    # capture raw results
-    confidence = float(result.stdout.split()[-1])
-    
-    # and get gt
-    if graph.classification_target_asthma(): gt = 1.0
-    else: gt = 0.0
-
-    logger.info(f"Classification/GT: {confidence}/{gt}")
+    # get the gt and reframe confidence (if needed)
+    (confidence, gt) = (confidence, 1.0) if graph.classification_target_asthma() else (1 - confidence, 0.0)
+    logger.info(f"Classification confidence/gt: {confidence}/{gt}")
 
     return (confidence, gt)

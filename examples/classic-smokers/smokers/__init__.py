@@ -21,9 +21,10 @@ def sample(size : Optional[int] = None):
         return Graph(size, default_parameterization)
 
 class Interface:
-    def __init__(self, fit, log_likelihood):
+    def __init__(self, fit, log_likelihood, classification_task):
         self._fit = fit
         self._log_likelihood = log_likelihood
+        self._classification_task = classification_task
         self._parameterization = None
 
     def fit(self, samples : int, graph_size : Optional[int] = None):
@@ -50,5 +51,19 @@ class Interface:
         lls, times = zip(*results)
         return mean(lls), mean(times)
 
-problog_interface = Interface(problog.fit, problog.log_likelihood)
-sherlog_interface = Interface(sherlog.fit, sherlog.log_likelihood)
+    def classification_accuracy(self, samples : int, graph_size : Optional[int] = None):
+        test_set = [sample(size=graph_size) for _ in range(samples)]
+
+        results, timer = [], Timer()
+
+        for graph in test_set:
+            with timer:
+                (confidence, gt) = self._classification_task(self._parameterization, graph)
+            score = 1.0 if abs(confidence - gt) < 0.5 else 0.0
+            results.append( (score, timer.elapsed) )
+
+        scores, times = zip(*results)
+        return mean(scores), mean(times)
+
+problog_interface = Interface(problog.fit, problog.log_likelihood, problog.classify_asthma)
+sherlog_interface = Interface(sherlog.fit, sherlog.log_likelihood, sherlog.classify_asthma)

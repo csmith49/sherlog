@@ -41,7 +41,12 @@ def evaluate(log, size, train, test, verbose, tool):
     # evaluate
     logger.info(f"Evaluating the average log-likelihood with {test} samples...")
     avg_ll, avg_ll_time = interface.average_log_likelihood(test, graph_size=size)
-    logger.info(f"Evaluation complete: average log-likelihood of {avg_ll} computed in {avg_ll_time} seconds.")
+    logger.info(f"Evaluation complete: average log-likelihood of {avg_ll} with average marginal time of {avg_ll_time} seconds.")
+
+    # test classification performance
+    logger.info(f"Evaluating the asthma prediction accuracy with {test} samples...")
+    accuracy, avg_class_time = interface.classification_accuracy(test, graph_size=size)
+    logger.info(f"Evaluation complete: accuracy of {accuracy} with average classification time of {avg_class_time} seconds.")
 
     # collate the results
     result = {
@@ -60,7 +65,9 @@ def evaluate(log, size, train, test, verbose, tool):
         "gt_spontaneous" : default_parameterization.spontaneous,
         "spontaneous" : interface._parameterization.spontaneous,
         "gt_influence" : default_parameterization.influence,
-        "influence" : interface._parameterization.influence
+        "influence" : interface._parameterization.influence,
+        "accuracy" : accuracy,
+        "average_classification_time" : avg_class_time
     }
 
     # if a log file is given, append the results

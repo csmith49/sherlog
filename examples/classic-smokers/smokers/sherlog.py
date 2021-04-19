@@ -1,7 +1,7 @@
 from .graph import Graph, Parameterization
 from typing import Iterable, Optional
 from itertools import chain
-from math import log
+from math import log, exp
 from sherlog.logs import get_external
 from sherlog.problem import loads
 from sherlog.inference import Optimizer
@@ -57,15 +57,15 @@ def structure(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
     for p, q in graph.friends(index=index):
         yield f"friend({p}, {q})."
 
-def evidence(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
+def evidence(graph : Graph, index : Optional[int] = None, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> Iterable[str]:
     def atoms():
-        for p in graph.smokes(True, index=index):
+        for p in graph.smokes(True, index=index, avoid_classification_target=avoid_target_smokes):
             yield f"smokes({p})"
-        for p in graph.smokes(False, index=index):
+        for p in graph.smokes(False, index=index, avoid_classification_target=avoid_target_smokes):
             yield f"not_smokes({p})"
-        for p in graph.asthma(True, index=index):
+        for p in graph.asthma(True, index=index, avoid_classification_target=avoid_target_asthma):
             yield f"asthma({p})"
-        for p in graph.asthma(False, index=index):
+        for p in graph.asthma(False, index=index, avoid_classification_target=avoid_target_asthma):
             yield f"not_asthma({p})"
     yield f"!evidence {', '.join(atoms())}."
 
@@ -115,7 +115,7 @@ def fit(*graphs : Graph, learning_rate : float = 0.01, epochs : int = 10, sample
 
     return parameterization
 
-def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samples : int = 100) -> float:
+def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samples : int = 100, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> float:
     """Compute log-likelihood of provided observation.
 
     Parameters
@@ -125,6 +125,9 @@ def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samp
 
     stories : int (default=10)
     samples : int (default=100)
+
+    avoid_target_smokes : bool (default=False)
+    avoid_target_asthma : bool (default=False)
 
     Returns
     -------
@@ -137,7 +140,7 @@ def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samp
     program_source = '\n'.join(chain(
         marginal_program(p),
         structure(graph),
-        evidence(graph)
+        evidence(graph, avoid_target_smokes=avoid_target_smokes, avoid_target_asthma=avoid_target_asthma)
     ))
 
     logger.info("Parsing the program.")
@@ -150,3 +153,41 @@ def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samp
     
     return log_likelihood
 
+def classify_asthma(p : Parameterization, graph : Graph, stories : int = 10, samples : int = 100):
+    """Compute confidence thta the classification target in the provided graph has asthma.
+
+    Sherlog has limited support for conditionals, so we use Bayes Rule to compute p(x | y) = p(x, y) / p(y).
+
+    Parameters
+    ----------
+    p : Parameterization
+    graph : Graph
+
+    stories : int (default=10)
+    samples : int (default=100)
+
+    Returns
+    -------
+    Tuple[float, float]
+    """
+
+    logger.info(f"Evaluating asthma classification confidence of {graph} with parameters {p}.")
+
+    # evaluate the joint first
+    logger.info("Computing the joint.")
+    joint_log_likelihood = log_likelihood(p, graph, stories=stories, samples=samples)
+    logger.info(f"Joint log-likelihood: {joint_log_likelihood}")
+
+    # then the prior
+    logger.info("Computing the prior.")
+    prior_log_likelihood = log_likelihood(p, graph, stories=stories, samples=samples, avoid_target_asthma=True)
+    logger.info(f"Prior log-likelihood: {prior_log_likelihood}")
+
+    # gt class confidence easily deduced
+    confidence = exp(joint_log_likelihood - prior_log_likelihood)
+
+    # get the gt and reframe confidence (if needed)
+    (confidence, gt) = (confidence, 1.0) if graph.classification_target_asthma() else (1 - confidence, 0.0)
+    logger.info(f"Classification confidence/gt: {confidence}/{gt}")
+
+    return (confidence, gt)
