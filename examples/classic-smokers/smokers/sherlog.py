@@ -69,15 +69,23 @@ def evidence(graph : Graph, index : Optional[int] = None, avoid_target_smokes : 
             yield f"not_asthma({p})"
     yield f"!evidence {', '.join(atoms())}."
 
-def fit(*graphs : Graph, learning_rate : float = 0.01, epochs : int = 10, samples : int = 10) -> Parameterization:
+def fit(*graphs : Graph,
+    epochs : int = 10,
+    learning_rate : float = 0.01,
+    stories : int = 1,
+    samples : int = 1,
+    attempts : int = 100,
+    seeds : int = 1,
+    width : Optional[int] = None,
+    depth : Optional[int] = None,
+    **kwargs) -> Parameterization:
     """Uses Sherlog to fit a set of parameters to the given graphs.
 
     Parameters
     ----------
     *graphs : Graph
-    learning_rate : float (default=0.01)
-    epochs : int (default=10)
-    samples : int (default=10)
+    
+    **kwargs
 
     Returns
     -------
@@ -106,7 +114,7 @@ def fit(*graphs : Graph, learning_rate : float = 0.01, epochs : int = 10, sample
     for epoch in range(epochs):
         logger.info(f"Learning epoch {epoch} / {epochs}.")
         with optimizer as o:
-            for obj in program.objectives(epoch=epoch, samples=samples):
+            for obj in program.objectives(epoch=epoch, samples=samples, stories=stories, width=width, depth=depth, attempts=attempts, seeds=seeds):
                 o.maximize(obj)
 
     # and extract the parameters
@@ -115,16 +123,20 @@ def fit(*graphs : Graph, learning_rate : float = 0.01, epochs : int = 10, sample
 
     return parameterization
 
-def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samples : int = 100, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> float:
+def log_likelihood(p : Parameterization, graph : Graph, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False,
+    stories : int = 1,
+    samples : int = 1,
+    attempts : int = 100,
+    seeds : int = 1,
+    width : Optional[int] = None,
+    depth : Optional[int] = None,
+    **kwargs) -> float:
     """Compute log-likelihood of provided observation.
 
     Parameters
     ----------
     p : Parameterization
     graph : Graph
-
-    stories : int (default=10)
-    samples : int (default=100)
 
     avoid_target_smokes : bool (default=False)
     avoid_target_asthma : bool (default=False)
@@ -148,12 +160,26 @@ def log_likelihood(p : Parameterization, graph : Graph, stories : int = 10, samp
 
     # evaluate the log-likelihood
     logger.info(f"Computing the marginal with {stories} stories and {samples} samples.")
-    log_likelihood = program.log_likelihood(stories=stories, samples=samples).item()
+    log_likelihood = program.log_likelihood(
+        stories=stories,
+        samples=samples,
+        attempts=attempts,
+        seeds=seeds,
+        width=width,
+        depth=depth
+    ).item()
     logger.info(f"Log-likelihood: {log_likelihood:3f}")
     
     return log_likelihood
 
-def classify_asthma(p : Parameterization, graph : Graph, stories : int = 10, samples : int = 100):
+def classify_asthma(p : Parameterization, graph : Graph, 
+    stories : int = 1,
+    samples : int = 1,
+    attempts : int = 100,
+    seeds : int = 1,
+    width : Optional[int] = None,
+    depth : Optional[int] = None,
+    **kwargs):
     """Compute confidence thta the classification target in the provided graph has asthma.
 
     Sherlog has limited support for conditionals, so we use Bayes Rule to compute p(x | y) = p(x, y) / p(y).
@@ -162,9 +188,6 @@ def classify_asthma(p : Parameterization, graph : Graph, stories : int = 10, sam
     ----------
     p : Parameterization
     graph : Graph
-
-    stories : int (default=10)
-    samples : int (default=100)
 
     Returns
     -------
@@ -175,12 +198,26 @@ def classify_asthma(p : Parameterization, graph : Graph, stories : int = 10, sam
 
     # evaluate the joint first
     logger.info("Computing the joint.")
-    joint_log_likelihood = log_likelihood(p, graph, stories=stories, samples=samples)
+    joint_log_likelihood = log_likelihood(p, graph,
+        stories=stories,
+        samples=samples,
+        attempts=attempts,
+        seeds=seeds,
+        width=width,
+        depth=depth
+    )
     logger.info(f"Joint log-likelihood: {joint_log_likelihood}")
 
     # then the prior
     logger.info("Computing the prior.")
-    prior_log_likelihood = log_likelihood(p, graph, stories=stories, samples=samples, avoid_target_asthma=True)
+    prior_log_likelihood = log_likelihood(p, graph, avoid_target_asthma=True,
+        stories=stories,
+        samples=samples,
+        attempts=attempts,
+        seeds=seeds,
+        width=width,
+        depth=depth
+    )
     logger.info(f"Prior log-likelihood: {prior_log_likelihood}")
 
     # gt class confidence easily deduced

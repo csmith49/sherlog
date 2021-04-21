@@ -49,6 +49,10 @@ def query(program, query, depth=None, width=None, seeds=None):
     program : JSON representation
     query : JSON representation
 
+    depth : Optional[int]
+    width : Optional[int]
+    seeds : Optional[int]
+
     Returns
     -------
     JSON representation of the entailed model

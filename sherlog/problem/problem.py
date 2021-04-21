@@ -59,24 +59,27 @@ class Problem:
         program = json
         return cls(parameters=parameters, namespaces=[], evidence=evidence, program=program)
 
-    def stories(self, evidence, samples=1, attempts=100, width=None, depth=None):
+    def stories(self, evidence, samples=1, attempts=100, width=None, depth=None, seeds=None):
         """Construct all stories encoded by the problem.
 
         Parameters
         ----------
         evidence : Evidence
 
-        samples : int
-            Number of samples desired (defaults to 1).
+        samples : int (default=1)
+            Number of samples desired.
 
-        attempts : int
-            Maximum number of queries to logic server (defaults to 100).
+        attempts : int (default=100)
+            Maximum number of queries to logic server.
 
         width : Optional[int]
-            Maximum beam width during stochastic resolution.
+            Maximum beam width during stochastic resolution. Unbounded if not given.
         
         depth : Optional[int]
-            Maximum proof depth.
+            Maximum proof depth. Unbounded if not given.
+
+        seeds : Optional[int]
+            Number of simultaneous stochastic resolution processes. Server defaults to 1 if not given.
 
         Returns
         -------
@@ -92,44 +95,52 @@ class Problem:
         def gen():
             for attempt in range(attempts):
                 logger.info(f"Starting story generation attempt {attempt}...")
-                for json in interface.query(self.program, evidence.json, width=width, depth=depth):
+                for json in interface.query(self.program, evidence.json, width=width, depth=depth, seeds=seeds):
                     logger.info("Story found.")
                     yield Story.of_json(json, external=external)
         
         # and grab only the number of samples desired
         yield from islice(gen(), samples)
 
-    def marginal_likelihood(self, evidence, stories=1, samples=1):
+    def marginal_likelihood(self, evidence, stories=1, samples=1, width=None, depth=None, attempts=100, seeds=None):
         """Compute the marginal likelihood of a piece of evidence.
 
         Parameters
         ----------
         evidence : Evidence
 
-        stories : int
-            Number of stories to sample (defaults to 1).
+        stories : int (default=1)
+            Number of stories to sample.
 
-        samples : int
-            Number of samples of likelihood to compute per-story (defaults to 1).
+        samples : int (default=1)
+            Number of samples of likelihood to compute per-story.
+
+        width : Optional[int]
+            Maximum beam width during stochastic resolution. Unbounded if not given.
+
+        depth : Optional[int]
+            Maximum proof depth. Unbounded if not given.
+
+        attempts : int (default=100)
+            Maximum number of queries to logic server.
+
+        seeds : Optional[int]
+            Number of simultaneous stochastic resolution processes. Server defaults to 1 if not given.
 
         Returns
         -------
         Tensor
         """
-        story_iter = self.stories(evidence, samples=stories)
+        story_iter = self.stories(evidence, samples=stories, width=width, depth=depth, attempts=attempts, seeds=seeds)
         samples = torch.cat([story.miser(samples=samples) for story in story_iter])
 
         likelihood = torch.mean(samples)
 
         logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
 
-        # give a warning if we've somehow constructed value with no gradient
-        if likelihood.grad_fn is None:
-            logger.warning(f"Evidence {evidence} has likelihood {likelihood} with no gradient.")
-
         return likelihood
 
-    def objectives(self, epoch=None, stories=1, samples=1):
+    def objectives(self, epoch=None, stories=1, samples=1, width=None, depth=None, attempts=100, seeds=None):
         """Generates log-likelihood objectives for all evidence.
 
         Parameters
@@ -137,9 +148,23 @@ class Problem:
         epoch : Optional[int]
             Current epoch.
 
-        stories : int
+        stories : int (default=1)
+            Number of stories to sample per evidence.
 
-        samples : int
+        samples : int (default=1)
+            Number of likelihood samples computed per story.
+
+        width : Optional[int]
+            Maximum beam width during stochastic resolution. Unbounded if not given.
+
+        depth : Optional[int]
+            Maximum proof depth. Unbounded if not given.
+
+        attempts : int (default=100)
+            Maximum number of queries to logic server.
+
+        seeds : Optional[int]
+            Number of simultaneous stochastic resolution processes. Server defaults to 1 if not given.
 
         Returns
         -------
@@ -153,23 +178,52 @@ class Problem:
 
         # yield objective per-evidence
         for evidence in self.evidence:
-            likelihood = self.marginal_likelihood(evidence, stories=stories, samples=samples)
+            likelihood = self.marginal_likelihood(evidence,
+                stories=stories,
+                samples=samples,
+                width=width,
+                depth=depth,
+                attempts=attempts,
+                seeds=seeds
+            )
             obj = Objective(f"{HEADER}:{evidence}", torch.log(likelihood))
             yield obj
 
-    def log_likelihood(self, stories=1, samples=1):
+    def log_likelihood(self, stories=1, samples=1, width=None, depth=None, attempts=100, seeds=None):
         """Compute the log-likelihood of the problem.
 
         Parameters
         ----------
         stories : int (default=1)
+            Number of stories to sample per evidence.
+
         samples : int (default=1)
+            Number of likelihood samples computed per story.
+
+        width : Optional[int]
+            Maximum beam width during stochastic resolution. Unbounded if not given.
+
+        depth : Optional[int]
+            Maximum proof depth. Unbounded if not given.
+
+        attempts : int (default=100)
+            Maximum number of queries to logic server.
+
+        seeds : Optional[int]
+            Number of simultaneous stochastic resolution processes. Server defaults to 1 if not given.
 
         Returns
         -------
         Tensor
         """
-        marginal = lambda e: self.marginal_likelihood(e, stories=stories, samples=samples)
+        marginal = lambda e: self.marginal_likelihood(e, 
+            stories=stories,
+            samples=samples,
+            width=width,
+            depth=depth,
+            attempts=attempts,
+            seeds=seeds
+        )
         marginals = torch.stack([marginal(evidence) for evidence in self.evidence])
         return marginals.log().sum()
 

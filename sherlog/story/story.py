@@ -106,6 +106,11 @@ class Story:
     def miser(self, samples=1):
         """Build a Miser surrogate objective for the story.
 
+        Parameters
+        ----------
+        samples : int (default=1)
+            Number of simultaneous executions to perform.
+
         Returns
         -------
         Tensor
@@ -133,10 +138,6 @@ class Story:
         scale = semantics.miser.forcing_scale(objective.dependencies())
         score = semantics.miser.magic_box(objective.dependencies())
         surrogate = objective.value * scale * score
-
-        # check to make sure gradients are being passed appropriately
-        if surrogate.grad_fn is None:
-            logger.warning(f"Miser objective {surrogate} has no gradient.")
 
         return surrogate
 
