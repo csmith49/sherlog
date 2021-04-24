@@ -101,14 +101,14 @@ def tune(log, verbose, train, test):
 
     # set up the hyperparameters to search through
     kwargs_gen = dict_product(
-        epochs=[1, 10, 50, 100],
-        learning_rate=[0.5, 0.1, 0.05, 0.01, 0.005, 0.001],
-        stories=[1, 5, 10, 50],
+        epochs=[1, 10, 50],
+        learning_rate=[1.0, 0.1, 0.01],
+        explanations=[1, 10, 100],
         samples=[1, 10, 100, 1000],
-        width=[1, 5, 10, 50, 100],
+        width=[1, 10, 100],
         depth=[10, 50, 100],
         attempts=[1, 50, 100],
-        seeds=[1, 5, 10, 50],
+        seeds=[1, 10, 100],
         graph_size=[3, 5, 10]
     )
 

@@ -3,9 +3,10 @@ from typing import Iterable, Optional
 from itertools import chain
 from math import log, exp
 from sherlog.logs import get_external
-from sherlog.problem import loads
-from sherlog.inference import Optimizer
+from sherlog.program import loads
+from sherlog.inference import Optimizer, minibatch
 from torch.optim import SGD
+import torch
 
 logger = get_external("smokers.sherlog")
 
@@ -57,7 +58,7 @@ def structure(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
     for p, q in graph.friends(index=index):
         yield f"friend({p}, {q})."
 
-def evidence(graph : Graph, index : Optional[int] = None, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> Iterable[str]:
+def evidence_atoms(graph : Graph, index : Optional[int] = None, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> Iterable[str]:
     def atoms():
         for p in graph.smokes(True, index=index, avoid_classification_target=avoid_target_smokes):
             yield f"smokes({p})"
@@ -72,7 +73,7 @@ def evidence(graph : Graph, index : Optional[int] = None, avoid_target_smokes : 
 def fit(*graphs : Graph,
     epochs : int = 10,
     learning_rate : float = 0.01,
-    stories : int = 1,
+    explanations : int = 1,
     samples : int = 1,
     attempts : int = 100,
     seeds : int = 1,
@@ -96,7 +97,7 @@ def fit(*graphs : Graph,
 
     # build the program
     graph_structure = [structure(g, index=i) for i, g in enumerate(graphs)]
-    graph_evidence = [evidence(g, index=i) for i, g in enumerate(graphs)]
+    graph_evidence = [evidence_atoms(g, index=i) for i, g in enumerate(graphs)]
 
     program_source = '\n'.join(chain(
         FIT_TEMPLATE,
@@ -105,17 +106,23 @@ def fit(*graphs : Graph,
     ))
     
     logger.info("Parsing the program.")
-    program = loads(program_source)
+    program, evidence = loads(program_source)
 
     # run the program
-    optimizer = Optimizer(program, SGD(program.parameters(), learning_rate))
-
+    optimizer = Optimizer(program, optimizer="sgd", learning_rate=learning_rate)
     logger.info(f"Starting training with: lr={learning_rate}, epochs={epochs}, samples={samples}")
-    for epoch in range(epochs):
-        logger.info(f"Learning epoch {epoch} / {epochs}.")
+
+    for batch in minibatch(evidence, 10, epochs=epochs):
+        logger.info(f"Learning epoch {batch.index + 1} / {epochs}.")
         with optimizer as o:
-            for obj in program.objectives(epoch=epoch, samples=samples, stories=stories, width=width, depth=depth, attempts=attempts, seeds=seeds):
-                o.maximize(obj)
+            o.maximize(batch.objective(program,
+                explanations=explanations,
+                samples=samples,
+                width=width,
+                depth=depth,
+                attempts=attempts,
+                seeds=seeds
+            ))
 
     # and extract the parameters
     parameterization = Parameterization(**{k : v.item() for k, v in program.parameter_map.items()})
@@ -124,7 +131,7 @@ def fit(*graphs : Graph,
     return parameterization
 
 def log_likelihood(p : Parameterization, graph : Graph, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False,
-    stories : int = 1,
+    explanations : int = 1,
     samples : int = 1,
     attempts : int = 100,
     seeds : int = 1,
@@ -152,28 +159,29 @@ def log_likelihood(p : Parameterization, graph : Graph, avoid_target_smokes : bo
     program_source = '\n'.join(chain(
         marginal_program(p),
         structure(graph),
-        evidence(graph, avoid_target_smokes=avoid_target_smokes, avoid_target_asthma=avoid_target_asthma)
+        evidence_atoms(graph, avoid_target_smokes=avoid_target_smokes, avoid_target_asthma=avoid_target_asthma)
     ))
 
     logger.info("Parsing the program.")
-    program = loads(program_source)
+    program, evidence = loads(program_source)
 
     # evaluate the log-likelihood
-    logger.info(f"Computing the marginal with {stories} stories and {samples} samples.")
-    log_likelihood = program.log_likelihood(
-        stories=stories,
+    logger.info(f"Computing the marginal with {explanations} stories and {samples} samples.")
+    marginals = [program.likelihood(ev,
+        explanations=explanations,
         samples=samples,
-        attempts=attempts,
-        seeds=seeds,
         width=width,
-        depth=depth
-    ).item()
+        depth=depth,
+        seeds=seeds,
+        attempts=attempts
+    ) for ev in evidence]
+    log_likelihood = torch.stack(marginals).log().sum().item()
     logger.info(f"Log-likelihood: {log_likelihood:3f}")
     
     return log_likelihood
 
 def classify_asthma(p : Parameterization, graph : Graph, 
-    stories : int = 1,
+    explanations : int = 1,
     samples : int = 1,
     attempts : int = 100,
     seeds : int = 1,
@@ -199,7 +207,7 @@ def classify_asthma(p : Parameterization, graph : Graph,
     # evaluate the joint first
     logger.info("Computing the joint.")
     joint_log_likelihood = log_likelihood(p, graph,
-        stories=stories,
+        explanations=explanations,
         samples=samples,
         attempts=attempts,
         seeds=seeds,
@@ -211,7 +219,7 @@ def classify_asthma(p : Parameterization, graph : Graph,
     # then the prior
     logger.info("Computing the prior.")
     prior_log_likelihood = log_likelihood(p, graph, avoid_target_asthma=True,
-        stories=stories,
+        explanations=explanations,
         samples=samples,
         attempts=attempts,
         seeds=seeds,
