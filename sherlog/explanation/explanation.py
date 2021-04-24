@@ -6,13 +6,12 @@ from ..logs import get
 from . import semantics
 
 import torch
-import storch
 
-logger = get("story")
+logger = get("explanation")
 
-class Story:
+class Explanation:
     def __init__(self, model, meet, avoid, external=()):
-        logger.info(f"Story {self} built.")
+        logger.info(f"Explanation {self} built.")
         self.model = model
         self.meet = meet
         self.avoid = avoid
@@ -20,7 +19,7 @@ class Story:
 
     @classmethod
     def of_json(cls, json, external=()):
-        logger.info(f"Building story from serialization: {json}...")
+        logger.info(f"Building explanation from serialization: {json}...")
         model = Model.of_json(json["assignments"])
         meet = Observation.of_json(json["meet"])
         avoid = Observation.of_json(json["avoid"])
@@ -31,7 +30,7 @@ class Story:
         return Store(external=self._external)
 
     def run(self, functor, wrap_args={}, fmap_args={}, parameters={}):
-        """Evaluate the story in the given functor.
+        """Evaluate the explanation in the given functor.
 
         Parameters
         ----------
@@ -59,7 +58,7 @@ class Story:
         return store
 
     def objective(self, functor):
-        """Use provided functor to evaluate the story and build optimization objective.
+        """Use provided functor to evaluate the explanation and build optimization objective.
 
         Parameters
         ----------
@@ -82,26 +81,6 @@ class Story:
 
         # just return the computed objective - functor should track all relevant info
         return store[objective]
-
-    def dice(self, samples=1):
-        """Build DiCE surrogate objective for a story.
-
-        Returns
-        -------
-        Tensor
-        """
-        # use dice functor to build surrogate objective
-        functor = semantics.dice.factory(samples)
-
-        objective = self.objective(functor)
-        score = semantics.dice.magic_box(objective.dependencies())
-        surrogate = objective.value * score
-
-        # check to make sure gradients are being passed appropriately
-        if surrogate.grad_fn is None:
-            logger.warning(f"DiCE objective {surrogate} has no gradient.")
-
-        return surrogate
 
     def miser(self, samples=1):
         """Build a Miser surrogate objective for the story.
@@ -141,7 +120,6 @@ class Story:
 
         return surrogate
 
-
     def graph(self):
         """Build a graph representation of the story.
 
@@ -151,18 +129,3 @@ class Story:
         """
         objective = self.objective(semantics.graph.functor)
         return semantics.graph.to_graph(objective)
-
-    def likelihood(self, samples=1):
-        """Estimate the likelihood."
-
-        Parameters
-        ----------
-        samples : int
-            Defaults to 1.
-
-        Returns
-        -------
-        Tensor
-        """
-        scores = [self.objective(semantics.tensor.functor) for _ in range(samples)]
-        return torch.mean(torch.tensor(scores))

@@ -30,6 +30,16 @@ forth_sort(L,L2) :- quicksort(L,L2).
 """
 
 def translate_example(example : Example) -> str:
+    """Convert an example to DeepProbLog syntax.
+
+    Parameters
+    ----------
+    example : Example
+
+    Returns
+    -------
+    string
+    """
     inputs = [str(i) for i in example.input]
     outputs = [str(o) for o in example.output]
     return f"forth_sort([{', '.join(inputs)}],[{', '.join(outputs)}])."
@@ -86,5 +96,14 @@ class DPLModel(Model):
         )
 
     def accuracy(self, example, **kwargs):
+        """
+        Parameters
+        ----------
+        example : Example
+
+        Returns
+        -------
+        float
+        """
         example = dpl.loads(translate_example(example))
         return self._model.accuracy(example)[0][1]

@@ -6,7 +6,7 @@ from torch.distributions import Bernoulli, Normal, Beta
 from itertools import chain
 from functools import partial
 
-logger = get("story.semantics.miser")
+logger = get("explanation.semantics.miser")
 
 class Miser:
     def __init__ (self, value, dependencies=(), distribution=None, forced=False):
