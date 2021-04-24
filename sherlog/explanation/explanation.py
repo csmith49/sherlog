@@ -1,5 +1,4 @@
 from ..engine import Store, value
-from ..inference import Objective
 from .observation import Observation
 from ..engine import Model
 from ..logs import get

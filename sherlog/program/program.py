@@ -1,7 +1,6 @@
 from .namespace import Namespace
 from .parameter import Parameter
 from .evidence import Evidence
-from ..inference import Objective
 from .. import interface
 from ..engine import Model, value, Store
 from ..explanation import Explanation

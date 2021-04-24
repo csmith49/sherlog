@@ -1,20 +1,28 @@
 import torch
+from torch.optim import SGD, Adam
 from ..logs import get
 
 logger = get("optimizer")
 
 class Optimizer:
-    def __init__(self, problem, optimizer):
+    def __init__(self, program, optimizer : str = "sgd", learning_rate : float = 0.1):
         """Context manager for optimizing registered objectives.
 
         Parameters
         ----------
         problem : Problem
 
-        optimizer : torch.optim.Optimizer
+        optimizer : str (default='sgd')
+            One of ['sgd', 'adam']
+
+        learning_rate : float (default=0.1)
         """
-        self.problem = problem
-        self.optimizer = optimizer
+        self.program = program
+
+        self.optimizer = {
+            "sgd" : SGD,
+            "adam" : Adam
+        }[optimizer](program.parameters(), lr=learning_rate)
 
         self._maximize, self._minimize = [], []
 
@@ -73,7 +81,7 @@ class Optimizer:
         else:
             cost.backward()
             self.optimizer.step()
-            self.problem.clamp_parameters()
+            self.program.clamp_parameters()
 
-        for p, v in self.problem.parameter_map.items():
+        for p, v in self.program.parameter_map.items():
             logger.info(f"Gradient for {p}: {v.grad}.")
