@@ -105,11 +105,11 @@ def tune(log, verbose, train, test):
         learning_rate=[0.5, 0.1, 0.05, 0.01, 0.005, 0.001],
         stories=[1, 5, 10, 50],
         samples=[1, 10, 100, 1000],
-        width=[None, 1, 5, 10],
-        depth=[None, 10, 50, 100],
+        width=[1, 5, 10, 50, 100],
+        depth=[10, 50, 100],
         attempts=[1, 50, 100],
         seeds=[1, 5, 10, 50],
-        graph_size=[3, 5, 10, 15]
+        graph_size=[3, 5, 10]
     )
 
     for kwargs in kwargs_gen:
@@ -154,7 +154,7 @@ def tune(log, verbose, train, test):
         # if a log file is given, append the results
         if log is not None:
             with open(log, 'a') as f:
-                f.write(dumps(result))
+                f.write(f"{dumps(result)}\n")
 
 if __name__ == "__main__":
     cli()

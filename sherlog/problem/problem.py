@@ -132,11 +132,16 @@ class Problem:
         Tensor
         """
         story_iter = self.stories(evidence, samples=stories, width=width, depth=depth, attempts=attempts, seeds=seeds)
-        samples = torch.cat([story.miser(samples=samples) for story in story_iter])
+        samples = [story.miser(samples=samples) for story in story_iter]
 
-        likelihood = torch.mean(samples)
+        if samples:
+            samples = torch.cat(samples)
+            likelihood = torch.mean(samples)
+            logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
 
-        logger.info(f"Evidence {evidence} has likelihood {likelihood:f} with variance {samples.var()}.")
+        else:
+            likelihood = torch.tensor(0.0)
+            logger.info(f"Evidence {evidence} has no stories, and likelihood 0.0.")
 
         return likelihood
 
