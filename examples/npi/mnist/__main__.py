@@ -24,7 +24,7 @@ def cli(): pass
     type=click.Choice(["deepproblog", "sherlog"], case_sensitive=False),
     help="Tool to be evaluated.")
 @click.option("-e", "--epochs", type=int, default=1)
-@click.option("-l", "--learning-rate", type=float, default=0.1)
+@click.option("-l", "--learning-rate", type=float, default=0.01)
 def evaluate(log, train, test, verbose, tool, epochs, learning_rate):
     """Evaluate a tool on the NPI MNIST benchmark."""
 

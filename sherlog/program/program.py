@@ -60,7 +60,7 @@ class Program:
         else:
             return cls(parameters, program_source, {})
 
-    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, depth : Optional[int] = None, seeds : Optional[int] = None):
+    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, depth : Optional[int] = None, seeds : Optional[int] = None, namespace = None):
         """Samples explanations for the provided evidence.
 
         Parameters
@@ -77,6 +77,8 @@ class Program:
 
         seeds : Optional[int]
 
+        namespace : Optional[Mapping[str, Any]]
+
         Returns
         -------
         Iterable[Explanation]
@@ -84,7 +86,10 @@ class Program:
         logger.info(f"Sampling explanations for evidence {evidence}...")
 
         # build the external evaluation context w/ namespaces
-        external = (self.parameter_map, self._namespace)
+        if namespace:
+            external = (self.parameter_map, self._namespace, namespace)
+        else:
+            external = (self.parameter_map, self._namespace)
 
         # build the explanation generator
         def gen():
@@ -96,7 +101,7 @@ class Program:
         
         yield from islice(gen(), quantity)
 
-    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 1, width : int = 50, depth : int = 200, attempts : int =100, seeds=1):
+    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 1, width : int = 50, depth : int = 200, attempts : int = 100, seeds : int = 1, namespace = None):
         """Compute the marginal likelihood of the provided evidence.
 
         Parameters
@@ -114,7 +119,7 @@ class Program:
         -------
         Tensor
         """
-        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, depth=depth, seeds=seeds)
+        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, depth=depth, seeds=seeds, namespace=namespace)
         explanation_likelihoods = [explanation.miser(samples=samples) for explanation in explanations]
         return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat
 

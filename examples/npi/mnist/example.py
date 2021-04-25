@@ -36,9 +36,11 @@ class Image:
         elif self.dataset == "test": return TEST[self.index]
         else: raise KeyError()
 
+    @property
     def vector(self):
         return self.get()[0]
-    
+
+    @property    
     def label(self):
         return self.get()[1]
 
@@ -46,12 +48,19 @@ class Image:
     def atom(self):
         return f"{self.dataset}({self.index})"
 
+    @property
+    def symbol(self):
+        return f"image_{self.dataset}_{self.index}"
+
 # examples pair images and results
 @dataclass
 class Example:
     left : Image
     right : Image
     total : int
+
+    def output_permutations(self):
+        yield from range(0, 19)
 
 # random access into train and test
 def random_image(dataset):
@@ -67,6 +76,6 @@ def sample(quantity : int, dataset : str):
     for _ in range(quantity):
         left = random_image(dataset)
         right = random_image(dataset)
-        total = left.label() + right.label()
+        total = left.label + right.label
 
         yield Example(left, right, total)

@@ -1,6 +1,6 @@
 from .objective import Objective
 from ..program import Program, Evidence
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Any, TypeVar, Generic, Mapping, Callable
 import torch
 
 class Batch:
@@ -23,4 +23,20 @@ class Batch:
         marginals = torch.stack([program.likelihood(evidence, **kwargs) for evidence in self.evidence])
         log_likelihood = marginals.log().sum()
         
+        return Objective(self.name, log_likelihood)
+
+T = TypeVar('T')
+
+class NamespaceBatch(Batch, Generic[T]):
+    def __init__(self, data : Iterable[T], to_evidence : Callable[[T], Evidence], to_namespace : Callable[[T], Mapping[str, Any]], index : Optional[int] = None):
+        super(NamespaceBatch, self).__init__(data, index)
+        self._to_evidence = to_evidence
+        self._to_namespace = to_namespace
+
+    def marginals(self, program : Program, **kwargs):
+        for evidence in self.evidence:
+            yield program.likelihood(self._to_evidence(evidence), namespace=self._to_namespace(evidence), **kwargs)
+
+    def objective(self, program : Program, **kwargs) -> Objective:
+        log_likelihood = torch.stack(list(self.marginals(program, **kwargs))).log().sum()
         return Objective(self.name, log_likelihood)

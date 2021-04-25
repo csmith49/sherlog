@@ -10,6 +10,6 @@ class Evidence:
         atoms = []
         for atom in self.json["value"]:
             rel = atom["relation"]
-            terms = [term["value"] for term in atom["terms"]]
+            terms = [str(term["value"]) for term in atom["terms"]]
             atoms.append(f"{rel}({', '.join(terms)})")
         return ", ".join(atoms)

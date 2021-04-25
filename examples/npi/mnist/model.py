@@ -11,7 +11,7 @@ def neural_predicate(network, image):
     return network.net(image.unsqueeze(0)).squeeze(0)
 
 class MNISTModule(nn.Module):
-    def __init__(self):
+    def __init__(self, squeeze=False):
         super(MNISTModule, self).__init__()
         self.encoder = nn.Sequential(
             nn.Conv2d(1, 6, 5),
@@ -29,7 +29,14 @@ class MNISTModule(nn.Module):
             nn.Linear(84, 10),
             nn.Softmax(1)
         )
+        self._squeeze = squeeze
 
     def forward(self, x):
+        if self._squeeze:
+            x = x.unsqueeze(0)
         x = self.encoder(x).view(-1, 16 * 4 * 4)
-        return self.classifier(x)
+        result = self.classifier(x)
+        if self._squeeze:
+            return result.squeeze(0)
+        else:
+            return result
