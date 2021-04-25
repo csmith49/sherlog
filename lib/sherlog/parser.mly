@@ -63,6 +63,11 @@ value :
 term :
     | v = value { v }
     | LBRACKET; RBRACKET { Term.Unit }
+    | v = value; DOUBLECOLON; t = term; { Term.Function ("cons", [v; t]) }
+    | LBRACKET; vs = separated_list(COMMA, value); RBRACKET { 
+        let cons x y = Term.Function ("cons", [x ; y]) in
+        CCList.fold_right cons vs Term.Unit
+    }
     | BLANK { Term.Wildcard }
     | LPARENS; t = term; RPARENS { t }
     ;
