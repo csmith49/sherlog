@@ -2,7 +2,7 @@ from ...engine import Functor
 from ...logs import get
 from . import batch
 import torch
-from torch.distributions import Bernoulli, Normal, Beta
+from torch.distributions import Bernoulli, Normal, Beta, Categorical
 from itertools import chain
 from functools import partial
 
@@ -254,6 +254,7 @@ def factory(samples, forcing=None):
         "beta" : batched_random_factory(Beta),
         "bernoulli" : batched_random_factory(Bernoulli),
         "normal" : batched_random_factory(Normal),
+        "categorical" : batched_random_factory(Categorical),
         "tensorize" : lift(_tensorize),
         "equal" : lift(_equal),
         "satisfy" : lift(_satisfy),

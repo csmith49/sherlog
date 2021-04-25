@@ -1,4 +1,3 @@
-from .namespace import Namespace
 from .parameter import Parameter
 from .evidence import Evidence
 from .. import interface
@@ -16,7 +15,7 @@ import random
 logger = get("program")
 
 class Program:
-    def __init__(self, parameters, program_source, namespaces=None):
+    def __init__(self, parameters, program_source, namespace):
         """Object representing a Sherlog problem file.
 
         Parameters
@@ -30,14 +29,14 @@ class Program:
         # convert params to name-param map
         self._parameters = {p.name : p for p in parameters}
         
-        # build the namespace obj from the namespaces provided
-        self._namespace = Namespace(modules=namespaces)
+
+        self._namespace = namespace
         
         # just record the rest
         self.program_source = program_source
 
     @classmethod
-    def of_json(cls, json):
+    def of_json(cls, json, namespace=None):
         """Build a program from a JSON-like object.
 
         Parameters
@@ -56,7 +55,10 @@ class Program:
             "ontology" : json["ontology"],
             "evidence" : [] # we split the evidence out into a different iterable, but the server expects this
         }
-        return cls(parameters, program_source, namespaces=[])
+        if namespace:
+            return cls(parameters, program_source, namespace)
+        else:
+            return cls(parameters, program_source, {})
 
     def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, depth : Optional[int] = None, seeds : Optional[int] = None):
         """Samples explanations for the provided evidence.
@@ -94,7 +96,7 @@ class Program:
         
         yield from islice(gen(), quantity)
 
-    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 1, width : int = 50, depth : int = 100, attempts : int =100, seeds=1):
+    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 1, width : int = 50, depth : int = 200, attempts : int =100, seeds=1):
         """Compute the marginal likelihood of the provided evidence.
 
         Parameters
@@ -114,7 +116,7 @@ class Program:
         """
         explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, depth=depth, seeds=seeds)
         explanation_likelihoods = [explanation.miser(samples=samples) for explanation in explanations]
-        return torch.mean(torch.stack(explanation_likelihoods)) # or could be torch.cat
+        return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.

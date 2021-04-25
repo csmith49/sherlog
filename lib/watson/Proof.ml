@@ -29,8 +29,7 @@ module State = struct
         state with goal = atoms @ (goal state);
     }
 
-    let variables state = state
-        |> goal
+    let variables state = (goal state) @ (cache state)
         |> CCList.flat_map Atom.variables
         |> CCList.uniq ~eq:CCString.equal
 
