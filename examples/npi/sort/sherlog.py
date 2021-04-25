@@ -1,4 +1,3 @@
-from .model import Model
 from .example import Example
 from typing import Iterable
 import torch
@@ -50,44 +49,66 @@ class Module(torch.nn.Module):
         output = self.nn(input_vec.unsqueeze(0))
         return output.squeeze(0)
 
-class SherlogModel(Model):
+class SherlogModel:
     def __init__(self):
         self._problem, _ = sherlog.program.loads(SOURCE, namespace={"swap_nn" : Module()})
 
     def fit(self, data : Iterable[Example], epochs : int = 1, learning_rate : float = 1.0, batch_size : int = 1, **kwargs):
         optimizer = sherlog.inference.Optimizer(self._problem, optimizer="adam", learning_rate=learning_rate)
         
+        # epochs here aren't really epochs - fix
         for batch in sherlog.inference.minibatch(translate_examples(data), batch_size=batch_size, epochs=epochs):
             with optimizer as o:
                 o.maximize(batch.objective(self._problem, explanations=3, samples=100, seeds=3))
 
-    def accuracy(self, example, **kwargs):
-        """Compute the 0-1 accuracy of the model on the given example.
-
-        Returns 1.0 if the sortest list has the highest log-prob across all permutations, and 0.0 otherwise.
+    def _ll(self, inputs : Iterable[int], outputs : Iterable[int], explanations : int, samples : int) -> float:
+        """Compute the log-likelihood of the inputs being converted to the outputs.
 
         Parameters
         ----------
-        example : Example
+        inputs : Iterable[int]
+        outputs : Iterable[int]
+        explanations : int
+        samples : int
 
         Returns
         -------
         float
         """
-        # compute log-likelihood of each possible permutation
-        prediction, likelihood = None, float("-inf")
+        _, evidence = sherlog.program.loads(translate_example(inputs, outputs))
+        return torch.log(self._problem.likelihood(evidence[0], explanations=explanations, samples=samples)).item()
 
-        print(f"Evaluating example {example.input} / {example.output}")
+    def log_likelihood(self, example, explanations : int = 5, samples : int = 100, **kwargs) -> float:
+        """Compute the log-likelihood of the example.
 
-        for possibility in example.output_permutations():
-            _, evidence = sherlog.program.loads(translate_example(example.input, possibility))
-            possibility_likelihood = self._problem.likelihood(evidence[0], explanations=5, samples=100)
-            if possibility_likelihood > likelihood:
-                print(f"swapping {prediction} for {possibility} w/ likelihood {possibility_likelihood}")
-                prediction, likelihood = possibility, possibility_likelihood
+        Parameters
+        ----------
+        example : Example
+        explanations : int (default=5)
+        samples : int (default=100)
 
-        if list(prediction) == example.output:
+        Returns
+        -------
+        float
+        """
+        return self._ll(example.input, example.output, explanations, samples)
+
+    def completion(self, example, explanations : int = 1, samples : int = 100, **kwargs):
+        """Compute the 0-1 accuracy of the model on the given example.
+
+        Parameters
+        ----------
+        example : Example
+        explanations : int (default=5)
+        samples : int (default=100)
+
+        Returns
+        -------
+        float
+        """
+        key = lambda p: self._ll(example.input, p, explanations=explanations, samples=samples)
+        mlo = max(example.output_permutations(), key=key)
+        if list(mlo) == example.output:
             return 1.0
         else:
             return 0.0
-                

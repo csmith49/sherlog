@@ -1,9 +1,10 @@
 import dpl
+from problog.logic import Var
 import torch
 from torch.optim import Adam
 from typing import Iterable
 from .example import Example
-from .model import Model
+from math import log
 
 SOURCE = """
 nn(swap_net, [X,Y],Z,[no_swap, swap]) :: swap(X,Y,Z).
@@ -52,7 +53,7 @@ def neural_predicate(network, i1, i2):
     output = network.net(d)
     return output.squeeze(0)
 
-class DPLModel(Model):
+class DPLModel:
     def __init__(self):
         """DPL model for NPI testing."""
         self._fc = dpl.FC(20, 2)
@@ -75,7 +76,7 @@ class DPLModel(Model):
         ----------
         data : Iterable[Example]
         epochs : int (default=1)
-        learning_rate : float (default=0.1)
+        learning_rate : float (default=1.0)
 
         Returns
         -------
@@ -95,7 +96,14 @@ class DPLModel(Model):
             dpl.Optimizer(self._model, 32) # not entire sure what the 32 controls...
         )
 
-    def accuracy(self, example, **kwargs):
+    def log_likelihood(self, example, **kwargs):
+        example = dpl.loads(translate_example(example))[0]
+        args = list(example.args)
+        args[-1:] = [Var(f"X_{i}") for i in range(1)]
+        solution = self._model.solve(example(*args), None)
+        return log(solution[example][0])
+
+    def completion(self, example, **kwargs):
         """
         Parameters
         ----------
