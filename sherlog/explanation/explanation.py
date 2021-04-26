@@ -114,7 +114,7 @@ class Explanation:
 
         # build surrogate
         scale = semantics.miser.forcing_scale(objective.dependencies())
-        score = semantics.miser.magic_box(objective.dependencies())
+        score = semantics.miser.magic_box(objective.dependencies(), samples)
         surrogate = objective.value * scale * score
 
         return surrogate

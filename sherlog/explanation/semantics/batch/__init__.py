@@ -76,3 +76,17 @@ def batch_map(callable, *args):
     batch_args = zip(*(unbatch(arg) for arg in args))
     results = (callable(*args) for args in batch_args)
     return rebatch(results)
+
+def sum_collapse(tensor):
+    """Reduces a multi-dimensional tensor to a batched tensor of sums along each batch.
+
+    Parameters
+    ----------
+    tensor : Tensor
+
+    Returns
+    -------
+    Tensor
+    """
+    if tensor.dim() == 1: return tensor
+    else: return sum_collapse(tensor.sum(dim=-1))

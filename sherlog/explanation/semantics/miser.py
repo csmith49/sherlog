@@ -55,7 +55,7 @@ class Miser:
         Tensor
         """
         if self.distribution and self.forced:
-            return self.distribution.log_prob(self.value)
+            return batch.sum_collapse(self.distribution.log_prob(self.value))
         else:
             return torch.zeros(batch.batches(self.value))
 
@@ -70,7 +70,7 @@ class Miser:
         Tensor
         """
         if self.distribution:
-            return self.distribution.log_prob(self.value)
+            return batch.sum_collapse(self.distribution.log_prob(self.value))
         else:
             return torch.zeros(batch.batches(self.value))
 
@@ -96,7 +96,10 @@ class Miser:
     def batch_values(self):
         yield from self.value.unbind()
 
-def magic_box(values):
+    def __repr__(self):
+        return repr(self.value)
+
+def magic_box(values, batches):
     """Computes the magic box of the provided values.
 
     Parameters
@@ -222,6 +225,7 @@ def _equal(v1, v2):
         return torch.tensor(1.0)
     else:
         return torch.tensor(0.0)
+    # return torch.exp(-1 * torch.dist(v1, v2).pow(2) / 0.001)
 
 def _satisfy(meet, avoid):
     return meet * (1 - avoid)
