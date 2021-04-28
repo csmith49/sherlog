@@ -109,10 +109,10 @@ intro_clause :
     ;
 
 fuzzy_clause :
-    | w = term; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
+    | w = value; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
         Line.encode_fuzzy ~head:head ~body:body ~weight:w
     }
-    | w = term; DOUBLECOLON; head = atom; PERIOD {
+    | w = value; DOUBLECOLON; head = atom; PERIOD {
         Line.encode_fuzzy ~head:head ~body:[] ~weight:w
     }
     ;
