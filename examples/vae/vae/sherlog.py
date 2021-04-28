@@ -4,14 +4,11 @@ import torch
 from .baseline import encode, decode, reconstruction_loss, kl_loss
 
 SOURCE = """
-exp(X; exp[X]).
-
 mean(X; encode_mean_nn[X]).
-log_sdev(X; encode_log_sdev_nn[X]).
-latent(X; normal[M, S]) <- mean(X, M), log_sdev(X, L), exp(L, S).
+latent(X; normal[M, 0.01]) <- mean(X, M).
 decode(X; decode_nn[Z]) <- latent(X, Z).
 
-kl(X; kl_loss[M, L]) <- mean(X, M), log_sdev(X, L).
+kl(X; kl_loss[M, 0.01]) <- mean(X, M).
 reconstruction(X; reconstruction_loss[X, Y]) <- decode(X, Y).
 
 objective(X; add[K, R]) <- kl(X, K), reconstruction(X, R).
@@ -34,11 +31,10 @@ class SherlogModel:
     def __init__(self, features=16):
         self._namespace = {
             "add"                 : add,
-            "exp"                 : exp,
             "encode_mean_nn"      : encode(features),
             "encode_log_sdev_nn"  : encode(features),
             "decode_nn"           : decode(features),
-            "kl_loss"             : kl_loss,
+            "kl_loss"             : kl_loss, # TODO - check this
             "reconstruction_loss" : reconstruction_loss
         }
         self._program, _ = sherlog.program.loads(SOURCE, namespace=self._namespace)

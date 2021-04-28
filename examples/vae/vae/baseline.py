@@ -20,8 +20,8 @@ def decode(features):
 def reconstruction_loss(x, y):
     return nn.BCELoss(reduction='sum')(y, x)
 
-def kl_loss(mean, log_sdev):
-    log_variance = log_sdev.exp().pow(2).log()
+def kl_loss(mean, sdev):
+    log_variance = sdev.pow(2).log()
     return -0.5 * torch.sum(1 + log_variance + mean.pow(2) - log_variance.exp())
 
 class TorchModel:

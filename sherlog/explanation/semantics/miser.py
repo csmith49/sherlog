@@ -160,6 +160,7 @@ def wrap(obj, batches=1, **kwargs):
 def fmap(callable, args, kwargs, **fmap_args):
     logger.info(f"Calling {callable} on {args}.")
     value = batch.batch_map(callable, *[arg.value for arg in args])
+    logger.info(f"Call to {callable} produced result {value}.")
     return Miser(value, dependencies=args)
 
 def random_factory(distribution, batches=1, forcing=None):
@@ -225,7 +226,6 @@ def _equal(v1, v2):
         return torch.tensor(1.0)
     else:
         return torch.tensor(0.0)
-    # return torch.exp(-1 * torch.dist(v1, v2).pow(2) / 0.001)
 
 def _satisfy(meet, avoid):
     return meet * (1 - avoid)

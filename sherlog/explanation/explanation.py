@@ -93,6 +93,8 @@ class Explanation:
         -------
         Tensor
         """
+
+        logger.info(f"Evaluating types and forcing values...")
         # build type info for the forcing
         types = self.run(semantics.types.functor) 
         forcing = {}
@@ -116,6 +118,9 @@ class Explanation:
         scale = semantics.miser.forcing_scale(objective.dependencies())
         score = semantics.miser.magic_box(objective.dependencies(), samples)
         surrogate = objective.value * scale * score
+
+        logger.info(f"Objective and likelihood ratio: {objective} / {scale}")
+        logger.info(f"Miser surrogate objective: {surrogate}")
 
         return surrogate
 
