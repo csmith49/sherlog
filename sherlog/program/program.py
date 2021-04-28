@@ -123,6 +123,38 @@ class Program:
         explanation_likelihoods = [explanation.miser(samples=samples) for explanation in explanations]
         return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat
 
+    def sample_explanation(self, evidence : Evidence, burn_in : int = 100, samples : int = 100, **kwargs):
+        """Sample an explanation from the posterior.
+
+        Parameters
+        ----------
+        evidence : Evidence
+        burn_in : int (default=100)
+        samples : int (default=100)
+
+        Returns
+        -------
+        Explanation
+        """
+
+        logger.info(f"Sampling explanation for {evidence} with {burn_in} burn-in steps.")
+        sample, sample_likelihood = None, 0.00001
+
+        for step in range(burn_in):
+            # sample a new explanation and compute likelihood
+            explanation = next(self.explanations(evidence, quantity=1, **kwargs))
+            # compute the likelihood
+            explanation_likelihood = explanation.miser(samples=samples).mean().item()
+            # accept/reject
+            ratio = explanation_likelihood / sample_likelihood
+            if random.random() <= ratio:
+                logger.info(f"Step {step}: sample accepted with likelihood ratio {ratio}.")
+                sample, sample_likelihood = explanation, explanation_likelihood
+
+        if sample is None:
+            logger.warning(f"No sample accepted after {burn_in} burn-in steps.")
+        return sample
+
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
 
@@ -156,6 +188,7 @@ class Program:
 
     def clamp_parameters(self):
         """Update the value of all parameters in-place to satisfy the constraints of their domain."""
+        logger.info("Clamping parameters.")
         with torch.no_grad():
             for _, parameter in self._parameters.items():
                 parameter.clamp()

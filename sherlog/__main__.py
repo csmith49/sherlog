@@ -134,5 +134,21 @@ def analyze(filename, show, output, plot):
     # save the resulting chart (if indicated)
     if output and chart: dump(chart, output)
 
+@main.command()
+@click.argument("filename", type=click.Path(exists=True))
+@click.option("-b", "--burn-in", type=int, default=100)
+@click.option("-s", "--samples", type=int, default=100)
+def explain(filename, burn_in, samples):
+    """Sample an explanation for each provided piece of evidence."""
+
+    program, evidence = load(filename)
+
+    for ev in evidence:
+        console.print(f"Explaining {ev}:")
+        explanation = program.sample_explanation(ev, burn_in=burn_in, samples=samples)
+        console.print(f"Model: {explanation.model}")
+        console.print(f"Meet:  {explanation.meet}")
+        console.print(f"Avoid: {explanation.avoid}\n")
+
 if __name__ == "__main__":
     main()
