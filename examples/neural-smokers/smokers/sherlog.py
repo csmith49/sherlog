@@ -133,5 +133,8 @@ class SherlogModel:
         friends = self.log_likelihood(example, force_target=True, **kwargs)
         not_friends = self.log_likelihood(example, force_target=False, **kwargs)
 
-        confidence = exp(friends - not_friends)
+        if friends >= not_friends:
+            confidence = 1.0
+        else:
+            confidence = 0.0
         return confidence, example.target_classification()

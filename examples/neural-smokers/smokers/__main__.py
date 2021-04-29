@@ -47,7 +47,7 @@ def evaluate(log, size, verbose, train, test, epochs, learning_rate):
     for example in sample(test, size=size):
         with timer:
             confidence, gt = model.classification_task(example)
-            score = 1.0 if abs(confidence - gt) < 0.5 else 0.0
+            score = 1.0 if confidence == gt else 0.0
         results.append( (score, timer.elapsed) )
     scores, times = zip(*results)
     accuracy, avg_class_time = mean(scores), mean(times)

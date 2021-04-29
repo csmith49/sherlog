@@ -38,7 +38,7 @@ class Graph:
         return self._graph.edges()
 
     def target_classification(self):
-        if self._class_target in self.friends():
+        if self._class_target in self.edges():
             return 1.0
         else:
             return 0.0
