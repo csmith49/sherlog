@@ -25,7 +25,6 @@ COMORBID = 0.3
 # social graph
 class Graph:
     def __init__(self, size : int, classification_target : Tuple[int, int] = (0, 1)):
-        logger.info(f"Generating a graph with size {size}.")
         self._size = size
         self._graph = scale_free_graph(size) # somehow this cannot be less than 3?
         self._class_target = classification_target
@@ -35,21 +34,25 @@ class Graph:
     def nodes(self) -> Iterable[int]:
         return self._graph.nodes()
     
-    def edges(self, avoid_classification_target : bool = False) -> Iterable[Tuple[int, int]]:
-        for edge in self._graph.edges():
-            if not avoid_classification_target or edge != self._class_target:
-                yield edge
+    def edges(self) -> Iterable[Tuple[int, int]]:
+        return self._graph.edges()
 
-    def classification_target(self):
-        l, r = self._class_target
-        return (self._symbol(l), self._symbol(r))
+    def target_classification(self):
+        if self._class_target in self.friends():
+            return 1.0
+        else:
+            return 0.0
 
     def people(self) -> Iterable[str]:
         for node in self.nodes():
             yield self._symbol(node)
 
-    def friends(self) -> Iterable[Tuple[str, str]]:
+    def friends(self, force_target : Optional[bool] = None) -> Iterable[Tuple[str, str]]:
         for (s, d) in self.edges():
+            if force_target is None or (s, d) != self._class_target:
+                yield (self._symbol(s), self._symbol(d))
+        if force_target is True:
+            s, d = self._class_target
             yield (self._symbol(s), self._symbol(d))
 
     def smokes(self, value : bool) -> Iterable[str]:
@@ -72,7 +75,6 @@ class Graph:
 
     def _initialize(self):
         """Construct the labels for each node and edge in the graph."""
-        logger.info(f"Initializing the graph labels.")
 
         # health(X; flat_dirichlet[10]) <- person(X)
         self._health = {node : HEALTH_DISTRIBUTION.rsample() for node in self.nodes()}

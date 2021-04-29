@@ -30,8 +30,44 @@ def evaluate(log, size, verbose, train, test, epochs, learning_rate):
     with timer:
         model.fit(sample(train, size=size), epochs=epochs)
     training_time = timer.elapsed
+    logger.info(f"Training completed in {training_time} seconds.")
 
-    console.print(training_time)
+    logger.info(f"Evaluating average LL with {test} samples...")
+    results = []
+    for example in sample(test, size=size):
+        with timer:
+            ll = model.log_likelihood(example)
+        results.append( (ll, timer.elapsed) )
+    lls, times = zip(*results)
+    avg_ll, avg_ll_time = mean(lls), mean(times)
+    logger.info(f"Evaluation completed in {avg_ll_time * test} seconds. Resulting avg. LL: {avg_ll}.")
+
+    logger.info(f"Testing predictive performance with {test} samples...")
+    results = []
+    for example in sample(test, size=size):
+        with timer:
+            confidence, gt = model.classification_task(example)
+            score = 1.0 if abs(confidence - gt) < 0.5 else 0.0
+        results.append( (score, timer.elapsed) )
+    scores, times = zip(*results)
+    accuracy, avg_class_time = mean(scores), mean(times)
+    logger.info(f"Evaluation complete: accuracy of {accuracy} with average classification time of {avg_class_time} seconds.")
+
+    result = {
+        "seed" : seed(),
+        "train" : train,
+        "test" : test,
+        "graph_size" : size,
+        "training_time" : training_time,
+        "average_log_likelihood" : avg_ll,
+        "average_log_likelihood_time" : avg_ll_time,
+        "accuracy" : accuracy,
+        "average_classification_time" : avg_class_time
+    }
+
+    if log is not None:
+        with open(log, 'a') as f:
+            f.write(dumps(result))
 
 if __name__ == "__main__":
     cli()

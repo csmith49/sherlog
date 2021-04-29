@@ -3,6 +3,7 @@ from sherlog.inference import minibatch
 from sherlog.logs import get_external
 import torch.nn as nn
 import torch
+from math import exp
 from . import data
 from itertools import chain
 
@@ -65,11 +66,10 @@ class InfluenceNN(nn.Module):
         return result[-1]
 
 # convert a graph to a sherlog program
-def translate_graph(graph):
-    logger.info(f"Translating graph {graph} to Sherlog.")
+def translate_graph(graph, force_target=None):
     # compute the structure of the graph
     people = [f"person({p})." for p in graph.people()]
-    friends = [f"friend({s}, {d})." for (s, d) in graph.friends()]
+    friends = [f"friend({s}, {d})." for (s, d) in graph.friends(force_target=force_target)]
 
     structure = '\n'.join(chain(people, friends))
 
@@ -109,28 +109,29 @@ class SherlogModel:
         yield from self._influence_nn.parameters()
 
     def fit(self, data, epochs : int = 1, learning_rate : float = 0.01, batch_size : int = 1, **kwargs):
-        logger.info(f"Initializing optimization with {epochs} epochs and learning rate {learning_rate}.")
-
         # we're doing everything manually here, unfortunately
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
         for batch in minibatch(data, batch_size=batch_size, epochs=epochs, direct=True):
-            logger.info(f"Starting batch {batch}...")
             optimizer.zero_grad()
             
             # build the objective
             objective = torch.tensor(0.0)
             for graph in batch:
-                logger.info(f"Constructing the program from {graph}...")
                 program, evidence = loads(translate_graph(graph), namespace=self._namespace)
-                logger.info(f"Computing likelihood...")
                 objective -= program.likelihood(evidence[0], explanations=3, samples=100).log()
 
-            logger.info(f"Objective {objective} built. Backpropagating...")
             # and optimize
             objective.backward()
             optimizer.step()
 
-    def log_likelihood(self, example, explanations : int = 1, samples : int = 100, **kwargs):
-        program, evidence = loads(translate_graph(example), namespace=self._namespace)
+    def log_likelihood(self, example, explanations : int = 1, samples : int = 100, force_target = None, **kwargs):
+        program, evidence = loads(translate_graph(example, force_target=force_target), namespace=self._namespace)
         return program.likelihood(evidence[0], explanations=explanations, samples=samples).log().item()
+
+    def classification_task(self, example, **kwargs):
+        friends = self.log_likelihood(example, force_target=True, **kwargs)
+        not_friends = self.log_likelihood(example, force_target=False, **kwargs)
+
+        confidence = exp(friends - not_friends)
+        return confidence, example.target_classification()
