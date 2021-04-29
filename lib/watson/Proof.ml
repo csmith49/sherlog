@@ -79,16 +79,29 @@ and witnesses proof = proof
     |> rev_witnesses
     |> CCList.rev
 
-
-let is_resolved = function  O (state, _) -> State.is_empty state
+let is_resolved = function O (state, _) -> State.is_empty state
 
 let state = function O (state, _) -> state
 
 let of_state state = O (state, None)
 
 let to_atoms proof = proof
+    |> witnesses
+    |> CCList.map Witness.atom
+
+(* let to_atoms proof = proof
     |> state
-    |> State.cache
+    |> State.cache *)
+
+(* let to_atoms proof =
+    let witnesses = proof |> rev_witnesses in
+    let sub = witnesses
+        |> CCList.map Witness.substitution
+        |> CCList.fold_left Substitution.compose Substitution.empty in
+    let atoms = witnesses
+        |> CCList.map Witness.atom
+        |> CCList.map (Atom.apply sub) in
+    CCList.rev atoms *)
 
 let resolve proof rule = let open CCOpt in
     (* change the rule variables to avoid those in the state *)

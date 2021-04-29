@@ -6,10 +6,13 @@ from ..program import Evidence
 
 from itertools import cycle, islice
 
-def minibatch(evidence : Iterable[Evidence], batch_size : int, epochs : int = 1):
+def minibatch(evidence : Iterable[Evidence], batch_size : int, epochs : int = 1, direct=False):
     data = cycle(evidence)
     for epoch in range(epochs):
-        yield Batch(islice(data, batch_size), index=epoch)
+        if direct:
+            yield islice(data, batch_size)
+        else:
+            yield Batch(islice(data, batch_size), index=epoch)
 
 T = TypeVar('T')
 
