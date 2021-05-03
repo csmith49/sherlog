@@ -39,7 +39,7 @@ class Graph:
 
     def target_classification(self):
         if self._class_target in self.edges():
-            return 1.0
+            return 1.0 # this always seems to be the case, smth about the scale-free construction?
         else:
             return 0.0
 

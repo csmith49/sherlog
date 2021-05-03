@@ -41,7 +41,8 @@ module JSON : sig
     val decode : JSON.t -> t option
 end
 
-val of_explanation : Explanation.t -> Explanation.t -> t
+val of_proof : Watson.Proof.t -> t
+val of_proof_and_contradiction : Watson.Proof.t -> Watson.Proof.t -> t
 
 val pp : t Fmt.t
 val to_string : t -> string

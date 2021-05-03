@@ -157,12 +157,26 @@ module Compile = struct
 
 end
 
-let of_explanation positive negative =
-    let pa = positive
+let of_proof proof = 
+    let pa = proof
+        |> Explanation.of_proof
         |> Compile.of_explanation
         |> Compile.associate_names
         |> Compile.assignments in
-    let na = negative
+    {
+        assignments = pa |> CCList.map fst;
+        meet = pa |> Compile.observation;
+        avoid = [];
+    }
+
+let of_proof_and_contradiction proof contradiction =
+    let pa = proof
+        |> Explanation.of_proof
+        |> Compile.of_explanation
+        |> Compile.associate_names
+        |> Compile.assignments in
+    let na = contradiction
+        |> Explanation.of_proof
         |> Compile.of_explanation
         |> Compile.associate_names
         |> Compile.assignments in

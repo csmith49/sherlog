@@ -27,20 +27,10 @@ let handler json = match JSON.Parse.(find string "command" json) with
             |> CCOpt.get_or ~default:CCInt.max_int in
         (* build filter from parameters *)
         let filter = Sherlog.Program.Filter.(
-            width search_width >> length search_length
+            intro_consistent >> length search_length >> width search_width
         ) in
         let models = query
-            |> Sherlog.Program.prove program filter
-            |> CCList.flat_map (fun proof ->
-                    let contradiction_proofs = Sherlog.Program.contradict program filter proof in
-                    let contradictions = if CCList.length contradiction_proofs > 0
-                        then contradiction_proofs |> CCList.map Sherlog.Explanation.of_proof
-                        else [Sherlog.Explanation.empty] in
-                    let justification = Sherlog.Explanation.of_proof proof in
-                    CCList.map (fun contradiction ->
-                        Sherlog.Model.of_explanation justification contradiction
-                    ) contradictions
-                )
+            |> Sherlog.Program.models program filter
             |> CCList.map Sherlog.Model.JSON.encode in
         return (`List models)
     | _ -> None

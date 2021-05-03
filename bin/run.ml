@@ -28,7 +28,7 @@ let _ = Fmt.pr "%a Search width/depth: %a/%a\n"
 
 (* utility functions *)
 let filter = Sherlog.Program.Filter.(
-    length !search_depth >> width !search_width >> intro_consistent
+    intro_consistent >> length !search_depth >> width !search_width
 )
 
 (* operation to be done per-file *)
@@ -61,35 +61,15 @@ let operate filename =
         else () in
 
     (* processing a proof *)
-    let process_proof index proof =
-        let _ = Fmt.pr "%a Examining proof %a...\n"
+    let process_model index model =
+        let _ = Fmt.pr "%a Examining model %a...\n"
             marker ()
             (Fmt.styled (`Fg `Blue) Fmt.int) index in
-        let contradictions = Sherlog.Program.contradict program filter proof in
-        let _ = Fmt.pr "%a Found %a contradictions.\n"
+        let _ = Fmt.pr "%a Model: %a\n"
             marker ()
-            (Fmt.styled (`Fg `Blue) Fmt.int) (contradictions |> CCList.length) in
-        let _ = Fmt.pr "%a Building models...\n" marker () in
-        let pos_ex = Sherlog.Explanation.of_proof proof in
-        let models = match contradictions with
-            | [] -> [Sherlog.Model.of_explanation pos_ex Sherlog.Explanation.empty]
-            | contradictions -> contradictions
-                |> CCList.map (Sherlog.Explanation.of_proof)
-                |> CCList.map (Sherlog.Model.of_explanation pos_ex) in
-        let _ = match CCList.head_opt models with
-            | Some model ->
-                let _ = Fmt.pr "%a %a models built. Printing sample model...\n"
-                    marker ()
-                    (Fmt.styled (`Fg `Blue) Fmt.int) (models |> CCList.length) in
-                let _ = Fmt.pr "%a Model: %a\n"
-                    marker ()
-                    Sherlog.Model.pp model in
-                ()
-            | None ->
-                let _ = Fmt.pr "%a No models built.\n" marker () in
-                () in
+            Sherlog.Model.pp model in
         () in
-
+    
     (* processing a fact *)
     let process_fact fact =
         (* render the found fact *)
@@ -97,11 +77,11 @@ let operate filename =
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
         (* compute proofs and process *)
-        let proofs = Sherlog.Program.prove program filter fact in
-        let _ = Fmt.pr "%a Found %a proofs.\n"
+        let models = Sherlog.Program.models program filter fact in
+        let _ = Fmt.pr "%a Found %a models.\n"
             marker ()
-            (Fmt.styled (`Fg `Blue) Fmt.int) (proofs |> CCList.length) in
-        let _ = CCList.iteri process_proof proofs in
+            (Fmt.styled (`Fg `Blue) Fmt.int) (models |> CCList.length) in
+        let _ = CCList.iteri process_model models in
         () in
 
     CCList.iter process_fact facts

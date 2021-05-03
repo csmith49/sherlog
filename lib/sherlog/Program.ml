@@ -19,42 +19,37 @@ let make rules parameters evidence ontology = {
 	ontology = ontology;
 }
 
+let apply_rules program proof = program
+	|> rules
+	|> CCList.filter_map (Watson.Proof.resolve proof)
+
+let apply_ontology program proof = program
+	|> ontology
+	|> Ontology.dependencies
+	|> CCList.filter_map (Watson.Proof.resolve proof)
+
 let apply program proof =
-	(* try applying rules *)
-	let proofs = program
-		|> rules
-		|> CCList.filter_map (Watson.Proof.resolve proof) in
-	(* otherwise use the ontology *)
+	let proofs = apply_rules program proof in
 	if (CCList.length proofs) != 0 then proofs
-	else let proofs = program
-		|> ontology
-		|> Ontology.dependencies
-		|> CCList.filter_map (Watson.Proof.resolve proof) in
-	proofs
+	else apply_ontology program proof
 
 module Filter = struct
 	type t = Watson.Proof.t list -> Watson.Proof.t list
 
 	let total proofs = proofs
 	
-	(* TODO - fix this to ensure consistency wrt params and contexts *)
 	let rec intro_consistent proofs = CCList.filter is_intro_consistent proofs
 	and is_intro_consistent proof =
-		let intros = proof
-			|> Watson.Proof.to_atoms
-			|> CCList.filter_map Explanation.Introduction.of_atom in
-		let size = intros |> CCList.length in
-		let unique_intros = intros
-			|> CCList.map intro_hash
-			|> CCList.uniq ~eq:(CCList.equal Watson.Term.equal)
+		let intro_tags = proof
+			|> Explanation.of_proof
+			|> Explanation.introductions
+			|> CCList.map Explanation.Introduction.tag in
+		let num_intros = CCList.length intro_tags in
+		let num_unique_intros = intro_tags
+			|> CCList.sort_uniq ~cmp:(CCList.compare Watson.Term.compare)
 			|> CCList.length in
-		CCInt.equal size unique_intros
-	and intro_hash intro =
-		let mechanism = Watson.Term.Symbol (Explanation.Introduction.mechanism intro) in
-		let parameters = Explanation.Introduction.parameters intro in
-		let context = Explanation.Introduction.context intro in
-			mechanism :: (parameters @ context)
-	
+		CCInt.equal num_intros num_unique_intros
+
 	let length l proofs = proofs
 		|> CCList.filter (fun p -> (p |> Watson.Proof.witnesses |> CCList.length) <= l)
 	
@@ -69,30 +64,43 @@ module Filter = struct
 	let (>>) f g = compose f g
 end
 
-let rec prove program filter goal =
-	let worklist = [Watson.Proof.of_atoms goal] in
-		explore_tr program filter worklist []
-and explore_tr program filter worklist proven = match worklist with
+let rec explore program expand filter worklist proven = match worklist with
 	| [] -> proven
 	| proof :: rest ->
 		if Watson.Proof.is_resolved proof then
-			explore_tr program filter rest (proof :: proven)
-		else
-			let proofs = proof
-				|> apply program
+			let proven = proof :: proven in
+			explore program expand filter rest proven
+		else let proofs = proof
+				|> expand program
 				|> filter in
-			explore_tr program filter (proofs @ rest) proven
+			let proofs = proofs @ rest in
+			explore program expand filter proofs proven
+
+let prove program filter goal =
+	let initial_proof = Watson.Proof.of_atoms goal [] in
+	let worklist = [initial_proof] in
+		explore program apply filter worklist []
 
 let (|=) program goal = prove program Filter.total goal
 
 let contradict program filter proof =
-	let state = proof |> Watson.Proof.state in
-	let proofs = program
+	let proven_atoms = proof
+		|> Watson.Proof.to_atoms in
+	let constraints = program
 		|> ontology
-		|> Ontology.constraints
-		|> CCList.map (Watson.Proof.State.reset_goal state)
-		|> CCList.map (Watson.Proof.of_state) in
-	explore_tr program filter proofs []
+		|> Ontology.constraints in
+	let initial_proofs = constraints
+		|> CCList.map (fun c -> Watson.Proof.of_atoms c proven_atoms) in
+	explore program apply_rules filter initial_proofs []
+
+let models program filter goal =
+	let mk (p, cs) = match cs with
+		| [] -> [Model.of_proof p]
+		| _ -> CCList.map (Model.of_proof_and_contradiction p) cs in
+	let proofs = goal
+		|> prove program filter
+		|> CCList.map (CCPair.dup_map (contradict program filter)) in
+	CCList.flat_map mk proofs
 
 let pp ppf program = let open Fmt in
 	pf ppf "Parameters: %a@, Rules: %a@,%a"
