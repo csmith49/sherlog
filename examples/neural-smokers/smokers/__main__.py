@@ -3,13 +3,15 @@ from sherlog.logs import enable, get_external
 from sherlog import console
 from sherlog.tooling.instrumentation import seed, Timer
 from json import dumps
+import torch
 from statistics import mean
 import click
 
 logger = get_external("neural-smokers")
 
 @click.group()
-def cli(): pass
+def cli():
+    pass
 
 @cli.command()
 @click.option("-l", "--log", type=str, help="JSONL file to append results to.")
@@ -18,17 +20,19 @@ def cli(): pass
 @click.option("--train", type=int, default=100)
 @click.option("--test", type=int, default=100)
 @click.option("-e", "--epochs", type=int, default=1)
-@click.option("-r", "--learning-rate", type=float, default=0.1)
+@click.option("-r", "--learning-rate", type=float, default=0.01)
 def evaluate(log, size, verbose, train, test, epochs, learning_rate):
     """Evaluate Sherlog on the Neural Smokers benchmark."""
-    if verbose: enable("neural-smokers")
+    if verbose:
+        enable("neural-smokers")
 
     model = SherlogModel()
     timer = Timer()
 
     logger.info(f"Starting training with {train} samples...")
     with timer:
-        model.fit(sample(train, size=size), epochs=epochs)
+        x, y = list(sample(train, size=size)), list(sample(test, size=size))
+        model.fit(x, y, epochs=epochs, learning_rate=learning_rate)
     training_time = timer.elapsed
     logger.info(f"Training completed in {training_time} seconds.")
 
@@ -46,8 +50,8 @@ def evaluate(log, size, verbose, train, test, epochs, learning_rate):
     results = []
     for example in sample(test, size=size):
         with timer:
-            confidence, gt = model.classification_task(example)
-            score = 1.0 if confidence == gt else 0.0
+            confidence, ground_truth = model.classification_task(example)
+            score = 1.0 if confidence == ground_truth else 0.0
         results.append( (score, timer.elapsed) )
     scores, times = zip(*results)
     accuracy, avg_class_time = mean(scores), mean(times)
@@ -68,6 +72,8 @@ def evaluate(log, size, verbose, train, test, epochs, learning_rate):
     if log is not None:
         with open(log, 'a') as f:
             f.write(dumps(result))
+    
+    console.print(result)
 
 if __name__ == "__main__":
     cli()

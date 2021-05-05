@@ -3,7 +3,8 @@ from sherlog.inference import minibatch
 from sherlog.logs import get_external
 import torch.nn as nn
 import torch
-from math import exp
+from math import exp, log
+from statistics import mean
 from . import data
 from itertools import chain
 
@@ -32,7 +33,7 @@ R :: asthma(X) <- asthma_risk(X, R).
 !constraint asthma(X), not_asthma(X).
 """
 
-HIDDEN_DIMENSIONS = 10
+HIDDEN_DIMENSIONS = 100
 
 # compute the risk of asthma
 class RiskNN(nn.Module):
@@ -42,7 +43,7 @@ class RiskNN(nn.Module):
             nn.Linear(data.HEALTH_DIMENSIONS, HIDDEN_DIMENSIONS),
             nn.ReLU(),
             nn.Linear(HIDDEN_DIMENSIONS, 2),
-            nn.Softmax()
+            nn.Softmax(dim=0)
         )
 
     def forward(self, health):
@@ -57,7 +58,7 @@ class InfluenceNN(nn.Module):
             nn.Linear(data.HEALTH_DIMENSIONS * 2, HIDDEN_DIMENSIONS),
             nn.ReLU(),
             nn.Linear(HIDDEN_DIMENSIONS, 2),
-            nn.Softmax()
+            nn.Softmax(dim=0)
         )
 
     def forward(self, x, y):
@@ -95,7 +96,7 @@ class SherlogModel:
         self._influence_nn = InfluenceNN()
 
         self._namespace = {
-            "dimension" : torch.ones(data.HEALTH_DIMENSIONS),
+            "dimension" : torch.ones(data.HEALTH_DIMENSIONS) * 0.5,
             "stress" : self._stress,
             "comorbid" : self._comorbid,
             "risk_nn" : self._risk_nn,
@@ -108,32 +109,56 @@ class SherlogModel:
         yield from self._risk_nn.parameters()
         yield from self._influence_nn.parameters()
 
-    def fit(self, data, epochs : int = 1, learning_rate : float = 0.01, batch_size : int = 1, **kwargs):
+    def clamp(self):
+        with torch.no_grad():
+            self._stress.clamp_(0, 1)
+            self._comorbid.clamp_(0, 1)
+
+    def fit(self, train, test, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 10, **kwargs):
         # we're doing everything manually here, unfortunately
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
+        lls = {}
 
-        for batch in minibatch(data, batch_size=batch_size, epochs=epochs, direct=True):
-            optimizer.zero_grad()
-            
-            # build the objective
-            objective = torch.tensor(0.0)
-            for graph in batch:
-                program, evidence = loads(translate_graph(graph), namespace=self._namespace)
-                objective -= program.likelihood(evidence[0], explanations=3, samples=100).log()
+        for epoch in range(epochs):
+            for batch in minibatch(train, batch_size):
 
-            # and optimize
-            objective.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                objective = torch.tensor(0.0)
 
-    def log_likelihood(self, example, explanations : int = 1, samples : int = 100, force_target = None, **kwargs):
+                for graph in batch:
+                    program, evidence = loads(translate_graph(graph), namespace=self._namespace)
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=100, width=15).log()
+                    # we have to make sure the gradients actually exist
+                    is_nan = torch.isnan(log_likelihood).any()
+                    is_inf = torch.isinf(log_likelihood).any()
+                    if not is_nan and not is_inf:
+                        objective -= log_likelihood
+
+                objective.backward()
+                optimizer.step()
+                self.clamp()
+
+            test_log_likelihood = self.average_log_likelihood(test, explanations=10, samples=500, width=15)
+            lls[epoch] = test_log_likelihood
+            logger.info(f"Epoch {epoch} LL: {test_log_likelihood}")
+
+        return lls
+
+    def average_log_likelihood(self, test, explanations : int = 10, samples : int = 1000, **kwargs):
+        lls = []
+        for graph in test:
+            lls.append(self.log_likelihood(graph, explanations=explanations, samples=samples, **kwargs))
+        return mean(lls)
+
+    def log_likelihood(self, example, explanations : int = 10, samples : int = 1000, force_target = None, **kwargs):
         program, evidence = loads(translate_graph(example, force_target=force_target), namespace=self._namespace)
-        return program.likelihood(evidence[0], explanations=explanations, samples=samples).log().item()
+        return program.likelihood(evidence[0], explanations=explanations, samples=samples, **kwargs).log().item()
 
     def classification_task(self, example, **kwargs):
         friends = self.log_likelihood(example, force_target=True, **kwargs)
         not_friends = self.log_likelihood(example, force_target=False, **kwargs)
-
-        if friends >= not_friends:
+        # if friends >= not_friends:
+        if exp(friends - not_friends) >= 0.5:
             confidence = 1.0
         else:
             confidence = 0.0

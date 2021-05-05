@@ -1,19 +1,17 @@
 from .objective import Objective
 from .optimizer import Optimizer
 from .batch import Batch, NamespaceBatch
-from typing import Iterable, TypeVar
+from typing import Iterable, TypeVar, List
 from ..program import Evidence
 
-from itertools import cycle, islice
+from random import shuffle
+from itertools import cycle, islice, chain, repeat, zip_longest
 
-def minibatch(evidence : Iterable[Evidence], batch_size : int, epochs : int = 1, direct=False):
-    data = cycle(evidence)
-    for epoch in range(epochs):
-        if direct:
-            yield islice(data, batch_size)
-        else:
-            yield Batch(islice(data, batch_size), index=epoch)
-
+def minibatch(evidence : List[Evidence], batch_size : int):
+    shuffle(evidence)
+    args = [iter(evidence)] * batch_size
+    return zip_longest(*args, fillvalue=None)
+    
 T = TypeVar('T')
 
 def namespace_minibatch(data : Iterable[T], batch_size : int, to_evidence, to_namespace, epochs : int = 1):

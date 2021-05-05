@@ -1,14 +1,18 @@
+"""Miser gradient estimation functor. Based on DiCE."""
+
+from functools import partial
+import torch
+from torch.distributions import Bernoulli, Normal, Beta, Categorical, Dirichlet
+
 from ...engine import Functor
 from ...logs import get
 from . import batch
-import torch
-from torch.distributions import Bernoulli, Normal, Beta, Categorical, Dirichlet
-from itertools import chain
-from functools import partial
 
 logger = get("explanation.semantics.miser")
 
 class Miser:
+    """Miser values."""
+
     def __init__ (self, value, dependencies=(), distribution=None, forced=False):
         """A value wrapped by the Miser functor.
 
@@ -25,10 +29,10 @@ class Miser:
         self.value = value
         self.distribution = distribution
         self.forced = forced
-        
+
         # we'll add some extra checks instead of revealing dependencies outright
         self._dependencies = dependencies
-        
+
 
     @property
     def is_stochastic(self):
@@ -46,7 +50,7 @@ class Miser:
     def forced_log_prob(self):
         """Computes the log-probability of the forcing.
 
-        If the value is not forced, assume the 'forcing' always holds (hence the forced log-prob is 0).
+        If the value is not forced, assume the 'forcing' always holds (so the forced log-prob is 0).
 
         See also `Miser.log_prob`.
 
@@ -130,8 +134,7 @@ def forcing_scale(values):
     -------
     Tensor
     """
-    tau = torch.stack([v.forced_log_prob for v in values]).sum(0)
-    return torch.exp(tau)
+    return torch.stack([v.forced_log_prob for v in values]).sum(0).exp()
 
 # FUNCTOR OPS -----------------------------------------------------------
 

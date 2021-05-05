@@ -14,8 +14,8 @@ logger = get_external("neural-smokers.data")
 def flip(weight : float) -> bool: return random() <= weight
 
 # parameters and models
-HEALTH_DIMENSIONS = 5
-HEALTH_DISTRIBUTION = dist.Dirichlet(torch.ones(HEALTH_DIMENSIONS))
+HEALTH_DIMENSIONS = 3
+HEALTH_DISTRIBUTION = dist.Dirichlet(torch.ones(HEALTH_DIMENSIONS) * 0.5)
 ASTHMA_RISK_PARAMETERS = torch.logspace(-1, 0, HEALTH_DIMENSIONS)
 ASTHMA_RISK = lambda h: torch.dot(ASTHMA_RISK_PARAMETERS, h)
 INFLUENCE = lambda x, y: nn.functional.cosine_similarity(x, y, dim=0)
@@ -24,7 +24,7 @@ COMORBID = 0.3
 
 # social graph
 class Graph:
-    def __init__(self, size : int, classification_target : Tuple[int, int] = (0, 1)):
+    def __init__(self, size : int, classification_target : Tuple[int, int] = (0, 2)):
         self._size = size
         self._graph = scale_free_graph(size) # somehow this cannot be less than 3?
         self._class_target = classification_target

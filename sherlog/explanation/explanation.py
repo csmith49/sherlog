@@ -1,10 +1,10 @@
+"""Explanation."""
+
 from ..engine import Store, value
 from .observation import Observation
 from ..engine import Model
 from ..logs import get
 from . import semantics
-
-import torch
 
 logger = get("explanation")
 
@@ -49,10 +49,10 @@ class Explanation:
         store = self.store
         for assignment in self.model.assignments:
             functor.run_assignment(
-                assignment, 
-                store, 
-                wrap_args=wrap_args, 
-                fmap_args=fmap_args, 
+                assignment,
+                store,
+                wrap_args=wrap_args,
+                fmap_args=fmap_args,
                 parameters=parameters)
         return store
 
@@ -94,19 +94,19 @@ class Explanation:
         Tensor
         """
 
-        logger.info(f"Evaluating types and forcing values...")
+        logger.info("Evaluating types and forcing values...")
         # build type info for the forcing
-        types = self.run(semantics.types.functor) 
+        types = self.run(semantics.types.functor)
         forcing = {}
-        
+
         # add the values from meet
-        for x in self.meet.variables:
-            forcing[x] = self.meet[x]
+        for variable in self.meet.variables:
+            forcing[variable] = self.meet[variable]
 
         # and, if possible, add values from avoid
-        for x in self.avoid.variables:
-            if types[x] == semantics.types.Discrete(2):
-                forcing[x] = 1 - self.avoid[x]
+        for variable in self.avoid.variables:
+            if types[variable] == semantics.types.Discrete(2):
+                forcing[variable] = 1 - self.avoid[variable]
 
         logger.info(f"Forcing with observations: {forcing}")
 
@@ -119,7 +119,7 @@ class Explanation:
         score = semantics.miser.magic_box(objective.dependencies(), samples)
         surrogate = objective.value * scale * score
 
-        logger.info(f"Objective and likelihood ratio: {objective} / {scale}")
+        logger.info(f"Objective, likelihood ratio, and magic box: {objective} / {scale} / {score}")
         logger.info(f"Miser surrogate objective: {surrogate}")
 
         return surrogate
