@@ -1,4 +1,4 @@
-from .graph import Graph, Parameterization
+from .data import Graph, Parameterization
 from typing import Iterable, Optional
 from itertools import chain
 from subprocess import run
@@ -23,34 +23,20 @@ def write(filename : str, lines : Iterable[str]):
         for line in lines:
             f.write(f"{line}\n")
 
-FIT_TEMPLATE = [
-    "t(_) :: stress(X) :- person(X).",
-    "t(_) :: asthma_latent(X) :- person(X).",
-    "t(_) :: asthma_smokes(X) :- person(X).",
-    "t(_) :: influences(X, Y) :- friend(X, Y).",
-    "smokes(X) :- stress(X).",
-    "smokes(X) :- influences(X, Y), smokes(Y).",
-    "asthma(X) :- asthma_latent(X).",
-    "asthma(X) :- smokes(X), asthma_smokes(X)."   
-]
+SOURCE = """
+{stress} :: smokes(X) :- person(X).
+{spontaneous} :: asthma(X) :- person(X).
+{comorbid} :: asthma(X) :- smokes(X).
+{influence} :: influence(X, Y) :- friend(X, Y).
 
-def marginal_program(p : Parameterization) -> Iterable[str]:
-    yield from [
-        f"{p.stress} :: stress(X) :- person(X).",
-        f"{p.spontaneous} :: asthma_latent(X) :- person(X).",
-        f"{p.comorbid} :: asthma_smokes(X) :- person(X).",
-        f"{p.influence} :: influences(X, Y) :- friend(X, Y).",
-        "smokes(X) :- stress(X).",
-        "smokes(X) :- influences(X, Y), smokes(Y).",
-        "asthma(X) :- asthma_latent(X).",
-        "asthma(X) :- smokes(X), asthma_smokes(X)."   
-    ]
+smokes(X) :- influence(X, Y), smokes(Y).
+"""
 
-def structure(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
-    for p in graph.people(index=index):
-        yield f"person({p})."
-    for p, q in graph.friends(index=index):
-        yield f"friend({p}, {q})."
+def combine(*evidences, separator="---") -> Iterable[str]:
+    """Combine evidence with separators."""
+    for ev in evidences:
+        yield separator
+        yield from ev
 
 def evidence(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
     for p in graph.smokes(True, index=index):
@@ -62,170 +48,108 @@ def evidence(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
     for p in graph.asthma(False, index=index):
         yield f"evidence(asthma({p}), false)."
 
-def combine(*evidences, separator="---") -> Iterable[str]:
-    """Combine evidence with separators."""
-    for evidence in evidences:
-        yield separator
-        yield from evidence
-
-def query(graph : Graph, index : Optional[int] = None, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> Iterable[str]:
+def query(graph : Graph, index : Optional[int] = None, force_target = None) -> Iterable[str]:
     # get the atoms for the hypothesis
     def atoms():
-        for p in graph.smokes(True, index=index, avoid_classification_target=avoid_target_smokes):
+        for p in graph.smokes(True, index=index):
             yield f"smokes({p})"
-        for p in graph.smokes(False, index=index, avoid_classification_target=avoid_target_smokes):
+        for p in graph.smokes(False, index=index):
             yield f"\\+smokes({p})"
-        for p in graph.asthma(True, index=index, avoid_classification_target=avoid_target_asthma):
+        for p in graph.asthma(True, index=index, force_target=force_target):
             yield f"asthma({p})"
-        for p in graph.asthma(False, index=index, avoid_classification_target=avoid_target_asthma):
+        for p in graph.asthma(False, index=index, force_target=force_target):
             yield f"\\+asthma({p})"
     
     yield f"q <- {', '.join(atoms())}."
     yield "query(q)."
 
-def asthma_conditional(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
-    for p in graph.smokes(True, index=index):
-        yield f"smokes({p})."
-    for p in graph.smokes(False, index=index):
-        yield f"\\+smokes({p})."
-    for p in graph.asthma(True, index=index, avoid_classification_target=True):
-        yield f"asthma({p})."
-    for p in graph.asthma(False, index=index, avoid_classification_target=True):
-        yield f"\\+asthma({p})."
+def source(parameterization, train=True):
+    if train:
+        items = {k : f"t({v})" for k, v in parameterization.items()}
+    else:
+        items = dict(parameterization.items())
+    return SOURCE.format(**items)
 
-    yield f"q <- asthma({graph.classification_target_symbol(index=index)})."
-    yield "query(q)."
+def structure(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
+    for p in graph.people(index=index):
+        yield f"person({p})."
+    for p, q in graph.friends(index=index):
+        yield f"friend({p}, {q})."
 
-def smoking_conditional(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
-    for p in graph.smokes(True, index=index, avoid_classification_target=True):
-        yield f"smokes({p})."
-    for p in graph.smokes(False, index=index, avoid_classification_target=True):
-        yield f"\\+smokes({p})."
-    for p in graph.asthma(True, index=index):
-        yield f"asthma({p})."
-    for p in graph.asthma(False, index=index):
-        yield f"\\+asthma({p})."
+class ProblogModel:
+    def __init__(self):
+        self._parameterization = Parameterization(0.5, 0.5, 0.5, 0.5)
 
-    yield f"q <- smokes({graph.classification_target_symbol(index=index)})."
-    yield "query(q)."
+    def fit(self, train):
+        logger.info(f"Fitting Problog program to {len(train)} graphs.")
 
-def fit(*graphs : Graph) -> Parameterization:
-    """Uses Problog to fit a set of parameters to the given graphs.
+        # write the program
+        graph_structure = [structure(g, index=i) for i, g in enumerate(train)]
+        write(PROGRAM, chain([source(self._parameterization)], *graph_structure))
 
-    Parameters
-    ----------
-    *graphs : Graph
+        # and write the evidence
+        graph_evidence = [evidence(g, index=i) for i, g in enumerate(train)]
+        write(EVIDENCE, combine(*graph_evidence))
 
-    Returns
-    -------
-    Parameterization
-    """
+        # run the program
+        logger.info("Starting external Problog in lfi mode.")
+        args = ["problog", "lfi", PROGRAM, EVIDENCE, "-k", "sdd"]
+        result = run(args, capture_output=True, text=True)
+        logger.info("External Problog run complete.")
 
-    logger.info(f"Fitting Problog program to {len(graphs)} graphs.")
-
-    # write the program
-    graph_structure = [structure(g, index=i) for i, g in enumerate(graphs)]
-    write(PROGRAM, chain(FIT_TEMPLATE, *graph_structure))
-
-    # and write the evidence
-    graph_evidence = [evidence(g, index=i) for i, g in enumerate(graphs)]
-    write(EVIDENCE, combine(*graph_evidence))
-
-    # run the program
-    logger.info(f"Starting external Problog in lfi mode.")
-    args = ["problog", "lfi", PROGRAM, EVIDENCE, "-k", "sdd"]
-    result = run(args, capture_output=True, text=True)
-    logger.info(f"External Problog run complete.")
-
-    # parse the results
-    raw_result = result.stdout.split()
+        # parse the results
+        raw_result = result.stdout.split()
+        print(raw_result)
     
-    # make sure nothing went wrong
-    if result.stderr:
-        logger.warning(f"Problog run failed with output: {result.stderr}")
+        # make sure nothing went wrong
+        if result.stderr:
+            logger.warning(f"Problog run failed with output: {result.stderr}")
 
-    # probably worth logging
-    log_likelihood = float(raw_result[-10]) # log-likelihood
-    steps = int(raw_result[-1]) # steps
+        # probably worth logging
+        log_likelihood = float(raw_result[-10]) # log-likelihood
+        steps = int(raw_result[-1]) # steps
 
-    logger.info(f"Training set log-likelihood of {log_likelihood:3f} achieved with {steps} EM steps.")
+        logger.info(f"Training set log-likelihood of {log_likelihood:3f} achieved with {steps} EM steps.")
 
-    # extracting the parameters from the split is very manual
-    parameter_values = [float(p) for p in " ".join(raw_result[-9:-5])[1:-1].split(", ")] # I'm sorry
-    parameter_names = ["stress", "spontaneous", "comorbid", "influence"]
-    parameters = Parameterization(**dict(zip(parameter_names, parameter_values)))
-    logger.info(f"Resulting parameterization: {parameters}")
+        # extracting the parameters from the split is very manual
+        parameter_values = [float(p) for p in " ".join(raw_result[-9:-5])[1:-1].split(", ")] # I'm sorry
+        parameter_names = ["stress", "spontaneous", "comorbid", "influence"]
+        self._parameterization = Parameterization(**dict(zip(parameter_names, parameter_values)))
 
-    return parameters
+        return log_likelihood / len(train), steps
+    
+    def log_likelihood(self, example, force_target = None):
+        # construct the program from p
+        write(PROGRAM, chain(
+            [source(self._parameterization, train=False)],
+            structure(example),
+            query(example, force_target=force_target)
+        ))
 
-def log_likelihood(p : Parameterization, graph : Graph, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> float:
-    """Compute log-likelihood of provided observation.
+        # run the program
+        logger.info("Starting external Problog in inference mode.")
+        args = ["problog", PROGRAM, "--knowledge", "sdd"]
+        result = run(args, capture_output=True, text=True)
+        logger.info("External Problog run complete.")
 
-    Parameters
-    ----------
-    p : Parameterization
-    graph : Graph
+        # make sure nothing went wrong
+        if result.stderr:
+            logger.warning(f"Problog run failed with output: {result.stderr}")
 
-    Returns
-    -------
-    float
-    """
-    logger.info(f"Evaluating likelihood of {graph} with parameters {p}.")
+        # and capture the raw results
+        try:
+            log_likelihood = log(float(result.stdout.split()[-1]))
+        except ValueError:
+            log_likelihood = float("-inf")
+        logger.info(f"Log-likelihood: {log_likelihood:3f}")
 
-    # construct the program from p
-    write(PROGRAM, chain(
-        marginal_program(p),
-        structure(graph),
-        query(graph, avoid_target_smokes=avoid_target_smokes, avoid_target_asthma=avoid_target_asthma)
-    ))
+        return log_likelihood
 
-    # run the program
-    logger.info(f"Starting external Problog in inference mode.")
-    args = ["problog", PROGRAM, "--knowledge", "sdd"]
-    result = run(args, capture_output=True, text=True)
-    logger.info(f"External Problog run complete.")
-
-    # make sure nothing went wrong
-    if result.stderr:
-        logger.warning(f"Problog run failed with output: {result.stderr}")
-
-    # and capture the raw results
-    log_likelihood = log(float(result.stdout.split()[-1]))
-    logger.info(f"Log-likelihood: {log_likelihood:3f}")
-
-    return log_likelihood
-
-def classify_asthma(p : Parameterization, graph : Graph):
-    """Compute confidence that the classification target in the provided graph has asthma.
-
-    Problog has limited support for conditionals, so we use Bayes Rule to compute p(x | y)  = p(x, y) / p(y).
-
-    Parameters
-    ----------
-    p : Parameterization
-    graph : Graph
-
-    Returns
-    -------
-    Tuple[float, float]
-    """
-    logger.info(f"Evaluating asthma classification confidence of {graph} with parameters {p}.")
-
-    # evaluate the joint first
-    logger.info("Computing the joint.")
-    joint_log_likelihood = log_likelihood(p, graph)
-    logger.info(f"Joint log-likelihood: {joint_log_likelihood}")
-
-    # then the prior
-    logger.info("Computing the prior.")
-    prior_log_likelihood = log_likelihood(p, graph, avoid_target_asthma=True)
-    logger.info(f"Prior log-likelihood: {prior_log_likelihood}")
-
-    # gt class confidence easily deduced
-    confidence = exp(joint_log_likelihood - prior_log_likelihood)
-
-    # get the gt and reframe confidence (if needed)
-    (confidence, gt) = (confidence, 1.0) if graph.classification_target_asthma() else (1 - confidence, 0.0)
-    logger.info(f"Classification confidence/gt: {confidence}/{gt}")
-
-    return (confidence, gt)
+    def classification_task(self, example):
+        asthma = self.log_likelihood(example, force_target=True)
+        not_asthma = self.log_likelihood(example, force_target=False)
+        if asthma >= not_asthma:
+            confidence = 1.0
+        else:
+            confidence = 0.0
+        return confidence, example.target_classification()

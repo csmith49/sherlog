@@ -63,3 +63,5 @@ val is_resolved : t -> bool
 
 val pp : t Fmt.t
 (** pretty printer for proofs *)
+
+val weak_compare : t -> t -> int

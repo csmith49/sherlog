@@ -3,7 +3,7 @@ from .interface import console
 from . import logs
 from .tooling import instrumentation
 from .program import load
-from .inference import Optimizer, minibatch
+from .inference import Optimizer, minibatch, Batch
 from torch.optim import SGD, Adam
 from rich.progress import track
 
@@ -47,18 +47,21 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
         "samples" : samples
     })
 
-    for batch in minibatch(evidence, batch_size, epochs=epochs):
-        with optimizer as o:
-            o.maximize(batch.objective(program, samples=samples))
+    for epoch in range(epochs):
+        for batch in minibatch(evidence, batch_size):
+            with optimizer as o:
+                batch = Batch(batch)
+                o.maximize(batch.objective(program, samples=samples))
 
-        if batch.index % resolution == 0:
-            log = {"epoch" : batch.index}
+        if epoch % resolution == 0:
+            log = {"epoch" : epoch}
             for k, v in program.parameter_map.items():
                 log[k] = v
                 log[f"{k} grad"] = v.grad
             instrumenter.emit(**log)
 
-    if instrument: instrumenter.flush()
+    if instrument:
+        instrumenter.flush()
 
     # print the values of the learned parameters
     console.print("MLE Results")

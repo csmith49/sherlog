@@ -1,15 +1,17 @@
-from . import problog_interface, sherlog_interface, default_parameterization, dict_product
+from json import dumps
+from statistics import mean
+import click
+
 from sherlog.logs import enable, get_external
 from sherlog import console
-from sherlog.tooling.instrumentation import seed
-from json import dumps
-from typing import Optional
-import click
+from sherlog.tooling.instrumentation import seed, Timer
+from . import ProblogModel, SherlogModel, sample
 
 logger = get_external("smokers")
 
 @click.group()
-def cli(): pass
+def cli():
+    pass
 
 @cli.command()
 @click.option("-l", "--log", type=str,
@@ -22,139 +24,137 @@ def cli(): pass
     help="Size of the test set.")
 @click.option("-v", "--verbose", is_flag=True,
     help="Enable verbose output with Sherlog's logging interface.")
-@click.option("-t", "--tool", default="problog",
-    type=click.Choice(["problog", "sherlog"], case_sensitive=False),
-    help="Tool to be evaluated.")
-def evaluate(log, size, train, test, verbose, tool):
-    """Evaluate a tool on the classic Smokers benchmark."""
-    
-    if verbose: enable("smokers")
+@click.option("-e", "--epochs", type=int, default=1)
+@click.option("-r", "--learning-rate", type=float, default=0.01)
+@click.option("-c", "--convergence", is_flag=True)
+def sherlog(log, size, train, test, verbose, epochs, learning_rate, convergence):
+    """Evaluate Sherlog on the classic Smokers benchmark."""
+    if verbose:
+        enable("smokers")
 
-    # select the correct interface
-    logger.info(f"Loading the {tool} interface.")
-    interface = {
-        "problog" : problog_interface,
-        "sherlog" : sherlog_interface
-    }[tool]
+    model = SherlogModel()
+    timer = Timer()
 
-    # train
-    logger.info(f"Training with {train} samples...")
-    training_time = interface.fit(train, graph_size=size)
+    logger.info(f"Starting training with {train} samples...")
+    with timer:
+        if convergence:
+            x, y = list(sample(train, size=size)), list(sample(test, size=size))
+            training_lls = model.fit(x, y, epochs=epochs, learning_rate=learning_rate)
+        else:
+            x = list(sample(train, size=size))
+            training_lls = model.fit(x, epochs=epochs, learning_rate=learning_rate)
+    training_time = timer.elapsed
     logger.info(f"Training completed in {training_time} seconds.")
 
-    # evaluate
-    logger.info(f"Evaluating the average log-likelihood with {test} samples...")
-    avg_ll, avg_ll_time = interface.average_log_likelihood(test, graph_size=size)
-    logger.info(f"Evaluation complete: average log-likelihood of {avg_ll} with average marginal time of {avg_ll_time} seconds.")
+    logger.info(f"Evaluating average LL with {test} samples...")
+    results = []
+    for example in sample(test, size=size):
+        with timer:
+            ll = model.log_likelihood(example)
+        results.append( (ll, timer.elapsed) )
+    lls, times = zip(*results)
+    avg_ll, avg_ll_time = mean(lls), mean(times)
+    logger.info(f"Evaluation completed in {avg_ll_time * test} seconds. Resulting avg. LL: {avg_ll}.")
 
-    # test classification performance
-    logger.info(f"Evaluating the asthma prediction accuracy with {test} samples...")
-    accuracy, avg_class_time = interface.classification_accuracy(test, graph_size=size)
-    logger.info(f"Evaluation complete: accuracy of {accuracy} with average classification time of {avg_class_time} seconds.")
+    logger.info(f"Testing predictive performance with {test} samples...")
+    results = []
+    for example in sample(test, size=size):
+        with timer:
+            confidence, ground_truth = model.classification_task(example)
+            score = 1.0 if confidence == ground_truth else 0.0
+        results.append( (score, timer.elapsed) )
+    scores, times = zip(*results)
+    accuracy, avg_class_time = mean(scores), mean(times)
+    logger.info(f"Evaluation completed: accuracy of {accuracy} with avg. time of {avg_class_time} seconds.")
 
-    # collate the results
     result = {
         "seed" : seed(),
-        "tool" : tool,
         "train" : train,
         "test" : test,
+        "tool" : "sherlog",
         "graph_size" : size,
+        "epochs" : epochs,
+        "learning_rate" : learning_rate,
         "training_time" : training_time,
         "average_log_likelihood" : avg_ll,
         "average_log_likelihood_time" : avg_ll_time,
-        "gt_stress" : default_parameterization.stress,
-        "stress" : interface._parameterization.stress,
-        "gt_comorbid" : default_parameterization.comorbid,
-        "comorbid" : interface._parameterization.comorbid,
-        "gt_spontaneous" : default_parameterization.spontaneous,
-        "spontaneous" : interface._parameterization.spontaneous,
-        "gt_influence" : default_parameterization.influence,
-        "influence" : interface._parameterization.influence,
         "accuracy" : accuracy,
-        "average_classification_time" : avg_class_time
+        "average_classification_time" : avg_class_time,
+        "training_log_likelihood" : training_lls
     }
 
-    # if a log file is given, append the results
     if log is not None:
         with open(log, 'a') as f:
             f.write(dumps(result))
-    
+
     console.print(result)
 
 @cli.command()
 @click.option("-l", "--log", type=str,
     help="JSONL file to append results to.")
-@click.option("-v", "--verbose", is_flag=True,
-    help="Enables verbose output using Sherlog's logging interface.")
-@click.option("--train", type=int, default=10,
+@click.option("-s", "--size", type=int,
+    help="Size of social graphs; random if not provided.")
+@click.option("--train", type=int, default=100,
     help="Size of the training set.")
-@click.option("--test", type=int, default=10,
+@click.option("--test", type=int, default=100,
     help="Size of the test set.")
-def tune(log, verbose, train, test):
-    """Evaluate Sherlog on a broad range of hyperparameters."""
+@click.option("-v", "--verbose", is_flag=True,
+    help="Enable verbose output with Sherlog's logging interface.")
+def problog(log, size, train, test, verbose):
+    """Evaluate Problog on the classic Smokers benchmark."""
+    if verbose:
+        enable("smokers")
 
-    if verbose: enable("smokers")
+    model = ProblogModel()
+    timer = Timer()
 
-    # load the sherlog interface
-    logger.info(f"Loading the interface.")
-    interface = sherlog_interface
+    logger.info(f"Starting training with {train} samples...")
+    with timer:
+        training_ll, em_steps = model.fit(list(sample(train, size=size)))
+    training_time = timer.elapsed
+    logger.info(f"Training completed in {training_time} seconds.")
 
-    # set up the hyperparameters to search through
-    kwargs_gen = dict_product(
-        epochs=[1, 10, 50],
-        learning_rate=[1.0, 0.1, 0.01],
-        explanations=[1, 10, 100],
-        samples=[1, 10, 100, 1000],
-        width=[1, 10, 100],
-        depth=[10, 50, 100],
-        attempts=[1, 50, 100],
-        seeds=[1, 10, 100],
-        graph_size=[3, 5, 10]
-    )
+    logger.info(f"Evaluating average LL with {test} samples...")
+    results = []
+    for example in sample(test, size=size):
+        with timer:
+            ll = model.log_likelihood(example)
+        results.append( (ll, timer.elapsed) )
+    lls, times = zip(*results)
+    avg_ll, avg_ll_time = mean(lls), mean(times)
+    logger.info(f"Evaluation completed in {avg_ll_time * test} seconds. Resulting avg. LL: {avg_ll}.")
 
-    for kwargs in kwargs_gen:
-        logger.info(f"Starting tuning run with parameterization: {kwargs}")
-        logger.info(f"Training with {train} samples...")
-        training_time = interface.fit(train, graph_size=kwargs["graph_size"], fit_kwargs=kwargs)
-        logger.info(f"Training completed in {training_time} seconds.")
+    logger.info(f"Testing predictive performance with {test} samples...")
+    results = []
+    for example in sample(test, size=size):
+        with timer:
+            confidence, ground_truth = model.classification_task(example)
+            score = 1.0 if confidence == ground_truth else 0.0
+        results.append( (score, timer.elapsed) )
+    scores, times = zip(*results)
+    accuracy, avg_class_time = mean(scores), mean(times)
+    logger.info(f"Evaluation completed: accuracy of {accuracy} with avg. time of {avg_class_time} seconds.")
 
-        # evaluate
-        logger.info(f"Evaluating the average log-likelihood with {test} samples...")
-        avg_ll, avg_ll_time = interface.average_log_likelihood(test, graph_size=kwargs["graph_size"], ll_kwargs=kwargs)
-        logger.info(f"Evaluation complete: average log-likelihood of {avg_ll} with average marginal time of {avg_ll_time} seconds.")
+    result = {
+        "seed" : seed(),
+        "train" : train,
+        "test" : test,
+        "tool" : "problog",
+        "graph_size" : size,
+        "training_time" : training_time,
+        "average_log_likelihood" : avg_ll,
+        "average_log_likelihood_time" : avg_ll_time,
+        "accuracy" : accuracy,
+        "average_classification_time" : avg_class_time,
+        "training_log_likelihood" : training_ll,
+        "em_steps" : em_steps
+    }
 
-        # test classification performance
-        logger.info(f"Evaluating the asthma prediction accuracy with {test} samples...")
-        accuracy, avg_class_time = interface.classification_accuracy(test, graph_size=kwargs["graph_size"], class_kwargs=kwargs)
-        logger.info(f"Evaluation complete: accuracy of {accuracy} with average classification time of {avg_class_time} seconds.")
+    if log is not None:
+        with open(log, 'a') as f:
+            f.write(dumps(result))
 
-        # collate the results
-        result = {
-            "seed" : seed(),
-            "train" : train,
-            "test" : test,
-            "training_time" : training_time,
-            "average_log_likelihood" : avg_ll,
-            "average_log_likelihood_time" : avg_ll_time,
-            "gt_stress" : default_parameterization.stress,
-            "stress" : interface._parameterization.stress,
-            "gt_comorbid" : default_parameterization.comorbid,
-            "comorbid" : interface._parameterization.comorbid,
-            "gt_spontaneous" : default_parameterization.spontaneous,
-            "spontaneous" : interface._parameterization.spontaneous,
-            "gt_influence" : default_parameterization.influence,
-            "influence" : interface._parameterization.influence,
-            "accuracy" : accuracy,
-            "average_classification_time" : avg_class_time
-        }
-        result.update(kwargs)
-
-        console.print(result)
-
-        # if a log file is given, append the results
-        if log is not None:
-            with open(log, 'a') as f:
-                f.write(f"{dumps(result)}\n")
+    console.print(result)
 
 if __name__ == "__main__":
     cli()

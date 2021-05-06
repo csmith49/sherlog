@@ -10,8 +10,9 @@ from itertools import cycle, islice, chain, repeat, zip_longest
 def minibatch(evidence : List[Evidence], batch_size : int):
     shuffle(evidence)
     args = [iter(evidence)] * batch_size
-    return zip_longest(*args, fillvalue=None)
-    
+    for batch in zip_longest(*args, fillvalue=None):
+        yield filter(lambda x: x is not None, batch)
+
 T = TypeVar('T')
 
 def namespace_minibatch(data : Iterable[T], batch_size : int, to_evidence, to_namespace, epochs : int = 1):

@@ -1,238 +1,122 @@
-from .graph import Graph, Parameterization
+from .data import Graph
 from typing import Iterable, Optional
 from itertools import chain
 from math import log, exp
+from statistics import mean
 from sherlog.logs import get_external
 from sherlog.program import loads
-from sherlog.inference import Optimizer, minibatch
+from sherlog.inference import Optimizer, minibatch, Batch
 from torch.optim import SGD
 import torch
 
 logger = get_external("smokers.sherlog")
 
-FIT_TEMPLATE = [
-    # parameters
-    "!parameter stress : unit.",
-    "!parameter spontaneous : unit.",
-    "!parameter comorbid : unit.",
-    "!parameter influence : unit.",
-    # probabilistic rules
-    "stress :: stress(X) <- person(X).",
-    "spontaneous :: asthma_latent(X) <- person(X).",
-    "comorbid :: asthma_smokes(X) <- person(X).",
-    "influence :: influence(X, Y) <- friend(X, Y).",
-    # logical rules
-    "smokes(X) <- stress(X).",
-    "smokes(X) <- influences(X, Y), smokes(Y).",
-    "asthma(X) <- asthma_latent(X).",
-    "asthma(X) <- smokes(X), asthma_smokes(X).",
-    # ontological rules
-    "!dependency smokes(X) | not_smokes(X) <- person(X).",
-    "!dependency asthma(X) | not_asthma(X) <- person(X).",
-    "!constraint smokes(X), not_smokes(X).",
-    "!constraint asthma(X), not_asthma(X)."
-]
+SOURCE = """
+# probabilistic rules
+stress :: stress(X) <- person(X).
+spontaneous :: asthma(X) <- person(X).
+comorbid :: asthma(X) <- smokes(X).
+influence :: influence(X, Y) <- friend(X, Y).
 
-def marginal_program(p : Parameterization) -> Iterable[str]:
-    yield from [
-        # probabilistic rules
-        f"{p.stress} :: stress(X) <- person(X).",
-        f"{p.spontaneous} :: asthma_latent(X) <- person(X).",
-        f"{p.comorbid} :: asthma_smokes(X) <- person(X).",
-        f"{p.influence} :: influence(X, Y) <- friend(X, Y).",
-        # logical rules
-        "smokes(X) <- stress(X).",
-        "smokes(X) <- influences(X, Y), smokes(Y).",
-        "asthma(X) <- asthma_latent(X).",
-        "asthma(X) <- smokes(X), asthma_smokes(X).",
-        # ontological rules
-        "!dependency smokes(X) | not_smokes(X) <- person(X).",
-        "!dependency asthma(X) | not_asthma(X) <- person(X).",
-        "!constraint smokes(X), not_smokes(X).",
-        "!constraint asthma(X), not_asthma(X)."
-    ]
+# logical rules
+smokes(X) <- stress(X).
+smokes(X) <- influence(X, Y), smokes(Y).
 
-def structure(graph : Graph, index : Optional[int] = None) -> Iterable[str]:
-    for p in graph.people(index=index):
-        yield f"person({p})."
-    for p, q in graph.friends(index=index):
-        yield f"friend({p}, {q})."
+# ontological rules
+!dependency smokes(X) | not_smokes(X) <- person(X).
+!constraint smokes(X), not_smokes(X).
+!dependency asthma(X) | not_asthma(X) <- person(X).
+!constraint asthma(X), not_asthma(X).
+"""
 
-def evidence_atoms(graph : Graph, index : Optional[int] = None, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False) -> Iterable[str]:
-    def atoms():
-        for p in graph.smokes(True, index=index, avoid_classification_target=avoid_target_smokes):
-            yield f"smokes({p})"
-        for p in graph.smokes(False, index=index, avoid_classification_target=avoid_target_smokes):
-            yield f"not_smokes({p})"
-        for p in graph.asthma(True, index=index, avoid_classification_target=avoid_target_asthma):
-            yield f"asthma({p})"
-        for p in graph.asthma(False, index=index, avoid_classification_target=avoid_target_asthma):
-            yield f"not_asthma({p})"
-    yield f"!evidence {', '.join(atoms())}."
+def translate_graph(graph, force_target=None):
+    # compute the structure
+    people = [f"person({p})." for p in graph.people()]
+    friends = [f"friend({s}, {d})." for (s, d) in graph.friends()]
 
-def fit(*graphs : Graph,
-    epochs : int = 10,
-    learning_rate : float = 0.01,
-    explanations : int = 1,
-    samples : int = 1,
-    attempts : int = 100,
-    seeds : int = 1,
-    width : Optional[int] = None,
-    depth : Optional[int] = None,
-    **kwargs) -> Parameterization:
-    """Uses Sherlog to fit a set of parameters to the given graphs.
+    structure = '\n'.join(chain(people, friends))
 
-    Parameters
-    ----------
-    *graphs : Graph
-    
-    **kwargs
+    # provide observables as evidence
+    smokes = [f"smokes({p})" for p in graph.smokes(True)]
+    not_smokes = [f"not_smokes({p})" for p in graph.smokes(False)]
+    asthma = [f"asthma({p})" for p in graph.asthma(True, force_target=force_target)]
+    not_asthma = [f"not_asthma({p})" for p in graph.asthma(False, force_target=force_target)]
 
-    Returns
-    -------
-    Parameterization
-    """
+    evidence = f"!evidence {', '.join(chain(smokes, not_smokes, asthma, not_asthma))}."
 
-    logger.info(f"Fitting Sherlog program to {len(graphs)} graphs.")
+    result = f"{SOURCE}\n{structure}\n{evidence}"
+    return result
 
-    # build the program
-    graph_structure = [structure(g, index=i) for i, g in enumerate(graphs)]
-    graph_evidence = [evidence_atoms(g, index=i) for i, g in enumerate(graphs)]
+class SherlogModel:
+    def __init__(self):
+        self._stress = torch.tensor(0.5, requires_grad=True)
+        self._spontaneous = torch.tensor(0.5, requires_grad=True)
+        self._comorbid = torch.tensor(0.5, requires_grad=True)
+        self._influence = torch.tensor(0.5, requires_grad=True)
 
-    program_source = '\n'.join(chain(
-        FIT_TEMPLATE,
-        *chain(graph_structure),
-        *chain(graph_evidence)
-    ))
-    
-    logger.info("Parsing the program.")
-    program, evidence = loads(program_source)
+        self._namespace = {
+            "stress" : self._stress,
+            "spontaneous" : self._spontaneous,
+            "comorbid" : self._comorbid,
+            "influence" : self._influence
+        }
 
-    # run the program
-    optimizer = Optimizer(program, optimizer="sgd", learning_rate=learning_rate)
-    logger.info(f"Starting training with: lr={learning_rate}, epochs={epochs}, samples={samples}")
+    def parameters(self):
+        yield from self._namespace.values()
 
-    for batch in minibatch(evidence, 10, epochs=epochs):
-        logger.info(f"Learning epoch {batch.index + 1} / {epochs}.")
-        with optimizer as o:
-            o.maximize(batch.objective(program,
-                explanations=explanations,
-                samples=samples,
-                width=width,
-                depth=depth,
-                attempts=attempts,
-                seeds=seeds
-            ))
+    def clamp(self):
+        with torch.no_grad():
+            for value in self._namespace.values():
+                value.clamp_(0, 1)
 
-    # and extract the parameters
-    parameterization = Parameterization(**{k : v.item() for k, v in program.parameter_map.items()})
-    logger.info(f"Resulting parameterization: {parameterization}")
+    def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 10, **kwargs):
+        # do everything manually for now
+        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
+        lls = {}
 
-    return parameterization
+        for epoch in range(epochs):
+            logger.info(f"Starting epoch {epoch}...")
+            for batch in minibatch(train, batch_size):
+                optimizer.zero_grad()
+                objective = torch.tensor(0.0)
 
-def log_likelihood(p : Parameterization, graph : Graph, avoid_target_smokes : bool = False, avoid_target_asthma : bool = False,
-    explanations : int = 1,
-    samples : int = 1,
-    attempts : int = 100,
-    seeds : int = 1,
-    width : Optional[int] = None,
-    depth : Optional[int] = None,
-    **kwargs) -> float:
-    """Compute log-likelihood of provided observation.
+                for graph in batch:
+                    logger.info("Translating graph...")
+                    program, evidence = loads(translate_graph(graph), namespace=self._namespace)
+                    logger.info("Program built...")
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=100, width=10, depth=100, **kwargs).log()
+                    logger.info(f"Log-likelihood: {log_likelihood}")
+                    # make sure gradients exist
+                    is_nan = torch.isnan(log_likelihood).any()
+                    is_inf = torch.isinf(log_likelihood).any()
+                    if not is_nan and not is_inf:
+                        objective -= log_likelihood
 
-    Parameters
-    ----------
-    p : Parameterization
-    graph : Graph
+                objective.backward()
+                optimizer.step()
+                self.clamp()
 
-    avoid_target_smokes : bool (default=False)
-    avoid_target_asthma : bool (default=False)
+            if test is not None:
+                lls[epoch] = self.average_log_likelihood(test, explanations=1, samples=100, width=50, depth=100)
+                logger.info(f"Epoch {epoch} LL: {lls[epoch]}")
 
-    Returns
-    -------
-    float
-    """
+        return lls
 
-    logger.info(f"Evaluating likelihood of {graph} with parameters {p}.")
-    
-    # build the program
-    program_source = '\n'.join(chain(
-        marginal_program(p),
-        structure(graph),
-        evidence_atoms(graph, avoid_target_smokes=avoid_target_smokes, avoid_target_asthma=avoid_target_asthma)
-    ))
+    def average_log_likelihood(self, test, explanations : int = 10, samples : int = 500, **kwargs):
+        lls = []
+        for graph in test:
+            lls.append(self.log_likelihood(graph, explanations=explanations, samples=samples, **kwargs))
+        return mean(lls)
 
-    logger.info("Parsing the program.")
-    program, evidence = loads(program_source)
+    def log_likelihood(self, example, explanations : int = 10, samples : int = 1000, force_target = None, **kwargs):
+        program, evidence = loads(translate_graph(example, force_target=force_target), namespace=self._namespace)
+        return program.likelihood(evidence[0], explanations=explanations, samples=samples, **kwargs).log().item()
 
-    # evaluate the log-likelihood
-    logger.info(f"Computing the marginal with {explanations} stories and {samples} samples.")
-    marginals = [program.likelihood(ev,
-        explanations=explanations,
-        samples=samples,
-        width=width,
-        depth=depth,
-        seeds=seeds,
-        attempts=attempts
-    ) for ev in evidence]
-    log_likelihood = torch.stack(marginals).log().sum().item()
-    logger.info(f"Log-likelihood: {log_likelihood:3f}")
-    
-    return log_likelihood
-
-def classify_asthma(p : Parameterization, graph : Graph, 
-    explanations : int = 1,
-    samples : int = 1,
-    attempts : int = 100,
-    seeds : int = 1,
-    width : Optional[int] = None,
-    depth : Optional[int] = None,
-    **kwargs):
-    """Compute confidence thta the classification target in the provided graph has asthma.
-
-    Sherlog has limited support for conditionals, so we use Bayes Rule to compute p(x | y) = p(x, y) / p(y).
-
-    Parameters
-    ----------
-    p : Parameterization
-    graph : Graph
-
-    Returns
-    -------
-    Tuple[float, float]
-    """
-
-    logger.info(f"Evaluating asthma classification confidence of {graph} with parameters {p}.")
-
-    # evaluate the joint first
-    logger.info("Computing the joint.")
-    joint_log_likelihood = log_likelihood(p, graph,
-        explanations=explanations,
-        samples=samples,
-        attempts=attempts,
-        seeds=seeds,
-        width=width,
-        depth=depth
-    )
-    logger.info(f"Joint log-likelihood: {joint_log_likelihood}")
-
-    # then the prior
-    logger.info("Computing the prior.")
-    prior_log_likelihood = log_likelihood(p, graph, avoid_target_asthma=True,
-        explanations=explanations,
-        samples=samples,
-        attempts=attempts,
-        seeds=seeds,
-        width=width,
-        depth=depth
-    )
-    logger.info(f"Prior log-likelihood: {prior_log_likelihood}")
-
-    # gt class confidence easily deduced
-    confidence = exp(joint_log_likelihood - prior_log_likelihood)
-
-    # get the gt and reframe confidence (if needed)
-    (confidence, gt) = (confidence, 1.0) if graph.classification_target_asthma() else (1 - confidence, 0.0)
-    logger.info(f"Classification confidence/gt: {confidence}/{gt}")
-
-    return (confidence, gt)
+    def classification_task(self, example, **kwargs):
+        asthma = self.log_likelihood(example, force_target=True, **kwargs)
+        not_asthma = self.log_likelihood(example, force_target=False, **kwargs)
+        if asthma >= not_asthma:
+            confidence = 1.0
+        else:
+            confidence = 0.0
+        return confidence, example.target_classification()

@@ -1,4 +1,4 @@
-# Sherlog.Interface
+"""Sherlog.Interface"""
 
 from .socket import connect
 from ..config import PORT
@@ -68,11 +68,18 @@ def query(program, query, depth=None, width=None, seeds=None):
     }
 
     # build the extra config tags
-    if depth: message["depth"] = depth
-    if width: message["width"] = width
-    if seeds: message["seeds"] = seeds
+    if depth:
+        message["depth"] = depth
+    if width:
+        message["width"] = width
+    if seeds:
+        message["seeds"] = seeds
 
     # send and rec
     response = SOCKET.communicate(message)
-    if response == "failure": raise CommunicationError()
-    return response
+    if response == "failure":
+        raise CommunicationError()
+    elif response == "timeout":
+        raise TimeoutError()
+    else:
+        return response

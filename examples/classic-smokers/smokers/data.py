@@ -1,8 +1,8 @@
+from typing import Iterable, Tuple, Optional
+from random import random
+from networkx import DiGraph
 from networkx.generators.directed import scale_free_graph
 from networkx.algorithms.traversal import dfs_preorder_nodes
-from networkx import DiGraph
-from random import random
-from typing import Iterable, Tuple, Mapping, Set, Union, Optional
 
 # UTILITY
 
@@ -30,6 +30,14 @@ class Parameterization:
     comorbid : float
     influence : float
 
+    def items(self):
+        return {
+            "stress" : self.stress,
+            "spontaneous" : self.spontaneous,
+            "comorbid" : self.comorbid,
+            "influence" : self.influence
+        }.items()
+
     def label(self, nodes : Iterable[int], edges : Iterable[Tuple[int, int]]):
         """Construct intensional labels for a provided set of nodes and edges.
 
@@ -46,12 +54,16 @@ class Parameterization:
         }
 
         for node in nodes:
-            if flip(self.stress): mapping["stress"].add(node)
-            if flip(self.spontaneous): mapping["spontaneous"].add(node)
-            if flip(self.comorbid): mapping["comorbid"].add(node)
+            if flip(self.stress):
+                mapping["stress"].add(node)
+            if flip(self.spontaneous):
+                mapping["spontaneous"].add(node)
+            if flip(self.comorbid):
+                mapping["comorbid"].add(node)
 
         for edge in edges:
-            if flip(self.influence): mapping["influence"].add(edge)
+            if flip(self.influence):
+                mapping["influence"].add(edge)
 
         return mapping
 
@@ -129,14 +141,13 @@ class Graph:
                 self._symbol(d, index=index)
             )
 
-    def smokes(self, value : bool, index : Optional[int] = None, avoid_classification_target : bool = False) -> Iterable[str]:
+    def smokes(self, value : bool, index : Optional[int] = None) -> Iterable[str]:
         """Yields all symbols whose smoking truthiness matches the provided value.
 
         Parameters
         ----------
         value : bool
         index : Optional[int]
-        avoid_classification_target : bool (default=False)
         
         Returns
         -------
@@ -144,10 +155,9 @@ class Graph:
         """
         for node in self.nodes():
             if (node in self._smokes) == value:
-                if not avoid_classification_target or node != self._classification_target:
-                    yield self._symbol(node, index=index)
+                yield self._symbol(node, index=index)
 
-    def asthma(self, value : bool, index : Optional[int] = None, avoid_classification_target : bool = False) -> Iterable[str]:
+    def asthma(self, value : bool, index : Optional[int] = None, force_target : Optional[bool] = None) -> Iterable[str]:
         """Yields all symbols whose asthma truthiness matches the provided value.
 
         Parameters
@@ -162,8 +172,10 @@ class Graph:
         """
         for node in self.nodes():
             if (node in self._asthma) == value:
-                if not avoid_classification_target or node != self._classification_target:
+                if force_target is None or node != self._classification_target:
                     yield self._symbol(node, index=index)
+        if force_target is not None and force_target == value:
+            yield self._symbol(self._classification_target, index=index)
 
     def classification_target_symbol(self, index : Optional[int] = None) -> str:
         """The symbol for the classification target (with optional index).
@@ -178,11 +190,11 @@ class Graph:
         """
         return self._symbol(self._classification_target, index=index)
 
-    def classification_target_smoke(self) -> bool:
-        return self._classification_target in self._smokes
-    
-    def classification_target_asthma(self) -> bool:
-        return self._classification_target in self._asthma
+    def target_classification(self) -> bool:
+        if self._classification_target in self._asthma:
+            return 1.0
+        else:
+            return 0.0
 
 def reference_implementation(graph, mapping):
     """Reference implementation for deriving extensional labels for a social graph.
@@ -218,46 +230,3 @@ def reference_implementation(graph, mapping):
     asthma.update(smokes.intersection(mapping["comorbid"]))
 
     return smokes, asthma
-
-def to_sherlog(task):
-    """Convert a social graph with concrete observations to a Sherlog problem.
-
-    Parameters
-    ----------
-    task : Dict[str, Any]
-
-    Returns
-    -------
-    str
-    """
-    with open("./programs/smokers.sl", "r") as f:
-        source = f.read()
-    
-    graph_atoms, evidence = [], []
-
-    # convert nodes
-    for node in task["graph"]["nodes"]:
-        graph_atoms.append(f"person(p_{node}).")
-    
-    # convert edges
-    for (s, d) in task["graph"]["edges"]:
-        graph_atoms.append(f"friend(p_{s}, p_{d}).")
-
-    graph = '\n'.join(graph_atoms)
-
-    # convert observations to evidence
-    for observation in task["observations"]:
-        atoms = []
-        
-        for node in observation["smokes"]["true"]:
-            atoms.append(f"smokes(p_{node})")
-        for node in observation["smokes"]["false"]:
-            atoms.append(f"not_smokes(p_{node})")
-        for node in observation["asthma"]["true"]:
-            atoms.append(f"asthma(p_{node})")
-        for node in observation["asthma"]["false"]:
-            atoms.append(f"not_asthma(p_{node})")
-        
-        evidence.append(f"!evidence {', '.join(atoms)}.")
-    
-    return source + "\n\n" + graph + "\n\n" + '\n'.join(evidence)

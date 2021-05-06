@@ -1,9 +1,11 @@
 (* reference for argument parsing *)
 let port = ref 7999 (* default port, changeable via args *)
+let timeout = ref 3600 (* doesn't do anything atm - lwt requires cooperative threading, and sherlog isn't cooperating *)
 
 (* argument parsing *)
 let spec_list = [
     ("--port", Arg.Set_int port, "Port to host local server on");
+    ("--timeout", Arg.Set_int timeout, "Max time (in seconds) per query");
 ]
 let usage_msg = "Server for SherLog"
 let _ = Arg.parse spec_list print_endline usage_msg
@@ -38,5 +40,5 @@ let handler json = match JSON.Parse.(find string "command" json) with
 (* main *)
 let _ =
     let socket = Network.socket Network.local_address !port in
-    let server = Network.server handler socket in
+    let server = Network.server ~timeout:(float_of_int !timeout) handler socket in
     Network.run server

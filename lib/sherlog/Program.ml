@@ -50,30 +50,34 @@ module Filter = struct
 			|> CCList.length in
 		CCInt.equal num_intros num_unique_intros
 
-	let length l proofs = proofs
+	let length l proofs = 
+		proofs
 		|> CCList.filter (fun p -> (p |> Watson.Proof.witnesses |> CCList.length) <= l)
 	
 	let width w proofs =
 		if CCList.length proofs <= w then proofs else
 		let random_proofs = proofs
 			|> CCRandom.pick_list
-			|> CCRandom.sample_without_duplicates ~cmp:Stdlib.compare w in
+			|> CCList.replicate w
+			|> CCRandom.list_seq in
 		CCRandom.run random_proofs
 
 	let compose f g proofs = proofs |> f |> g
 	let (>>) f g = compose f g
 end
 
-let rec explore program expand filter worklist proven = match worklist with
+let rec explore program expand filter worklist proven =
+	match worklist with
 	| [] -> proven
 	| proof :: rest ->
 		if Watson.Proof.is_resolved proof then
 			let proven = proof :: proven in
 			explore program expand filter rest proven
-		else let proofs = proof
+		else
+			let proofs = proof
 				|> expand program
+				|> CCList.append rest
 				|> filter in
-			let proofs = proofs @ rest in
 			explore program expand filter proofs proven
 
 let prove program filter goal =

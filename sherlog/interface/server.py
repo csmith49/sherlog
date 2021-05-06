@@ -5,21 +5,23 @@ On import, starts an instance of `sherlog-server` on port `config.PORT`.
 Relies on `atexit` to terminate the server when this module goes out of scope.
 """
 
-from ..logs import get
-from subprocess import Popen
-from ..config import PORT
 import atexit
+from subprocess import Popen
+from ..logs import get
+from ..config import PORT, TIMEOUT
+
 
 logger = get("interface.server")
 
-SERVER_ARGS = ["sherlog-server", "--port", f"{PORT}"]
-logger.info(f"Starting translation server on port {PORT}...")
+SERVER_ARGS = ["sherlog-server", "--port", f"{PORT}", "--timeout", f"{TIMEOUT}"]
+logger.info("Starting translation server on port %i...", PORT)
 SERVER = Popen(SERVER_ARGS)
-logger.info(f"Translation port successfully started on port {PORT}.")
+logger.info("Translation port successfully started on port %i.", PORT)
 
 def close_server():
-    logger.info(f"Terminating the translation server...")
+    """Send the termination signal to the server."""
+    logger.info("Terminating the translation server...")
     SERVER.terminate()
-    logger.info(f"Translation server terminated.")
+    logger.info("Translation server terminated.")
 
 atexit.register(close_server)

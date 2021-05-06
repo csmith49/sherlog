@@ -1,7 +1,8 @@
-from .data import Graph
-from .sherlog import SherlogModel
 from typing import Optional, Iterable
 from random import randint
+
+from .data import Graph
+from .sherlog import SherlogModel
 
 def sample(quantity : int, size : Optional[int] = None) -> Iterable[Graph]:
     for _ in range(quantity):

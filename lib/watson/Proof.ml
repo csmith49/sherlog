@@ -138,3 +138,8 @@ let resolve proof rule = let open CCOpt in
 
 let pp ppf proof = let open Fmt in
     pf ppf "%a" (list ~sep:(any "@ => ") Witness.pp) (witnesses proof)
+
+let weak_compare left right =
+    let left = to_atoms left in
+    let right = to_atoms right in
+    CCList.compare Atom.compare left right

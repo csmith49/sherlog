@@ -83,7 +83,7 @@ class Program:
         -------
         Iterable[Explanation]
         """
-        logger.info(f"Sampling explanations for evidence {evidence}...")
+        logger.info("Sampling explanations for evidence %s...", evidence)
 
         # build the external evaluation context w/ namespaces
         if namespace:
@@ -94,14 +94,17 @@ class Program:
         # build the explanation generator
         def gen():
             for attempt in range(attempts):
-                logger.info(f"Starting explanation generation attempt {attempt}...")
-                for json in interface.query(self.program_source, evidence.json, width=width, depth=depth, seeds=seeds):
-                    logger.info("Explanation found.")
-                    yield Explanation.of_json(json, external=external)
+                logger.info("Starting explanation generation attempt %i...", attempt)
+                try:
+                    for json in interface.query(self.program_source, evidence.json, width=width, depth=depth, seeds=seeds):
+                        logger.info("Explanation found.")
+                        yield Explanation.of_json(json, external=external)
+                except TimeoutError:
+                    logger.warning("Explanation generation timed out. Restarting...")
         
         yield from islice(gen(), quantity)
 
-    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 1, width : int = 50, depth : int = 200, attempts : int = 100, seeds : int = 1, namespace = None):
+    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 100, width : int = 100, depth : int = 200, attempts : int = 100, seeds : int = 1, namespace = None):
         """Compute the marginal likelihood of the provided evidence.
 
         Parameters
