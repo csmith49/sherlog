@@ -57,9 +57,11 @@ class SherlogModel:
         optimizer = sherlog.inference.Optimizer(self._problem, optimizer="adam", learning_rate=learning_rate)
         
         # epochs here aren't really epochs - fix
-        for batch in sherlog.inference.minibatch(translate_examples(data), batch_size=batch_size, epochs=epochs):
-            with optimizer as o:
-                o.maximize(batch.objective(self._problem, explanations=3, samples=100, seeds=3))
+        for epoch in range(epochs):
+            for batch in sherlog.inference.minibatch(translate_examples(data), batch_size=batch_size):
+                with optimizer as o:
+                    batch = sherlog.inference.Batch(batch, index=epoch)
+                    o.maximize(batch.objective(self._problem, explanations=3, samples=100, seeds=3))
 
     def _ll(self, inputs : Iterable[int], outputs : Iterable[int], explanations : int, samples : int) -> float:
         """Compute the log-likelihood of the inputs being converted to the outputs.

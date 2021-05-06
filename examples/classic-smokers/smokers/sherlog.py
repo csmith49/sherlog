@@ -97,7 +97,7 @@ class SherlogModel:
                 self.clamp()
 
             if test is not None:
-                lls[epoch] = self.average_log_likelihood(test, explanations=1, samples=100, width=50, depth=100)
+                lls[epoch] = self.average_log_likelihood(test, explanations=10, samples=1000, width=50, depth=100)
                 logger.info(f"Epoch {epoch} LL: {lls[epoch]}")
 
         return lls
