@@ -25,7 +25,7 @@ def cli():
 @click.option("-v", "--verbose", is_flag=True,
     help="Enable verbose output with Sherlog's logging interface.")
 @click.option("-e", "--epochs", type=int, default=1)
-@click.option("-r", "--learning-rate", type=float, default=0.01)
+@click.option("-r", "--learning-rate", type=float, default=0.1)
 @click.option("-c", "--convergence", is_flag=True)
 def sherlog(log, size, train, test, verbose, epochs, learning_rate, convergence):
     """Evaluate Sherlog on the classic Smokers benchmark."""

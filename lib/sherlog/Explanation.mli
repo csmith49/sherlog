@@ -11,6 +11,8 @@ module Introduction : sig
 
     val tag : t -> Watson.Term.t list
 
+    val is_constrained : t -> bool
+
     val to_atom : t -> Watson.Atom.t
     val of_atom : Watson.Atom.t -> t option
 

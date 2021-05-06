@@ -69,7 +69,7 @@ class SherlogModel:
             for value in self._namespace.values():
                 value.clamp_(0, 1)
 
-    def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 10, **kwargs):
+    def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 1, **kwargs):
         # do everything manually for now
         optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
         lls = {}
@@ -84,7 +84,7 @@ class SherlogModel:
                     logger.info("Translating graph...")
                     program, evidence = loads(translate_graph(graph), namespace=self._namespace)
                     logger.info("Program built...")
-                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=100, width=10, depth=100, **kwargs).log()
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=500, width=5, depth=100, seeds=5, **kwargs).log()
                     logger.info(f"Log-likelihood: {log_likelihood}")
                     # make sure gradients exist
                     is_nan = torch.isnan(log_likelihood).any()
@@ -92,12 +92,13 @@ class SherlogModel:
                     if not is_nan and not is_inf:
                         objective -= log_likelihood
 
-                objective.backward()
-                optimizer.step()
-                self.clamp()
+                if objective != 0.0:
+                    objective.backward()
+                    optimizer.step()
+                    self.clamp()
 
             if test is not None:
-                lls[epoch] = self.average_log_likelihood(test, explanations=10, samples=1000, width=50, depth=100)
+                lls[epoch] = self.average_log_likelihood(test, explanations=1, samples=100)
                 logger.info(f"Epoch {epoch} LL: {lls[epoch]}")
 
         return lls
@@ -105,16 +106,16 @@ class SherlogModel:
     def average_log_likelihood(self, test, explanations : int = 10, samples : int = 500, **kwargs):
         lls = []
         for graph in test:
-            lls.append(self.log_likelihood(graph, explanations=explanations, samples=samples, **kwargs))
+            lls.append(self.log_likelihood(graph, explanations=explanations, samples=samples, width=7, depth=100, **kwargs))
         return mean(lls)
 
-    def log_likelihood(self, example, explanations : int = 10, samples : int = 1000, force_target = None, **kwargs):
+    def log_likelihood(self, example, explanations : int = 1, samples : int = 100, force_target = None, **kwargs):
         program, evidence = loads(translate_graph(example, force_target=force_target), namespace=self._namespace)
-        return program.likelihood(evidence[0], explanations=explanations, samples=samples, **kwargs).log().item()
+        return program.likelihood(evidence[0], explanations=explanations, samples=samples, width=7, depth=100, **kwargs).log().item()
 
     def classification_task(self, example, **kwargs):
-        asthma = self.log_likelihood(example, force_target=True, **kwargs)
-        not_asthma = self.log_likelihood(example, force_target=False, **kwargs)
+        asthma = self.log_likelihood(example, explanations=1, samples=100, force_target=True, **kwargs)
+        not_asthma = self.log_likelihood(example, explanations=1, samples=100, force_target=False, **kwargs)
         if asthma >= not_asthma:
             confidence = 1.0
         else:

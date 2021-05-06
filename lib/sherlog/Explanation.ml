@@ -64,6 +64,10 @@ module Introduction = struct
 		let mech = Watson.Term.Symbol intro.mechanism in
 		mech :: (intro.parameters @ intro.context)
 
+	let is_constrained intro = match intro.target with
+		| Watson.Term.Variable _ -> false
+		| _ -> true
+
 	let to_string intro =
 		let t = intro |> target |> Watson.Term.to_string in
 		let f = intro |> mechanism in
