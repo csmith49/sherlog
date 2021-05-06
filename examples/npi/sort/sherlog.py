@@ -61,7 +61,7 @@ class SherlogModel:
             for batch in sherlog.inference.minibatch(translate_examples(data), batch_size=batch_size):
                 with optimizer as o:
                     batch = sherlog.inference.Batch(batch, index=epoch)
-                    o.maximize(batch.objective(self._problem, explanations=3, samples=100, seeds=3))
+                    o.maximize(batch.objective(self._problem, explanations=1, samples=100, width=20, depth=100))
 
     def _ll(self, inputs : Iterable[int], outputs : Iterable[int], explanations : int, samples : int) -> float:
         """Compute the log-likelihood of the inputs being converted to the outputs.
