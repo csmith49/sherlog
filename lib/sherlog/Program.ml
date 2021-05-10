@@ -54,47 +54,21 @@ module Filter = struct
 		proofs
 		|> CCList.filter (fun p -> (p |> Watson.Proof.witnesses |> CCList.length) <= l)
 	
-
-	(* width done via sampling from categorical w/ heuristic scores *)
-
-	(* we rely on the gumbel trick *)
-	let gumbel_trick weight = let open CCRandom in
-		let scale u = u |> log |> log |> fun x -> 0.0 -. x in
-		(float_range 0.0 1.0) >|= scale >|= CCFloat.add (log weight)
-
-	let categorical weights : int CCRandom.t = fun state ->
-		let scores = weights
-			|> CCList.map gumbel_trick
-			|> CCList.map (CCRandom.run ~st:state)
-			|> CCList.mapi CCPair.make in
-		let sort_key (li, ls) (ri, rs) = if ls >= rs then (li, ls) else (ri, rs) in
-		let argmax = scores
-			|> CCList.fold_left sort_key (0, -1.0) in
-		fst argmax
-
-	let score proof : float = 
-		let intros = proof |> Explanation.of_proof |> Explanation.introductions in
-		(* total introductions *)
-		let total_intros = intros |> CCList.length in
-		(* constrained introductions *)
-		let constrained_intros = intros |> CCList.filter Explanation.Introduction.is_constrained |> CCList.length in
-		(* proof length *)
-		let proof_length = proof |> Watson.Proof.to_atoms |> CCList.length in
-		(* linear combo *)
-		-1.0 *. (float total_intros) +. 0.3 *. (float constrained_intros) +. 0.2 *. (float proof_length)
-
-	let random_proof score proofs : Watson.Proof.t option CCRandom.t = fun state ->
-		let weights = proofs |> CCList.map score in
-		let index = CCRandom.run ~st:state (categorical weights) in
-		CCList.get_at_idx index proofs
-
-	let width w proofs =
+	let beam_width score w proofs =
 		if CCList.length proofs <= w then proofs else
 		let random_proofs = proofs
-			|> random_proof score
+			|> Posterior.random_proof score
 			|> CCList.replicate w
 			|> CCRandom.list_seq in
-		CCRandom.run random_proofs |> CCList.keep_some
+		CCRandom.run random_proofs
+	
+	let uniform_width w proofs =
+		if CCList.length proofs <= w then proofs else
+		let random_proofs = proofs
+			|> CCRandom.pick_list
+			|> CCList.replicate w
+			|> CCRandom.list_seq in
+		CCRandom.run random_proofs
 
 	let compose f g proofs = proofs |> f |> g
 	let (>>) f g = compose f g

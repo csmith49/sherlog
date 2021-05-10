@@ -12,7 +12,8 @@ module Filter : sig
     val total : t
     val intro_consistent : t
     val length : int -> t
-    val width : int -> t
+    val beam_width : Posterior.score -> int -> t
+    val uniform_width : int -> t
     val compose : t -> t -> t
     val (>>) : t -> t -> t
 end

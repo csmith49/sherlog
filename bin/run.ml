@@ -28,7 +28,7 @@ let _ = Fmt.pr "%a Search width/depth: %a/%a\n"
 
 (* utility functions *)
 let filter = Sherlog.Program.Filter.(
-    intro_consistent >> length !search_depth >> width !search_width
+    intro_consistent >> length !search_depth >> uniform_width !search_width
 )
 
 (* operation to be done per-file *)

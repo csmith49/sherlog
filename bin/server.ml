@@ -29,7 +29,7 @@ let handler json = match JSON.Parse.(find string "command" json) with
             |> CCOpt.get_or ~default:CCInt.max_int in
         (* build filter from parameters *)
         let filter = Sherlog.Program.Filter.(
-            intro_consistent >> length search_length >> width search_width
+            intro_consistent >> length search_length >> uniform_width search_width
         ) in
         let models = query
             |> Sherlog.Program.models program filter
