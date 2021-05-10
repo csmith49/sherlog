@@ -69,6 +69,9 @@ class SherlogModel:
             for value in self._namespace.values():
                 value.clamp_(0, 1)
 
+    def program(self, graph, force_target=None):
+        return loads(translate_graph(graph, force_target=force_target), namespace=self._namespace)
+
     def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 1, **kwargs):
         # do everything manually for now
         optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
@@ -82,7 +85,7 @@ class SherlogModel:
 
                 for graph in batch:
                     logger.info("Translating graph...")
-                    program, evidence = loads(translate_graph(graph), namespace=self._namespace)
+                    program, evidence = self.program(graph)
                     logger.info("Program built...")
                     log_likelihood = program.likelihood(evidence[0], explanations=1, samples=500, width=5, depth=100, seeds=5, **kwargs).log()
                     logger.info(f"Log-likelihood: {log_likelihood}")
@@ -110,7 +113,7 @@ class SherlogModel:
         return mean(lls)
 
     def log_likelihood(self, example, explanations : int = 1, samples : int = 100, force_target = None, **kwargs):
-        program, evidence = loads(translate_graph(example, force_target=force_target), namespace=self._namespace)
+        program, evidence = self.program(example, force_target=force_target)
         return program.likelihood(evidence[0], explanations=explanations, samples=samples, width=7, depth=100, **kwargs).log().item()
 
     def classification_task(self, example, **kwargs):
