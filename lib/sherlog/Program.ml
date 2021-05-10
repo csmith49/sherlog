@@ -38,6 +38,16 @@ module Filter = struct
 
 	let total proofs = proofs
 	
+	let constraint_avoiding ontology proofs =
+		let constraints = ontology
+			|> Ontology.constraints in
+		let check proof =
+			let atoms = proof |> Watson.Proof.to_atoms in
+			constraints
+				|> CCList.map (fun c -> Watson.Atom.embed_all c atoms)
+				|> CCList.for_all CCList.is_empty in
+		CCList.filter check proofs
+
 	let rec intro_consistent proofs = CCList.filter is_intro_consistent proofs
 	and is_intro_consistent proof =
 		let intro_tags = proof

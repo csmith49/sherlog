@@ -16,6 +16,9 @@ val apply : Substitution.t -> t -> t
 
 val unify : t -> t -> Substitution.t option
 
+val embed : t -> t list -> Substitution.t list
+val embed_all : t list -> t list -> Substitution.t list
+
 val pp : t Fmt.t
 
 module JSON : sig
