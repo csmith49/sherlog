@@ -116,13 +116,11 @@ let contradict program filter proof =
 	explore program apply_rules filter initial_proofs []
 
 let models program pos_filter neg_filter goal =
-	let mk (p, cs) = match cs with
-		| [] -> [Model.of_proof p]
-		| _ -> CCList.map (Model.of_proof_and_contradiction p) cs in
-	let proofs = goal
+	let brooms = goal
 		|> prove program pos_filter
+		|> Filter.constraint_avoiding (ontology program)
 		|> CCList.map (CCPair.dup_map (contradict program neg_filter)) in
-	CCList.flat_map mk proofs
+	CCList.map (fun (handle, bristles) -> Model.of_proof_and_contradictions handle bristles) brooms
 
 let pp ppf program = let open Fmt in
 	pf ppf "Parameters: %a@, Rules: %a@,%a"

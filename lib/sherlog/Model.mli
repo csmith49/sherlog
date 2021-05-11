@@ -30,11 +30,11 @@ end
 
 type t
 
-val make : Assignment.t list -> Observation.t -> Observation.t -> t
+val make : Assignment.t list -> Observation.t -> Observation.t list -> t
 
 val assignments : t -> Assignment.t list
 val meet : t -> Observation.t
-val avoid : t -> Observation.t
+val avoid : t -> Observation.t list
 
 module JSON : sig
     val encode : t -> JSON.t
@@ -42,7 +42,7 @@ module JSON : sig
 end
 
 val of_proof : Watson.Proof.t -> t
-val of_proof_and_contradiction : Watson.Proof.t -> Watson.Proof.t -> t
+val of_proof_and_contradictions : Watson.Proof.t -> Watson.Proof.t list -> t
 
 val pp : t Fmt.t
 val to_string : t -> string

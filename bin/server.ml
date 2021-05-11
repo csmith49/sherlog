@@ -39,13 +39,10 @@ let handler json = match JSON.Parse.(find string "command" json) with
         (* build filter from parameters *)
         let pos_filter = Sherlog.Program.Filter.(
             intro_consistent
-                >> constraint_avoiding (Sherlog.Program.ontology program)
                 >> length search_length
                 >> beam_width pos_score search_width
         ) in
         let neg_score = Sherlog.Posterior.(score_of_assoc [
-            (* (-1.0, Feature.length);
-            (1.0, Feature.constrained_intros); *)
             (0.8, Feature.context "fuzzy:stress");
             (0.9, Feature.context "fuzzy:asthma_spontaneous");
             (0.7, Feature.context "fuzzy:asthma_comorbid");

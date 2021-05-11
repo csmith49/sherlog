@@ -61,7 +61,7 @@ end
 type t = {
     assignments : Assignment.t list;
     meet : Observation.t;
-    avoid : Observation.t;
+    avoid : Observation.t list;
 }
 
 let make assignments meet avoid = {
@@ -77,13 +77,13 @@ module JSON = struct
         ("type", `String "model");
         ("assignments", `List (model |> assignments |> CCList.map Assignment.JSON.encode));
         ("meet",  model |> meet |> Observation.JSON.encode);
-        ("avoid", model |> avoid |> Observation.JSON.encode);
+        ("avoid", model |> avoid |> CCList.map Observation.JSON.encode |> JSON.Make.list);
     ]
 
     let decode json = let open CCOpt in
         let* assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
         let* meet = JSON.Parse.(find Observation.JSON.decode "meet" json) in
-        let* avoid = JSON.Parse.(find Observation.JSON.decode "avoid" json) in
+        let* avoid = JSON.Parse.(find (list Observation.JSON.decode) "avoid" json) in
             return (make assignments meet avoid)
 end
 
@@ -169,27 +169,25 @@ let of_proof proof =
         avoid = [];
     }
 
-let of_proof_and_contradiction proof contradiction =
-    let pa = proof
-        |> Explanation.of_proof
-        |> Compile.of_explanation
-        |> Compile.associate_names
-        |> Compile.assignments in
-    let na = contradiction
-        |> Explanation.of_proof
-        |> Compile.of_explanation
-        |> Compile.associate_names
-        |> Compile.assignments in
+let compile proof = proof
+    |> Explanation.of_proof
+    |> Compile.of_explanation
+    |> Compile.associate_names
+    |> Compile.assignments
+
+let of_proof_and_contradictions proof contradictions =
+    let pa = compile proof in
+    let nas = contradictions |> CCList.map compile in
     {
-        assignments = pa @ na |> CCList.map fst;
+        assignments = pa :: nas |> CCList.flat_map (CCList.map fst);
         meet = pa |> Compile.observation;
-        avoid = na |> Compile.observation;
+        avoid = nas |> CCList.map Compile.observation;
     }
 
 let pp ppf model = let open Fmt in
     pf ppf "{%a@,; +: %a@,; -: %a}"
     (list ~sep:comma Assignment.pp) (model |> assignments)
     Observation.pp (model |> meet)
-    Observation.pp (model |> avoid)
+    (list ~sep:comma Observation.pp) (model |> avoid)
 
 let to_string = Fmt.to_to_string pp
