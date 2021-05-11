@@ -10,18 +10,22 @@ from subprocess import Popen
 from ..logs import get
 from ..config import PORT, TIMEOUT
 
+_SERVER = None
 
 logger = get("interface.server")
 
-SERVER_ARGS = ["sherlog-server", "--port", f"{PORT}", "--timeout", f"{TIMEOUT}"]
-logger.info("Starting translation server on port %i...", PORT)
-SERVER = Popen(SERVER_ARGS)
-logger.info("Translation port successfully started on port %i.", PORT)
-
 def close_server():
     """Send the termination signal to the server."""
+    global _SERVER
     logger.info("Terminating the translation server...")
-    SERVER.terminate()
+    if _SERVER:
+        _SERVER.terminate()
     logger.info("Translation server terminated.")
+
+def initialize_server(port=PORT):
+    logger.info("Starting translation server on port %i...", port)
+    global _SERVER
+    _SERVER = Popen(["sherlog-server", "--port", f"{port}", "--timeout", f"{TIMEOUT}"])
+    logger.info("Translation port successfully started on port %i.", port)
 
 atexit.register(close_server)

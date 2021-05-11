@@ -36,7 +36,6 @@ let handler json = match JSON.Parse.(find string "command" json) with
             (0.1, Feature.context "fuzzy:asthma_spontaneous");
             (0.3, Feature.context "fuzzy:asthma_comorbid");
             (0.3, Feature.context "fuzzy:influence");
-            (-1.0, Feature.length)
         ]) in
         (* build filter from parameters *)
         let pos_filter = Sherlog.Program.Filter.(
@@ -49,12 +48,11 @@ let handler json = match JSON.Parse.(find string "command" json) with
             (0.9, Feature.context "fuzzy:asthma_spontaneous");
             (0.7, Feature.context "fuzzy:asthma_comorbid");
             (0.7, Feature.context "fuzzy:influence");
-            (1.0, Feature.length)
         ]) in
         let neg_filter = Sherlog.Program.Filter.(
             intro_consistent
                 >> length search_length
-                >> beam_width neg_score (2 * search_width)
+                >> beam_width neg_score (10 * search_width)
         ) in
         let models = query
             |> Sherlog.Program.models program pos_filter neg_filter

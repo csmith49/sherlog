@@ -127,18 +127,20 @@ class SherlogModel:
 
                 for graph in batch:
                     program, evidence = loads(translate_graph(graph), namespace=self._namespace)
-                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=100, width=15).log()
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=5000, width=50).log()
+                    logger.info(f"Log-likelihood: {log_likelihood.item()}")
                     # we have to make sure the gradients actually exist
                     is_nan = torch.isnan(log_likelihood).any()
                     is_inf = torch.isinf(log_likelihood).any()
                     if not is_nan and not is_inf:
                         objective -= log_likelihood
 
-                objective.backward()
-                optimizer.step()
-                self.clamp()
+                if objective != 0.0:
+                    objective.backward()
+                    optimizer.step()
+                    self.clamp()
 
-            test_log_likelihood = self.average_log_likelihood(test, explanations=10, samples=500, width=15)
+            test_log_likelihood = self.average_log_likelihood(test, explanations=1, samples=5000, width=50)
             lls[epoch] = test_log_likelihood
             logger.info(f"Epoch {epoch} LL: {test_log_likelihood}")
 

@@ -1,19 +1,24 @@
 """Sherlog.Interface"""
 
 from .socket import connect
+from .server import initialize_server
 from ..config import PORT
 from time import sleep
 from . import server
 from rich.console import Console
 
-console = Console(markup=False)
+_SOCKET = None
 
-SOCKET = None
-while not SOCKET:
-    try:
-        SOCKET = connect(PORT)
-    except:
-        pass
+def initialize(port=PORT):
+    global _SOCKET
+    initialize_server(port=port)
+    while not _SOCKET:
+        try:
+            _SOCKET = connect(port)
+        except Exception as e:
+            pass
+
+console = Console(markup=False)
 
 class CommunicationError(Exception): pass
 
@@ -37,7 +42,7 @@ def parse(source: str):
         "command" : "parse",
         "program" : source
     }
-    response = SOCKET.communicate(message)
+    response = _SOCKET.communicate(message)
     if response == "failure": raise CommunicationError()
     return response
 
@@ -76,7 +81,7 @@ def query(program, query, depth=None, width=None, seeds=None):
         message["seeds"] = seeds
 
     # send and rec
-    response = SOCKET.communicate(message)
+    response = _SOCKET.communicate(message)
     if response == "failure":
         raise CommunicationError()
     elif response == "timeout":

@@ -58,6 +58,6 @@ class JSONSocket:
         return self.receive()
 
 def connect(port):
-    socket = JSONSocket(port).__enter__()
-    atexit.register(socket.__exit__)
-    return socket
+    sock = JSONSocket(port).__enter__()
+    atexit.register(sock.__exit__)
+    return sock

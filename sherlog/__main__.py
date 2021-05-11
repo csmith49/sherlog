@@ -1,5 +1,6 @@
 import click
 from .interface import console
+from .interface import initialize
 from . import logs
 from .tooling import instrumentation
 from .program import load
@@ -11,9 +12,16 @@ from rich.progress import track
 @click.option("-l", "--log", multiple=True,
     type=click.Choice(logs.logged_modules(), case_sensitive=False),
     help="Enable/disable verbose output via logging")
-def main(log): 
+@click.option("-p", "--port", type=int)
+def main(log, port):
     """Simple wrapper around common manipulations of Sherlog programs."""
-    if log: logs.enable(*log)
+    if log:
+        logs.enable(*log)
+    
+    if port is not None:
+        initialize(port=port)
+    else:
+        initialize()
 
 @main.command()
 @click.argument("filename", type=click.Path(exists=True))
@@ -51,7 +59,7 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
         for batch in minibatch(evidence, batch_size):
             with optimizer as o:
                 batch = Batch(batch)
-                o.maximize(batch.objective(program, samples=samples))
+                o.maximize(batch.objective(program, explanations=2, samples=samples))
 
         if epoch % resolution == 0:
             log = {"epoch" : epoch}

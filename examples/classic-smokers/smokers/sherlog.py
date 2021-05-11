@@ -90,7 +90,7 @@ class SherlogModel:
                     logger.info("Translating graph...")
                     program, evidence = self.program(graph)
                     logger.info("Program built...")
-                    log_likelihood = program.likelihood(evidence[0], explanations=1, width=15, samples=500, depth=100, seeds=1, **kwargs).log()
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, width=15, samples=100, depth=100, seeds=1, **kwargs).log()
                     logger.info(f"Log-likelihood: {log_likelihood}")
                     # make sure gradients exist
                     is_nan = torch.isnan(log_likelihood).any()
@@ -100,7 +100,7 @@ class SherlogModel:
 
                 if objective != 0.0:
                     objective.backward()
-                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=2.0, norm_type=2)
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0, norm_type=2)
                     optimizer.step()
                     # scheduler.step()
                     self.clamp()

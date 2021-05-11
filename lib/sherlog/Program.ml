@@ -54,11 +54,13 @@ module Filter = struct
 			|> Explanation.of_proof
 			|> Explanation.introductions
 			|> CCList.map Explanation.Introduction.tag in
+			(* |> CCList.filter (CCList.for_all Watson.Term.is_ground) in *)
 		let num_intros = CCList.length intro_tags in
 		let num_unique_intros = intro_tags
 			|> CCList.sort_uniq ~cmp:(CCList.compare Watson.Term.compare)
 			|> CCList.length in
-		CCInt.equal num_intros num_unique_intros
+		let result = CCInt.equal num_intros num_unique_intros in
+		result
 
 	let length l proofs = 
 		proofs

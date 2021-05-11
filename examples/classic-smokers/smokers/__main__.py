@@ -6,13 +6,18 @@ import click
 from sherlog.logs import enable, get_external
 from sherlog import console
 from sherlog.tooling.instrumentation import seed, Timer
+from sherlog.interface import initialize
 from . import ProblogModel, SherlogModel, sample
 
 logger = get_external("smokers")
 
 @click.group()
-def cli():
-    pass
+@click.option("-p", "--port", type=int)
+def cli(port):
+    if port:
+        initialize(port=port)
+    else:
+        initialize()
 
 @cli.command()
 @click.option("-l", "--log", type=str,
