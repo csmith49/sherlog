@@ -9,20 +9,22 @@ from . import semantics
 logger = get("explanation")
 
 class Explanation:
-    def __init__(self, model, meet, avoid, external=()):
+    def __init__(self, model, meet, avoids, external=()):
         logger.info(f"Explanation {self} built.")
         self.model = model
         self.meet = meet
-        self.avoid = avoid
+        self.avoids = avoids
         self._external = external
+
+        print(self.avoids)
 
     @classmethod
     def of_json(cls, json, external=()):
         logger.info(f"Building explanation from serialization: {json}...")
         model = Model.of_json(json["assignments"])
         meet = Observation.of_json(json["meet"])
-        avoid = Observation.of_json(json["avoid"])
-        return cls(model, meet, avoid, external=external)
+        avoids = [Observation.of_json(obs) for obs in json["avoid"]]
+        return cls(model, meet, avoids, external=external)
 
     @property
     def store(self):
@@ -72,7 +74,9 @@ class Explanation:
 
         # build meet and avoid
         meet = self.meet.equality(store, functor, prefix="sherlog:meet", default=1.0)
-        avoid = self.avoid.equality(store, functor, prefix="sherlog:avoid", default=0.0)
+        avoids = [obs.equality(store, functor, prefix=f"sherlog:avoid:{i}", default=0.0) for i, obs in enumerate(self.avoids)]
+        avoid = value.Variable("sherlog:avoid")
+        functor.run(avoid, "or", avoids, store)
 
         # build objective
         objective = value.Variable("sherlog:objective")
@@ -96,7 +100,8 @@ class Explanation:
 
         logger.info("Evaluating types and forcing values...")
         # build type info for the forcing
-        types = self.run(semantics.types.functor)
+        # TODO - should only be necessary for avoiding variables
+        # types = self.run(semantics.types.functor)
         forcing = {}
 
         # add the values from meet
@@ -104,9 +109,10 @@ class Explanation:
             forcing[variable] = self.meet[variable]
 
         # and, if possible, add values from avoid
-        for variable in self.avoid.variables:
-            if types[variable] == semantics.types.Discrete(2):
-                forcing[variable] = 1 - self.avoid[variable]
+        # for variable in self.avoid.variables:
+        #     if types[variable] == semantics.types.Discrete(2):
+        #         forcing[variable] = 1 - self.avoid[variable]
+        # TODO - what does this mean when different avoiding observations disagree?
 
         logger.info(f"Forcing with observations: {forcing}")
 
@@ -115,7 +121,7 @@ class Explanation:
         objective = self.objective(functor)
 
         # build surrogate
-        scale = semantics.miser.forcing_scale(objective.dependencies())
+        scale = semantics.miser.forcing_scale(objective.dependencies()).detach() # if we don't detach here, we "overcount" forced instances
         score = semantics.miser.magic_box(objective.dependencies(), samples)
         surrogate = objective.value * scale * score
 

@@ -228,7 +228,13 @@ def _equal(v1, v2):
     if torch.equal(v1, v2):
         return torch.tensor(1.0)
     else:
-        return torch.tensor(0.05)
+        return torch.tensor(0.0)
+
+def _or(*args):
+    prod = torch.tensor(1.0)
+    for arg in args:
+        prod *= (1 - arg)
+    return 1 - prod
 
 def _satisfy(meet, avoid):
     return meet * (1 - avoid)
@@ -267,7 +273,8 @@ def factory(samples, forcing=None):
         "tensorize" : lift(_tensorize),
         "equal" : lift(_equal),
         "satisfy" : lift(_satisfy),
-        "set" : lift(_set)
+        "set" : lift(_set),
+        "or" : lift(_or)
     }
 
     # use constructed operations
