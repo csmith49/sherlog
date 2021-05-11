@@ -76,7 +76,7 @@ class SherlogModel:
 
     def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 10, **kwargs):
         # do everything manually for now
-        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=learning_rate * 0.01, max_lr=learning_rate)
         lls = {}
 
