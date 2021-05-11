@@ -37,7 +37,7 @@ def evaluate(log, size, verbose, train, test, epochs, learning_rate):
     logger.info(f"Starting training with {train} samples...")
     with timer:
         x, y = list(sample(train, size=size)), list(sample(test, size=size))
-        model.fit(x, y, epochs=epochs, learning_rate=learning_rate)
+        training_lls = model.fit(x, y, epochs=epochs, learning_rate=learning_rate)
     training_time = timer.elapsed
     logger.info(f"Training completed in {training_time} seconds.")
 
@@ -68,6 +68,7 @@ def evaluate(log, size, verbose, train, test, epochs, learning_rate):
         "test" : test,
         "graph_size" : size,
         "training_time" : training_time,
+        "training_log_likelihood" : training_lls,
         "average_log_likelihood" : avg_ll,
         "average_log_likelihood_time" : avg_ll_time,
         "accuracy" : accuracy,
