@@ -16,8 +16,6 @@ class Explanation:
         self.avoids = avoids
         self._external = external
 
-        print(self.avoids)
-
     @classmethod
     def of_json(cls, json, external=()):
         logger.info(f"Building explanation from serialization: {json}...")
@@ -76,7 +74,10 @@ class Explanation:
         meet = self.meet.equality(store, functor, prefix="sherlog:meet", default=1.0)
         avoids = [obs.equality(store, functor, prefix=f"sherlog:avoid:{i}", default=0.0) for i, obs in enumerate(self.avoids)]
         avoid = value.Variable("sherlog:avoid")
-        functor.run(avoid, "or", avoids, store)
+        if avoids:
+            functor.run(avoid, "or", avoids, store)
+        else:
+            functor.run(avoid, "set", [0.0], store)
 
         # build objective
         objective = value.Variable("sherlog:objective")
@@ -100,7 +101,6 @@ class Explanation:
 
         logger.info("Evaluating types and forcing values...")
         # build type info for the forcing
-        # TODO - should only be necessary for avoiding variables
         # types = self.run(semantics.types.functor)
         forcing = {}
 
@@ -109,10 +109,10 @@ class Explanation:
             forcing[variable] = self.meet[variable]
 
         # and, if possible, add values from avoid
-        # for variable in self.avoid.variables:
-        #     if types[variable] == semantics.types.Discrete(2):
-        #         forcing[variable] = 1 - self.avoid[variable]
-        # TODO - what does this mean when different avoiding observations disagree?
+        # for avoid in self.avoids:
+        #     for variable in avoid.variables:
+        #         if types[variable] == semantics.types.Discrete(2):
+        #             forcing[variable] = 1 - avoid[variable]
 
         logger.info(f"Forcing with observations: {forcing}")
 

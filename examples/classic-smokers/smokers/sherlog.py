@@ -76,8 +76,8 @@ class SherlogModel:
 
     def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 10, **kwargs):
         # do everything manually for now
-        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate, momentum=0.9)
-        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=learning_rate * 0.001, max_lr=learning_rate)
+        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
+        # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=learning_rate * 0.01, max_lr=learning_rate)
         lls = {}
 
         for epoch in range(epochs):
@@ -90,7 +90,7 @@ class SherlogModel:
                     logger.info("Translating graph...")
                     program, evidence = self.program(graph)
                     logger.info("Program built...")
-                    log_likelihood = program.likelihood(evidence[0], explanations=1, width=10, samples=500, depth=100, seeds=10, **kwargs).log()
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, width=15, samples=500, depth=100, seeds=1, **kwargs).log()
                     logger.info(f"Log-likelihood: {log_likelihood}")
                     # make sure gradients exist
                     is_nan = torch.isnan(log_likelihood).any()
@@ -100,19 +100,19 @@ class SherlogModel:
 
                 if objective != 0.0:
                     objective.backward()
-                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0, norm_type=2)
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=2.0, norm_type=2)
                     optimizer.step()
-                    scheduler.step()
+                    # scheduler.step()
                     self.clamp()
             
 
-                print(f"STRESS - {self._stress.item()} - {self._stress.grad.item()}")
-                print(f"SPONTANEOUS - {self._spontaneous.item()} - {self._spontaneous.grad.item()}")
-                print(f"COMORBID - {self._comorbid.item()} - {self._comorbid.grad.item()}")
-                print(f"INFLUENCE - {self._influence.item()} - {self._influence.grad.item()}")
+                print(f"STRESS - {self._stress.item()}")
+                print(f"SPONTANEOUS - {self._spontaneous.item()}")
+                print(f"COMORBID - {self._comorbid.item()}")
+                print(f"INFLUENCE - {self._influence.item()}")
 
             if test is not None:
-                lls[epoch] = self.average_log_likelihood(test, explanations=1, samples=100)
+                lls[epoch] = self.average_log_likelihood(test, explanations=1, samples=500)
                 logger.info(f"Epoch {epoch} LL: {lls[epoch]}")
 
         return lls
