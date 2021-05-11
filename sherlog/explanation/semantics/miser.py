@@ -228,10 +228,11 @@ def _equal(v1, v2):
     if torch.equal(v1, v2):
         return torch.tensor(1.0)
     else:
-        return torch.tensor(0.0)
+        return torch.tensor(0.05)
 
 def _satisfy(meet, avoid):
     return meet * (1 - avoid)
+    # return meet + (1 - avoid) / 2
 
 def _set(x):
     return x

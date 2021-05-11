@@ -39,6 +39,14 @@ module Feature = struct
     |> Watson.Proof.to_atoms
     |> CCList.length
     |> CCFloat.of_int
+
+  let context str proof = proof
+    |> Explanation.of_proof
+    |> Explanation.introductions
+    |> CCList.flat_map Explanation.Introduction.context
+    |> CCList.filter (fun t -> Watson.Term.equal t (Watson.Term.Symbol str))
+    |> CCList.length
+    |> CCFloat.of_int
 end
 
 module Parameterization = struct
@@ -52,6 +60,11 @@ let dot (params : Parameterization.t) (features : Feature.t list) (proof : Watso
   CCList.fold_left ( *. ) 1.0 sums
 
 let ( @. ) = dot
+
+let score_of_assoc pairs =
+  let params = CCList.map fst pairs in
+  let features = CCList.map snd pairs in
+    dot params features
 
 let random_proof (score : score) (proofs : Watson.Proof.t list) : t = fun state ->
   let weights = proofs |> CCList.map score in

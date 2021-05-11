@@ -27,12 +27,37 @@ let handler json = match JSON.Parse.(find string "command" json) with
             |> CCOpt.get_or ~default:CCInt.max_int in
         let search_width = JSON.Parse.(find int "width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
+        (* build score function *)
+        let pos_score = Sherlog.Posterior.(score_of_assoc [
+            (* (-1.0, Feature.length);
+            (1.0, Feature.constrained_intros); *)
+            (0.2, Feature.context "fuzzy:stress");
+            (0.1, Feature.context "fuzzy:asthma_spontaneous");
+            (0.3, Feature.context "fuzzy:asthma_comorbid");
+            (0.3, Feature.context "fuzzy:influence");
+        ]) in
         (* build filter from parameters *)
-        let filter = Sherlog.Program.Filter.(
-            intro_consistent >> length search_length >> uniform_width search_width
+        let pos_filter = Sherlog.Program.Filter.(
+            intro_consistent
+                >> constraint_avoiding (Sherlog.Program.ontology program)
+                >> length search_length
+                >> beam_width pos_score search_width
+        ) in
+        let neg_score = Sherlog.Posterior.(score_of_assoc [
+            (* (-1.0, Feature.length);
+            (1.0, Feature.constrained_intros); *)
+            (0.8, Feature.context "fuzzy:stress");
+            (0.9, Feature.context "fuzzy:asthma_spontaneous");
+            (0.7, Feature.context "fuzzy:asthma_comorbid");
+            (0.7, Feature.context "fuzzy:influence");
+        ]) in
+        let neg_filter = Sherlog.Program.Filter.(
+            intro_consistent
+                >> length search_length
+                >> beam_width neg_score (2 * search_width)
         ) in
         let models = query
-            |> Sherlog.Program.models program filter
+            |> Sherlog.Program.models program pos_filter neg_filter
             |> CCList.map Sherlog.Model.JSON.encode in
         return (`List models)
     | _ -> None

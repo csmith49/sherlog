@@ -115,13 +115,13 @@ let contradict program filter proof =
 		|> CCList.map (fun c -> Watson.Proof.of_atoms c proven_atoms) in
 	explore program apply_rules filter initial_proofs []
 
-let models program filter goal =
+let models program pos_filter neg_filter goal =
 	let mk (p, cs) = match cs with
 		| [] -> [Model.of_proof p]
 		| _ -> CCList.map (Model.of_proof_and_contradiction p) cs in
 	let proofs = goal
-		|> prove program filter
-		|> CCList.map (CCPair.dup_map (contradict program filter)) in
+		|> prove program pos_filter
+		|> CCList.map (CCPair.dup_map (contradict program neg_filter)) in
 	CCList.flat_map mk proofs
 
 let pp ppf program = let open Fmt in

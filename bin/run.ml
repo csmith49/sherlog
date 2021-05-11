@@ -77,7 +77,7 @@ let operate filename =
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
         (* compute proofs and process *)
-        let models = Sherlog.Program.models program filter fact in
+        let models = Sherlog.Program.models program filter filter fact in
         let _ = Fmt.pr "%a Found %a models.\n"
             marker ()
             (Fmt.styled (`Fg `Blue) Fmt.int) (models |> CCList.length) in

@@ -20,6 +20,9 @@ module Feature : sig
     val length : t
     (** [length proof] is the number of resolution steps in [proof] *)
 
+    val context : string -> t
+    (** [context str proof] counts the number of instances of str in a context in [proof] *)
+
     val apply : Watson.Proof.t -> t -> float
     (** [apply proof f] applies [f] to [proof] - inverse application *)
 end
@@ -34,6 +37,8 @@ val dot : Parameterization.t -> Feature.t list -> score
 
 val ( @. ) : Parameterization.t -> Feature.t list -> score
 (** [p @. fs] is short-hand for [dot p fs] *)
+
+val score_of_assoc : (float * Feature.t) list -> score
 
 val random_proof : score -> Watson.Proof.t list -> t
 (** [random_proof score proofs] samples a proof from proofs proportional to [score proof] *)

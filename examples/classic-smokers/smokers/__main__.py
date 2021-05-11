@@ -110,7 +110,7 @@ def overfit(log, size, verbose, epochs, learning_rate):
 @click.option("-v", "--verbose", is_flag=True,
     help="Enable verbose output with Sherlog's logging interface.")
 @click.option("-e", "--epochs", type=int, default=1)
-@click.option("-r", "--learning-rate", type=float, default=0.1)
+@click.option("-r", "--learning-rate", type=float, default=0.05)
 @click.option("-c", "--convergence", is_flag=True)
 def sherlog(log, size, train, test, verbose, epochs, learning_rate, convergence):
     """Evaluate Sherlog on the classic Smokers benchmark."""
@@ -135,7 +135,7 @@ def sherlog(log, size, train, test, verbose, epochs, learning_rate, convergence)
     results = []
     for example in sample(test, size=size):
         with timer:
-            ll = model.log_likelihood(example)
+            ll = model.log_likelihood(example, width=50, depth=100, seeds=5)
         results.append( (ll, timer.elapsed) )
     lls, times = zip(*results)
     avg_ll, avg_ll_time = mean(lls), mean(times)
@@ -145,7 +145,7 @@ def sherlog(log, size, train, test, verbose, epochs, learning_rate, convergence)
     results = []
     for example in sample(test, size=size):
         with timer:
-            confidence, ground_truth = model.classification_task(example)
+            confidence, ground_truth = model.classification_task(example, width=5, depth=100, seeds=5)
             score = 1.0 if confidence == ground_truth else 0.0
         results.append( (score, timer.elapsed) )
     scores, times = zip(*results)

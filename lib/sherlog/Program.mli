@@ -41,7 +41,7 @@ val (|=) : t -> Watson.Atom.t list -> Watson.Proof.t list
 
 val contradict : t -> Filter.t -> Watson.Proof.t -> Watson.Proof.t list
 
-val models : t -> Filter.t -> Watson.Atom.t list -> Model.t list
+val models : t -> Filter.t -> Filter.t -> Watson.Atom.t list -> Model.t list
 
 val pp : t Fmt.t
 

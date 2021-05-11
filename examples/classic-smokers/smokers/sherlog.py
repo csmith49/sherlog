@@ -14,13 +14,15 @@ logger = get_external("smokers.sherlog")
 SOURCE = """
 # probabilistic rules
 stress :: stress(X) <- person(X).
-spontaneous :: asthma(X) <- person(X).
-comorbid :: asthma(X) <- smokes(X).
+spontaneous :: asthma_spontaneous(X) <- person(X).
+comorbid :: asthma_comorbid(X) <- smokes(X).
 influence :: influence(X, Y) <- friend(X, Y).
 
 # logical rules
 smokes(X) <- stress(X).
 smokes(X) <- influence(X, Y), smokes(Y).
+asthma(X) <- asthma_spontaneous(X).
+asthma(X) <- asthma_comorbid(X).
 
 # ontological rules
 !dependency smokes(X) | not_smokes(X) <- person(X).
@@ -64,17 +66,18 @@ class SherlogModel:
     def parameters(self):
         yield from self._namespace.values()
 
-    def clamp(self):
+    def clamp(self, epsilon=0.001):
         with torch.no_grad():
             for value in self._namespace.values():
-                value.clamp_(0, 1)
+                value.clamp_(0 + epsilon, 1 - epsilon)
 
     def program(self, graph, force_target=None):
         return loads(translate_graph(graph, force_target=force_target), namespace=self._namespace)
 
-    def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 1, **kwargs):
+    def fit(self, train, test = None, epochs : int = 1, learning_rate : float = 0.1, batch_size : int = 10, **kwargs):
         # do everything manually for now
-        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
+        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate, momentum=0.9)
+        scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=learning_rate * 0.001, max_lr=learning_rate)
         lls = {}
 
         for epoch in range(epochs):
@@ -87,7 +90,7 @@ class SherlogModel:
                     logger.info("Translating graph...")
                     program, evidence = self.program(graph)
                     logger.info("Program built...")
-                    log_likelihood = program.likelihood(evidence[0], explanations=1, samples=500, width=5, depth=100, seeds=5, **kwargs).log()
+                    log_likelihood = program.likelihood(evidence[0], explanations=1, width=10, samples=500, depth=100, seeds=10, **kwargs).log()
                     logger.info(f"Log-likelihood: {log_likelihood}")
                     # make sure gradients exist
                     is_nan = torch.isnan(log_likelihood).any()
@@ -97,8 +100,16 @@ class SherlogModel:
 
                 if objective != 0.0:
                     objective.backward()
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0, norm_type=2)
                     optimizer.step()
+                    scheduler.step()
                     self.clamp()
+            
+
+                print(f"STRESS - {self._stress.item()} - {self._stress.grad.item()}")
+                print(f"SPONTANEOUS - {self._spontaneous.item()} - {self._spontaneous.grad.item()}")
+                print(f"COMORBID - {self._comorbid.item()} - {self._comorbid.grad.item()}")
+                print(f"INFLUENCE - {self._influence.item()} - {self._influence.grad.item()}")
 
             if test is not None:
                 lls[epoch] = self.average_log_likelihood(test, explanations=1, samples=100)
@@ -106,15 +117,15 @@ class SherlogModel:
 
         return lls
 
-    def average_log_likelihood(self, test, explanations : int = 10, samples : int = 500, **kwargs):
+    def average_log_likelihood(self, test, explanations : int = 1, samples : int = 500, **kwargs):
         lls = []
         for graph in test:
-            lls.append(self.log_likelihood(graph, explanations=explanations, samples=samples, width=7, depth=100, **kwargs))
+            lls.append(self.log_likelihood(graph, explanations=explanations, samples=samples, width=30, depth=100, **kwargs))
         return mean(lls)
 
     def log_likelihood(self, example, explanations : int = 1, samples : int = 100, force_target = None, **kwargs):
         program, evidence = self.program(example, force_target=force_target)
-        return program.likelihood(evidence[0], explanations=explanations, samples=samples, width=7, depth=100, **kwargs).log().item()
+        return program.likelihood(evidence[0], explanations=explanations, samples=samples, **kwargs).log().item()
 
     def classification_task(self, example, **kwargs):
         asthma = self.log_likelihood(example, explanations=1, samples=100, force_target=True, **kwargs)

@@ -124,7 +124,10 @@ class Program:
         """
         explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, depth=depth, seeds=seeds, namespace=namespace)
         explanation_likelihoods = [explanation.miser(samples=samples) for explanation in explanations]
-        return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat
+        if explanation_likelihoods:
+            return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat
+        else:
+            return torch.tensor(0.0)
 
     def sample_explanation(self, evidence : Evidence, burn_in : int = 100, samples : int = 100, **kwargs):
         """Sample an explanation from the posterior.
