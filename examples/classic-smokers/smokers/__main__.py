@@ -81,6 +81,7 @@ def overfit(log, size, verbose, epochs, learning_rate):
     logger.info("Testing predictive performance...")
     with timer:
         confidence, ground_truth = model.classification_task(data)
+        print(confidence, ground_truth)
         score = 1.0 if confidence == ground_truth else 0.0
     accuracy, avg_class_time = score, timer.elapsed
     logger.info(f"Evaluation completed: accuracy of {accuracy} with avg. time of {avg_class_time} seconds.")
