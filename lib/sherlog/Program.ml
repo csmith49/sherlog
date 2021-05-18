@@ -7,7 +7,19 @@ type t = {
 	ontology : Ontology.t;
 }
 
+let is_intro_rule rule = rule
+	|> Rule.head
+	|> Atom.relation
+	|> CCString.equal Explanation.Introduction.Key.introduction
+
 let rules program = program.rules
+let introduction_rules program = program
+	|> rules
+	|> CCList.filter is_intro_rule
+let non_introduction_rules program = program
+	|> rules
+	|> CCList.filter (fun r -> not (is_intro_rule r))
+
 let parameters program = program.parameters
 let evidence program = program.evidence
 let ontology program = program.ontology
@@ -72,7 +84,7 @@ module Filter = struct
 			|> Posterior.random_proof score
 			|> CCList.replicate w
 			|> CCRandom.list_seq in
-		CCRandom.run random_proofs
+		CCRandom.run random_proofs |> CCList.map snd
 	
 	let uniform_width w proofs =
 		if CCList.length proofs <= w then proofs else

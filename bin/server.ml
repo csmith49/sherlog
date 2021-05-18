@@ -27,8 +27,14 @@ let handler json = match JSON.Parse.(find string "command" json) with
             |> CCOpt.get_or ~default:CCInt.max_int in
         let search_width = JSON.Parse.(find int "width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
+        let operator = JSON.Parse.(find (list string) "contexts" json)
+            |> CCOpt.get_or ~default:[]
+            |> Sherlog.Posterior.Feature.context_operator in
+        let parameterization = JSON.Parse.(find Sherlog.Posterior.Parameterization.JSON.decode "parameters" json)
+            |> CCOpt.get_or ~default:(CCList.replicate (CCList.length operator) 1.0) in
         (* build score function *)
-        let pos_score = Sherlog.Posterior.(score_of_assoc [
+        let score = Sherlog.Posterior.Score.dot parameterization operator in
+        let pos_score = Sherlog.Posterior.(Score.of_assoc [
             (* (0.5, Feature.constrained_intros); *)
             (* (0.3, Feature.intros); *)
             (* (-1.0, Feature.length); *)
@@ -43,7 +49,7 @@ let handler json = match JSON.Parse.(find string "command" json) with
                 >> length search_length
                 >> beam_width pos_score search_width
         ) in
-        let neg_score = Sherlog.Posterior.(score_of_assoc [
+        let neg_score = Sherlog.Posterior.(Score.of_assoc [
             (0.8, Feature.context "fuzzy:stress");
             (0.9, Feature.context "fuzzy:asthma_spontaneous");
             (0.7, Feature.context "fuzzy:asthma_comorbid");

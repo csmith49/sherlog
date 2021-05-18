@@ -19,6 +19,14 @@ module Introduction : sig
     val to_string : t -> string
 
     val pp : t Fmt.t
+
+    module Key : sig
+        val mechanism : string
+        val parameters : string
+        val context : string
+        val target : string
+        val introduction : string
+    end
 end
 
 type t

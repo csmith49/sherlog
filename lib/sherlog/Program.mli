@@ -1,6 +1,8 @@
 type t
 
 val rules : t -> Watson.Rule.t list
+val introduction_rules : t -> Watson.Rule.t list
+val non_introduction_rules : t -> Watson.Rule.t list
 val parameters : t -> Parameter.t list
 val evidence : t -> Evidence.t list
 val ontology : t -> Ontology.t
@@ -13,7 +15,7 @@ module Filter : sig
     val total : t
     (** [total proofs] is the identity filter that just returns [proofs] *)
 
-    val constraint_avoiding : Ontology.t -> t
+    val constraint_avoiding : Ontology.t ->  t
     (** [constraint_avoiding ontology proofs] returns all proofs that avoid constraints given by [ontology] *)
 
     val intro_consistent : t
@@ -22,7 +24,7 @@ module Filter : sig
     val length : int -> t
     (** [length k proofs] removes proofs that are longer than [k] resolution steps *)
 
-    val beam_width : Posterior.score -> int -> t
+    val beam_width : Posterior.Score.t -> int -> t
     (** [beam_width score k proofs] samples [k] proofs from [proofs] proportional to [score] *)
     
     val uniform_width : int -> t
