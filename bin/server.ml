@@ -34,31 +34,16 @@ let handler json = match JSON.Parse.(find string "command" json) with
             |> CCOpt.get_or ~default:(CCList.replicate (CCList.length operator) 1.0) in
         (* build score function *)
         let score = Sherlog.Posterior.Score.dot parameterization operator in
-        let pos_score = Sherlog.Posterior.(Score.of_assoc [
-            (* (0.5, Feature.constrained_intros); *)
-            (* (0.3, Feature.intros); *)
-            (* (-1.0, Feature.length); *)
-            (0.2, Feature.context "fuzzy:stress");
-            (0.1, Feature.context "fuzzy:asthma_spontaneous");
-            (0.3, Feature.context "fuzzy:asthma_comorbid");
-            (0.3, Feature.context "fuzzy:influence");
-        ]) in
         (* build filter from parameters *)
         let pos_filter = Sherlog.Program.Filter.(
             intro_consistent
                 >> length search_length
-                >> beam_width pos_score search_width
+                >> beam_width score search_width
         ) in
-        let neg_score = Sherlog.Posterior.(Score.of_assoc [
-            (0.8, Feature.context "fuzzy:stress");
-            (0.9, Feature.context "fuzzy:asthma_spontaneous");
-            (0.7, Feature.context "fuzzy:asthma_comorbid");
-            (0.7, Feature.context "fuzzy:influence");
-        ]) in
         let neg_filter = Sherlog.Program.Filter.(
             intro_consistent
                 >> length search_length
-                >> beam_width neg_score (10 * search_width)
+                >> beam_width score (10 * search_width)
         ) in
         let models = query
             |> Sherlog.Program.models program pos_filter neg_filter

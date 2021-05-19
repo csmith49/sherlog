@@ -1,5 +1,7 @@
 open Watson
 
+(* BASICS *)
+
 type t = {
 	rules : Rule.t list;
 	parameters : Parameter.t list;
@@ -30,6 +32,49 @@ let make rules parameters evidence ontology = {
 	evidence = evidence;
 	ontology = ontology;
 }
+
+(* SEMANTICS *)
+
+module Semantics = struct
+	open Watson
+	
+	type t = Proof.t -> Proof.t list
+
+	let rec one rules proof = match rules with
+		| [] -> []
+		| rule :: rest -> begin match Proof.resolve proof rule with
+			| Some result -> [result]
+			| None -> one rest proof
+		end
+	
+	let all rules proof = rules |> CCList.filter_map (Proof.resolve proof)
+
+	let rec fp sem proof = match sem proof with
+		| [] -> [proof]
+		| results -> results
+			|> CCList.flat_map (fp sem)
+
+	let seq fst snd proof = proof
+		|> fst
+		|> CCList.flat_map snd
+
+	let xor fst snd proof = match fst proof with
+		| [] -> snd proof
+		| results -> results
+
+	module Infix = struct
+		let ( <+> ) = xor
+		let ( >> ) = seq
+	end
+end
+
+(* let apply_intro_rules program proof = program
+	|> introduction_rules
+	|> CCList.filter_map (Watson.Proof.resolve proof)
+
+let apply_non_intro_rules program proof = program
+	|> introduction_rules
+	|> CCList.filter_map (Watson.Proof.resolve proof) *)
 
 let apply_rules program proof = program
 	|> rules
@@ -136,6 +181,8 @@ let models program pos_filter neg_filter goal =
 		|> CCList.map (CCPair.dup_map (contradict program neg_filter)) in
 	CCList.map (fun (handle, bristles) -> Model.of_proof_and_contradictions handle bristles) brooms
 
+(* INPUT / OUTPUT *)
+
 let pp ppf program = let open Fmt in
 	pf ppf "Parameters: %a@, Rules: %a@,%a"
 		(list ~sep:comma Parameter.pp) program.parameters
@@ -151,17 +198,15 @@ module JSON = struct
 		("ontology", program |> ontology |> Ontology.JSON.encode);
 	]
 
-	let decode json =
-		let rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
-		let parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
-		let evidence = JSON.Parse.(find (list Evidence.JSON.decode) "evidence" json) in
-		let ontology = JSON.Parse.(find Ontology.JSON.decode "ontology" json) in
-		match rules, parameters, evidence, ontology with
-			| Some rules, Some parameters, Some evidence, Some ontology -> Some {
+	let decode json = let open CCOpt in
+		let* rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
+		let* parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
+		let* evidence = JSON.Parse.(find (list Evidence.JSON.decode) "evidence" json) in
+		let* ontology = JSON.Parse.(find Ontology.JSON.decode "ontology" json) in
+			return {
 				rules = rules;
 				parameters = parameters;
 				evidence = evidence;
 				ontology = ontology;
 			}
-			| _ -> None
 end
