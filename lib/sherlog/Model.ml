@@ -62,24 +62,35 @@ type t = {
     assignments : Assignment.t list;
     meet : Observation.t;
     avoid : Observation.t list;
+    meet_history : Search.History.t;
+    avoid_history : Search.History.t list;
 }
 
 let make assignments meet avoid = {
-    assignments = assignments ; meet = meet ; avoid = avoid ;
+    assignments = assignments;
+    meet = meet;
+    avoid = avoid;
+    meet_history = Search.History.empty;
+    avoid_history = [];
 }
 
 let assignments m = m.assignments
 let meet m = m.meet
 let avoid m = m.avoid
+let meet_history m = m.meet_history
+let avoid_history m = m.avoid_history
 
 module JSON = struct
     let encode model = `Assoc [
         ("type", `String "model");
         ("assignments", `List (model |> assignments |> CCList.map Assignment.JSON.encode));
         ("meet",  model |> meet |> Observation.JSON.encode);
+        ("meet_history", model |> meet_history |> Search.History.JSON.encode);
         ("avoid", model |> avoid |> CCList.map Observation.JSON.encode |> JSON.Make.list);
+        ("avoid_history", model |> avoid_history |> CCList.map Search.History.JSON.encode |> JSON.Make.list);
     ]
 
+    (* TODO - this drops the histories, but that's okay for now *)
     let decode json = let open CCOpt in
         let* assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
         let* meet = JSON.Parse.(find Observation.JSON.decode "meet" json) in
@@ -163,11 +174,10 @@ let of_proof proof =
         |> Compile.of_explanation
         |> Compile.associate_names
         |> Compile.assignments in
-    {
-        assignments = pa |> CCList.map fst;
-        meet = pa |> Compile.observation;
-        avoid = [];
-    }
+    let assignments = pa |> CCList.map fst in
+    let meet = pa |> Compile.observation in
+    let avoid = [] in
+        make assignments meet avoid
 
 let compile proof = proof
     |> Explanation.of_proof
@@ -178,10 +188,29 @@ let compile proof = proof
 let of_proof_and_contradictions proof contradictions =
     let pa = compile proof in
     let nas = contradictions |> CCList.map compile in
+    let assignments = pa :: nas |> CCList.flat_map (CCList.map fst) in
+    let meet = pa |> Compile.observation in
+    let avoid = nas |> CCList.map Compile.observation in
+        make assignments meet avoid
+
+let of_search_states handle bristles =
+    let pa = handle
+        |> Search.State.value
+        |> compile in
+    let nas = bristles
+        |> CCList.map Search.State.value
+        |> CCList.map compile in
+    let assignments = pa :: nas |> CCList.flat_map (CCList.map fst) in
+    let meet = pa |> Compile.observation in
+    let avoid = nas |> CCList.map Compile.observation in
+    let meet_history = handle |> Search.State.history in
+    let avoid_history = bristles |> CCList.map Search.State.history in
     {
-        assignments = pa :: nas |> CCList.flat_map (CCList.map fst);
-        meet = pa |> Compile.observation;
-        avoid = nas |> CCList.map Compile.observation;
+        assignments = assignments;
+        meet = meet;
+        avoid = avoid;
+        meet_history = meet_history;
+        avoid_history = avoid_history;
     }
 
 let pp ppf model = let open Fmt in

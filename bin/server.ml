@@ -23,30 +23,18 @@ let handler json = match JSON.Parse.(find string "command" json) with
         let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "query" json) 
             |> CCOpt.map Sherlog.Evidence.to_atoms in
         (* get parameters for search *)
-        let search_length = JSON.Parse.(find int "depth" json)
-            |> CCOpt.get_or ~default:CCInt.max_int in
         let search_width = JSON.Parse.(find int "width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
         let operator = JSON.Parse.(find (list string) "contexts" json)
             |> CCOpt.get_or ~default:[]
-            |> Sherlog.Posterior.Feature.context_operator in
+            |> Sherlog.Posterior.Operator.of_contexts in
         let parameterization = JSON.Parse.(find Sherlog.Posterior.Parameterization.JSON.decode "parameters" json)
             |> CCOpt.get_or ~default:(CCList.replicate (CCList.length operator) 1.0) in
         (* build score function *)
-        let score = Sherlog.Posterior.Score.dot parameterization operator in
+        let posterior = Sherlog.Posterior.make operator parameterization in
         (* build filter from parameters *)
-        let pos_filter = Sherlog.Program.Filter.(
-            intro_consistent
-                >> length search_length
-                >> beam_width score search_width
-        ) in
-        let neg_filter = Sherlog.Program.Filter.(
-            intro_consistent
-                >> length search_length
-                >> beam_width score (10 * search_width)
-        ) in
         let models = query
-            |> Sherlog.Program.models program pos_filter neg_filter
+            |> Sherlog.Program.models ~width:search_width program posterior
             |> CCList.map Sherlog.Model.JSON.encode in
         return (`List models)
     | _ -> None

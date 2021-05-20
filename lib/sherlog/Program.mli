@@ -67,39 +67,22 @@ module Semantics : sig
 end
 
 module Filter : sig
-    type t = Watson.Proof.t list -> Watson.Proof.t list
-    
-    val total : t
-    (** [total proofs] is the identity filter that just returns [proofs] *)
+    type t = Watson.Proof.t -> bool
 
-    val constraint_avoiding : Ontology.t ->  t
-    (** [constraint_avoiding ontology proofs] returns all proofs that avoid constraints given by [ontology] *)
+    val negate : t -> t
+
+    val constraint_avoiding : Ontology.t -> t
 
     val intro_consistent : t
-    (** [intro_consistent proofs] removes any proofs that are not introduction consistent *)
-    
+
     val length : int -> t
-    (** [length k proofs] removes proofs that are longer than [k] resolution steps *)
 
-    val beam_width : Posterior.Score.t -> int -> t
-    (** [beam_width score k proofs] samples [k] proofs from [proofs] proportional to [score] *)
-    
-    val uniform_width : int -> t
-    (** [uniform_width k proofs] samples [k] proofs uniformly from [proofs] *)
-    
-    val compose : t -> t -> t
-    (** [compose f g] constructs the filter where [f] is applied, then [g] *)
+    val join : t -> t -> t
 
-    val (>>) : t -> t -> t
-    (** [f >> g] is short-hand for [compose f g] *)
+    val ( ++ ) : t -> t -> t
 end
 
 val apply : t -> Watson.Proof.t -> Watson.Proof.t list
-val prove : t -> Filter.t -> Watson.Atom.t list -> Watson.Proof.t list
-val (|=) : t -> Watson.Atom.t list -> Watson.Proof.t list
+val apply_with_dependencies : t -> Watson.Proof.t -> Watson.Proof.t list
 
-val contradict : t -> Filter.t -> Watson.Proof.t -> Watson.Proof.t list
-
-val models : t -> Filter.t -> Filter.t -> Watson.Atom.t list -> Model.t list
-
-
+val models : ?width:int -> t -> Posterior.t -> Watson.Atom.t list -> Model.t list

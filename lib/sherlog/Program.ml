@@ -68,118 +68,106 @@ module Semantics = struct
 	end
 end
 
-(* let apply_intro_rules program proof = program
-	|> introduction_rules
-	|> CCList.filter_map (Watson.Proof.resolve proof)
-
-let apply_non_intro_rules program proof = program
-	|> introduction_rules
-	|> CCList.filter_map (Watson.Proof.resolve proof) *)
-
-let apply_rules program proof = program
-	|> rules
-	|> CCList.filter_map (Watson.Proof.resolve proof)
-
-let apply_ontology program proof = program
-	|> ontology
-	|> Ontology.dependencies
-	|> CCList.filter_map (Watson.Proof.resolve proof)
-
-let apply program proof =
-	let proofs = apply_rules program proof in
-	if (CCList.length proofs) != 0 then proofs
-	else apply_ontology program proof
-
 module Filter = struct
-	type t = Watson.Proof.t list -> Watson.Proof.t list
+	type t = Watson.Proof.t -> bool
 
-	let total proofs = proofs
-	
-	let constraint_avoiding ontology proofs =
-		let constraints = ontology
-			|> Ontology.constraints in
-		let check proof =
-			let atoms = proof |> Watson.Proof.to_atoms in
-			constraints
-				|> CCList.map (fun c -> Watson.Atom.embed_all c atoms)
-				|> CCList.for_all CCList.is_empty in
-		CCList.filter check proofs
+	let negate filter = fun x -> not (filter x)
 
-	let rec intro_consistent proofs = CCList.filter is_intro_consistent proofs
-	and is_intro_consistent proof =
+	let constraint_avoiding ontology proof =
+		let constraints = ontology |> Ontology.constraints in
+		let atoms = proof |> Watson.Proof.to_atoms in
+		constraints
+			|> CCList.map (fun c -> Watson.Atom.embed_all c atoms)
+			|> CCList.for_all CCList.is_empty
+
+	let intro_consistent proof =
 		let intro_tags = proof
 			|> Explanation.of_proof
 			|> Explanation.introductions
 			|> CCList.map Explanation.Introduction.tag in
-			(* |> CCList.filter (CCList.for_all Watson.Term.is_ground) in *)
 		let num_intros = CCList.length intro_tags in
 		let num_unique_intros = intro_tags
 			|> CCList.sort_uniq ~cmp:(CCList.compare Watson.Term.compare)
 			|> CCList.length in
-		let result = CCInt.equal num_intros num_unique_intros in
-		result
+		CCInt.equal num_intros num_unique_intros
 
-	let length l proofs = 
-		proofs
-		|> CCList.filter (fun p -> (p |> Watson.Proof.witnesses |> CCList.length) <= l)
-	
-	let beam_width score w proofs =
-		if CCList.length proofs <= w then proofs else
-		let random_proofs = proofs
-			|> Posterior.random_proof score
-			|> CCList.replicate w
-			|> CCRandom.list_seq in
-		CCRandom.run random_proofs |> CCList.map snd
-	
-	let uniform_width w proofs =
-		if CCList.length proofs <= w then proofs else
-		let random_proofs = proofs
-			|> CCRandom.pick_list
-			|> CCList.replicate w
-			|> CCRandom.list_seq in
-		CCRandom.run random_proofs
+	let length k proof = 
+		let l = proof
+			|> Watson.Proof.witnesses
+			|> CCList.length in
+		l <= k
 
-	let compose f g proofs = proofs |> f |> g
-	let (>>) f g = compose f g
+	let join l r = fun proof -> (l proof) && (r proof)
+
+	let ( ++ ) = join
 end
 
-let rec explore program expand filter worklist proven =
-	match worklist with
-	| [] -> proven
-	| proof :: rest ->
-		if Watson.Proof.is_resolved proof then
-			let proven = proof :: proven in
-			explore program expand filter rest proven
-		else
-			let proofs = proof
-				|> expand program
-				|> CCList.append rest
-				|> filter in
-			explore program expand filter proofs proven
+(* APPLICATION *)
 
-let prove program filter goal =
-	let initial_proof = Watson.Proof.of_atoms goal [] in
-	let worklist = [initial_proof] in
-		explore program apply filter worklist []
+let apply program =
+	let intro_rules = introduction_rules program in
+	let non_intro_rules = non_introduction_rules program in
+	let open Semantics in let open Semantics.Infix in
+		(fp (one non_intro_rules)) >> (all intro_rules)
 
-let (|=) program goal = prove program Filter.total goal
+let apply_with_dependencies program =
+	let intro_rules = introduction_rules program in
+	let non_intro_rules = non_introduction_rules program in
+	let ontological_rules = program |> ontology |> Ontology.dependencies in
+	let open Semantics in let open Semantics.Infix in
+		(fp (one non_intro_rules)) >> (all intro_rules <+> all ontological_rules)
 
-let contradict program filter proof =
-	let proven_atoms = proof
-		|> Watson.Proof.to_atoms in
-	let constraints = program
+(* SEARCH *)
+
+let linear_domain : t -> (t -> Watson.Proof.t -> Watson.Proof.t list) -> Posterior.t -> (module Search.Domain with type t = Watson.Proof.t) = fun program successor posterior ->
+	(module struct
+		type t = Watson.Proof.t
+
+		let features = Posterior.Operator.apply (Posterior.operator posterior)
+		let score = Posterior.Parameterization.linear_combination (Posterior.parameterization posterior)
+		let accept = Watson.Proof.is_resolved
+		let reject = fun _ -> false
+		let successors = successor program
+	end)
+
+let initial_worklist goal cache =
+	let history = Search.History.empty in
+	let proof = Watson.Proof.of_atoms goal cache in
+		[Search.State.make proof history]
+
+(* MODEL BUILDING *)
+let prove ?width:(width=CCInt.max_int) program posterior goal =
+	(* get search domain *)
+	let (module D) = linear_domain program apply_with_dependencies posterior in
+	(* initialize worklist *)
+	let wl = initial_worklist goal [] in
+	(* search *)
+	let results = Search.stochastic_beam_search (module D) width wl [] in
+	(* and remove anything with a contradiction *)
+	let constraint_avoiding = program
 		|> ontology
-		|> Ontology.constraints in
-	let initial_proofs = constraints
-		|> CCList.map (fun c -> Watson.Proof.of_atoms c proven_atoms) in
-	explore program apply_rules filter initial_proofs []
+		|> Filter.constraint_avoiding in
+	results |> CCList.filter (Search.State.check constraint_avoiding)
 
-let models program pos_filter neg_filter goal =
+let contradict ?width:(width=CCInt.max_int) program posterior proof =
+	(* get search domain *)
+	let (module D) = linear_domain program apply posterior in
+	(* initialize worklist *)
+	let proven_atoms = proof |> Watson.Proof.to_atoms in
+	let constraints = program |> ontology |> Ontology.constraints in
+	let wl = constraints |> CCList.flat_map (fun c -> initial_worklist c proven_atoms) in
+	(* search *)
+	let results = Search.stochastic_beam_search (module D) width wl [] in
+		results
+
+let models ?width:(width=CCInt.max_int) program posterior goal =
 	let brooms = goal
-		|> prove program pos_filter
-		|> Filter.constraint_avoiding (ontology program)
-		|> CCList.map (CCPair.dup_map (contradict program neg_filter)) in
-	CCList.map (fun (handle, bristles) -> Model.of_proof_and_contradictions handle bristles) brooms
+		|> prove ~width:width program posterior
+		|> CCList.map (fun state ->
+				let proof = state |> Search.State.value in
+				let contradictions = contradict ~width:width program posterior proof in
+					(state, contradictions)) in
+	brooms |> CCList.map (CCPair.merge Model.of_search_states)
 
 (* INPUT / OUTPUT *)
 

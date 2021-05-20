@@ -109,7 +109,7 @@ let rec stochastic_beam_search : type a . (module Domain with type t = a) -> int
 		let repacked = unpacked |> CCList.map repack in
 		(* step 4: sub-sample, if necessary *)
 		let worklist = 
-			if CCList.length repacked <= width then worklist 
+			if CCList.length repacked <= width then repacked 
 			else
 				let scores state = state |> State.features |> D.score in
 				let samples = prop_to repacked scores

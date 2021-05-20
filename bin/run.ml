@@ -27,9 +27,10 @@ let _ = Fmt.pr "%a Search width/depth: %a/%a\n"
     (Fmt.styled (`Fg `Blue) Fmt.int) !search_depth
 
 (* utility functions *)
-let filter = Sherlog.Program.Filter.(
-    intro_consistent >> length !search_depth >> uniform_width !search_width
-)
+
+let operator = Sherlog.Posterior.Operator.of_contexts []
+let parameterization = CCList.replicate (CCList.length operator) 1.0
+let posterior = Sherlog.Posterior.make operator parameterization
 
 (* operation to be done per-file *)
 let operate filename =
@@ -77,7 +78,7 @@ let operate filename =
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
         (* compute proofs and process *)
-        let models = Sherlog.Program.models program filter filter fact in
+        let models = Sherlog.Program.models ~width:!search_width program posterior fact in
         let _ = Fmt.pr "%a Found %a models.\n"
             marker ()
             (Fmt.styled (`Fg `Blue) Fmt.int) (models |> CCList.length) in
