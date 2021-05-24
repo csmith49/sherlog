@@ -60,23 +60,15 @@ class Program:
         else:
             return cls(parameters, program_source, {})
 
-    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, depth : Optional[int] = None, seeds : Optional[int] = None, namespace = None):
+    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, namespace = None):
         """Samples explanations for the provided evidence.
 
         Parameters
         ----------
         evidence : Evidence
-
         quantity : int
-
         attempts : int (default=100)
-
         width : Optional[int]
-
-        depth : Optional[int]
-
-        seeds : Optional[int]
-
         namespace : Optional[Mapping[str, Any]]
 
         Returns
@@ -96,7 +88,7 @@ class Program:
             for attempt in range(attempts):
                 logger.info("Starting explanation generation attempt %i...", attempt)
                 try:
-                    for json in interface.query(self.program_source, evidence.json, width=width, depth=depth, seeds=seeds):
+                    for json in interface.query(self.program_source, evidence.json, width=width):
                         logger.info("Explanation found.")
                         yield Explanation.of_json(json, external=external)
                 except TimeoutError:
@@ -104,7 +96,7 @@ class Program:
         
         yield from islice(gen(), quantity)
 
-    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 100, width : int = 100, depth : int = 200, attempts : int = 100, seeds : int = 1, namespace = None):
+    def likelihood(self, evidence : Evidence, explanations : int = 1, samples : int = 100, width : int = 100, attempts : int = 100, namespace = None):
         """Compute the marginal likelihood of the provided evidence.
 
         Parameters
@@ -122,7 +114,7 @@ class Program:
         -------
         Tensor
         """
-        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, depth=depth, seeds=seeds, namespace=namespace)
+        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, namespace=namespace)
         explanation_likelihoods = [explanation.miser(samples=samples) for explanation in explanations]
         if explanation_likelihoods:
             return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat

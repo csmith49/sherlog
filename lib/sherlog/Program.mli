@@ -42,27 +42,31 @@ val pp : t Fmt.t
 module Semantics : sig
     type t = Watson.Proof.t -> Watson.Proof.t list
 
-    val one : Watson.Rule.t list -> t
-    (* applies the first possible rule in the list *)
-
-    val all : Watson.Rule.t list -> t
-    (* applies all possible rules in the list *)
-
-    val fp : t -> t
-    (* applies semantic transform until convergence *)
-
-    val seq : t -> t -> t
-    (* [seq l r] does [l] then [r] to all results *)
-
-    val xor : t -> t -> t
-    (* [xor l r] does [l] then [r] if [l] produces no results *)
-
-    module Infix : sig
-        val ( <+> ) : t -> t -> t
-        (* xor *)
+    module M : sig
+        val return : Watson.Proof.t -> Watson.Proof.t list
+        val (>>=) : Watson.Proof.t list -> (Watson.Proof.t -> Watson.Proof.t list) -> Watson.Proof.t list
         
-        val ( >> ) : t -> t -> t
-        (* seq *)
+        val zero : Watson.Proof.t list
+        val (++) : Watson.Proof.t list -> Watson.Proof.t list -> Watson.Proof.t list
+    end
+
+    (* construction *)
+    val result : Watson.Proof.t list -> t
+    val of_rule : Watson.Rule.t -> t
+
+    module Combinator : sig
+        (* disjunction *)
+        val (<|>) : t -> t -> t
+        val choice : t list -> t
+        (* conjunction *)
+        val (<&>) : t -> t -> t
+        val union : t list -> t
+        (* sequence *)
+        val (>>) : t -> t -> t
+        (* failure *)
+        val attempt : t -> t
+        (* recursion *)
+        val fixpoint : t -> t
     end
 end
 

@@ -25,7 +25,7 @@ def main(log, port):
 
 @main.command()
 @click.argument("filename", type=click.Path(exists=True))
-@click.option("-e", "--epochs", default=300, help="Number of training epochs.")
+@click.option("-e", "--epochs", default=10, help="Number of training epochs.")
 @click.option("-o", "--optimizer", default="sgd",
     type=click.Choice(["sgd", "adam"], case_sensitive=False), show_default=True,
     help="Optimization strategy for training parameters.")
@@ -35,7 +35,7 @@ def main(log, port):
     help="Samples-per-explanation in gradient estimation.")
 @click.option("-i", "--instrument", type=click.Path(),
     help="Output file for instrumentation logs.")
-@click.option("-r", "--resolution", default=50, help="Instrumentation resolution (in epochs).")
+@click.option("-r", "--resolution", default=5, help="Instrumentation resolution (in epochs).")
 @click.option("-b", "--batch-size", default=10, help="Batch size.")
 def train(filename, epochs, optimizer, learning_rate, samples, instrument, resolution, batch_size):
     """Train FILENAME with the provided parameters."""
@@ -59,7 +59,7 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
         for batch in minibatch(evidence, batch_size):
             with optimizer as o:
                 batch = Batch(batch)
-                o.maximize(batch.objective(program, explanations=2, samples=samples))
+                o.maximize(batch.objective(program, explanations=1, samples=samples))
 
         if epoch % resolution == 0:
             log = {"epoch" : epoch}

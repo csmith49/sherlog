@@ -46,7 +46,7 @@ def parse(source: str):
     if response == "failure": raise CommunicationError()
     return response
 
-def query(program, query, depth=None, width=None, seeds=None):
+def query(program, query, width=None, posterior_context=None, parameterization=None):
     """Run a Sherlog program on a query.
 
     Parameters
@@ -54,9 +54,9 @@ def query(program, query, depth=None, width=None, seeds=None):
     program : JSON representation
     query : JSON representation
 
-    depth : Optional[int]
     width : Optional[int]
-    seeds : Optional[int]
+    posterior_context : Optional[List[str]]
+    parameterization : Optional[List[float]]
 
     Returns
     -------
@@ -73,17 +73,19 @@ def query(program, query, depth=None, width=None, seeds=None):
     }
 
     # build the extra config tags
-    if depth:
-        message["depth"] = depth
     if width:
         message["width"] = width
-    if seeds:
-        message["seeds"] = seeds
+    if posterior_context:
+        message["contexts"] = posterior_context
+    if parameterization:
+        message["parameters"] = parameterization
 
     # send and rec
     response = _SOCKET.communicate(message)
     if response == "failure":
         raise CommunicationError()
+    # this never actually happens - lwt is collaborative, and resolution currently does not consider it
+    # TODO - fix
     elif response == "timeout":
         raise TimeoutError()
     else:

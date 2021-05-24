@@ -35,36 +35,52 @@ let make rules parameters evidence ontology = {
 
 (* SEMANTICS *)
 
-module Semantics = struct
-	open Watson
-	
+module Semantics = struct	
 	type t = Proof.t -> Proof.t list
 
-	let rec one rules proof = match rules with
-		| [] -> []
-		| rule :: rest -> begin match Proof.resolve proof rule with
-			| Some result -> [result]
-			| None -> one rest proof
-		end
+	module M = struct
+		let return = CCList.return
+		let bind xs f = CCList.flat_map f xs
+		let (>>=) = bind
+		let zero = []
+		let plus = (@)
+		let (++) = plus
+	end
+
+	(* CONSTRUCTION *)
 	
-	let all rules proof = rules |> CCList.filter_map (Proof.resolve proof)
+	let result xs = fun _ -> xs
+	
+	let of_rule rule proof = match Proof.resolve proof rule with
+	| Some result -> M.return result
+	| None -> M.zero
 
-	let rec fp sem proof = match sem proof with
-		| [] -> [proof]
-		| results -> results
-			|> CCList.flat_map (fp sem)
+	(* COMBINATORS *)
 
-	let seq fst snd proof = proof
-		|> fst
-		|> CCList.flat_map snd
+	module Combinator = struct
+		(* DISJUNCTIVE *)
+		let try_or l r = fun p -> match l p with
+			| [] -> r p
+			| results -> results
+		let (<|>) = try_or
+		let choice ss = CCList.fold_left try_or (result M.zero) ss
 
-	let xor fst snd proof = match fst proof with
-		| [] -> snd proof
-		| results -> results
+		(* CONJUNCTIVE *)
+		let try_and l r = fun p -> M.(l p ++ r p)
+		let (<&>) = try_and
+		let union ss = CCList.fold_left try_and (result M.zero) ss
 
-	module Infix = struct
-		let ( <+> ) = xor
-		let ( >> ) = seq
+		(* SEQUENCING *)
+		let seq l r = fun p -> M.(l p >>= r)
+		let (>>) = seq
+
+		(* FAILURE *)
+		let attempt (sem : t) : t = sem <|> M.return
+
+		(* RECURSION *)
+		let rec fixpoint sem proof = match sem proof with
+			| [] -> [proof]
+			| results -> M.(results >>= fixpoint sem)
 	end
 end
 
@@ -105,17 +121,37 @@ end
 (* APPLICATION *)
 
 let apply program =
-	let intro_rules = introduction_rules program in
-	let non_intro_rules = non_introduction_rules program in
-	let open Semantics in let open Semantics.Infix in
-		(fp (one non_intro_rules)) >> (all intro_rules)
+	let classical = program
+		|> non_introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in (* choice here doesn't quite do what you want... *)
+	let introduction = program
+		|> introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	Semantics.Combinator.(
+		let fp = fixpoint classical in
+		fp >> introduction >> fp
+	)
 
 let apply_with_dependencies program =
-	let intro_rules = introduction_rules program in
-	let non_intro_rules = non_introduction_rules program in
-	let ontological_rules = program |> ontology |> Ontology.dependencies in
-	let open Semantics in let open Semantics.Infix in
-		(fp (one non_intro_rules)) >> (all intro_rules <+> all ontological_rules)
+	let classical = program
+		|> non_introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	let introduction = program
+		|> introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	let ontological = program
+		|> ontology
+		|> Ontology.dependencies
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	Semantics.Combinator.(
+		let fp = fixpoint classical in
+		fp >> (introduction <|> ontological) >> fp
+	)
 
 (* SEARCH *)
 
@@ -148,6 +184,7 @@ let prove ?width:(width=CCInt.max_int) program posterior goal =
 		|> ontology
 		|> Filter.constraint_avoiding in
 	results |> CCList.filter (Search.State.check constraint_avoiding)
+	
 
 let contradict ?width:(width=CCInt.max_int) program posterior proof =
 	(* get search domain *)
