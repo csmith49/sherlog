@@ -1,5 +1,7 @@
+from os import name
 from .parameter import Parameter
 from .evidence import Evidence
+from .posterior import Posterior
 from .. import interface
 from ..engine import Model, value, Store
 from ..explanation import Explanation
@@ -15,7 +17,7 @@ import random
 logger = get("program")
 
 class Program:
-    def __init__(self, parameters, program_source, namespace):
+    def __init__(self, parameters, program_source, namespace, contexts=None):
         """Object representing a Sherlog problem file.
 
         Parameters
@@ -24,16 +26,23 @@ class Program:
 
         namespaces : Iterable[str]
 
+        posterior : Optional[List[str]]
+
         program_source : JSON
         """
         # convert params to name-param map
         self._parameters = {p.name : p for p in parameters}
         
-
         self._namespace = namespace
         
         # just record the rest
         self.program_source = program_source
+
+        # and set the posterior
+        if contexts:
+            self.posterior = Posterior(contexts=contexts)
+        else:
+            self.posterior = Posterior()
 
     @classmethod
     def of_json(cls, json, namespace=None):
@@ -60,7 +69,7 @@ class Program:
         else:
             return cls(parameters, program_source, {})
 
-    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, namespace = None):
+    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, namespace = None, posterior = None):
         """Samples explanations for the provided evidence.
 
         Parameters
@@ -70,6 +79,7 @@ class Program:
         attempts : int (default=100)
         width : Optional[int]
         namespace : Optional[Mapping[str, Any]]
+        posterior : Optional[Posterior]
 
         Returns
         -------
@@ -83,12 +93,19 @@ class Program:
         else:
             external = (self.parameter_map, self._namespace)
 
+        # interface kwargs
+        kwargs = {}
+        kwargs["width"] = width
+        if posterior:
+            kwargs["contexts"] = list(posterior.contexts)
+            kwargs["parameterization"] = list(posterior.weights)
+
         # build the explanation generator
         def gen():
             for attempt in range(attempts):
                 logger.info("Starting explanation generation attempt %i...", attempt)
                 try:
-                    for json in interface.query(self.program_source, evidence.json, width=width):
+                    for json in interface.query(self.program_source, evidence.json, **kwargs):
                         logger.info("Explanation found.")
                         yield Explanation.of_json(json, external=external)
                 except TimeoutError:
@@ -115,11 +132,27 @@ class Program:
         Tensor
         """
         explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, namespace=namespace)
-        explanation_likelihoods = [explanation.miser(samples=samples) for explanation in explanations]
+        explanation_likelihoods = [explanation.likelihood(self.posterior.parameterization, samples=samples) for explanation in explanations]
         if explanation_likelihoods:
             return torch.mean(torch.cat(explanation_likelihoods)) # or could be torch.cat
         else:
             return torch.tensor(0.0)
+
+    def log_prob(self, evidence, explanations=1, samples=100, width=100, namespace=None):
+        explanations = self.explanations(evidence, quantity=explanations, width=width, namespace=namespace)
+        explanation_lps = [ex.log_prob(self.posterior.parameterization, samples=samples) for ex in explanations]
+        if explanation_lps:
+            return torch.mean(torch.stack(explanation_lps))
+        else:
+            return torch.tensor(0.0)
+
+    def log_likelihood(self, evidence, explanations=1, samples=100, width=100, attempts=100, namespace=None):
+        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width, namespace=namespace)
+        explanation_lps = [explanation.log_prob(self.posterior.parameterization, samples=samples) for explanation in explanations]
+        if explanation_lps:
+            return torch.mean(torch.cat(explanation_lps))
+        else:
+            return torch.ones(samples)
 
     def sample_explanation(self, evidence : Evidence, burn_in : int = 100, samples : int = 100, **kwargs):
         """Sample an explanation from the posterior.
@@ -152,6 +185,8 @@ class Program:
         if sample is None:
             logger.warning(f"No sample accepted after {burn_in} burn-in steps.")
         return sample
+
+    # TODO - save and load posterior parameters with this contraption
 
     def save_parameters(self, filepath):
         """Write all parameter values in scope to a file.
@@ -203,6 +238,7 @@ class Program:
         for _, obj in self._namespace.items():
             if hasattr(obj, "parameters"):
                 yield from obj.parameters()
+        yield from self.posterior.parameters()
 
     @property
     def parameter_map(self):

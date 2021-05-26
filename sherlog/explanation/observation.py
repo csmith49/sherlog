@@ -119,6 +119,14 @@ class Observation:
         # return the variable storing the result
         return result
 
+    def join(self, other):
+        mapping = {}
+        for k, v in self.mapping.items():
+            mapping[k] = v
+        for k, v in other.mapping.items():
+            mapping[k] = v
+        return Observation(mapping)
+
     # MAGIC METHODS ------------------------------------------------------
 
     def __getitem__(self, key):
@@ -143,3 +151,6 @@ class Observation:
 
     def __str__(self):
         return str(self.mapping)
+    
+    def __add__(self, other):
+        return self.join(other)

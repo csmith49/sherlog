@@ -10,8 +10,21 @@ let spec_list = [
 let usage_msg = "Server for SherLog"
 let _ = Arg.parse spec_list print_endline usage_msg
 
-(* message handling *)
+(* utility *)
+let rec shuffle xs = match xs with
+    | [] -> []
+    | xs ->
+        (* get a random index *)
+        let idx' = xs
+            |> CCList.length
+            |> CCRandom.int in
+        let idx = CCRandom.run idx' in
+        (* split xs into x and xs' *)
+        let x = CCList.get_at_idx_exn idx xs in
+        let xs' = CCList.remove_at_idx idx xs in
+            x :: (shuffle xs')
 
+(* message handling *)
 let handler json = match JSON.Parse.(find string "command" json) with
     | Some "parse" ->
         JSON.Parse.(find string "program" json)
@@ -28,14 +41,15 @@ let handler json = match JSON.Parse.(find string "command" json) with
         let operator = JSON.Parse.(find (list string) "contexts" json)
             |> CCOpt.get_or ~default:[]
             |> Sherlog.Posterior.Operator.of_contexts in
-        let parameterization = JSON.Parse.(find Sherlog.Posterior.Parameterization.JSON.decode "parameters" json)
+        let parameterization = JSON.Parse.(find Sherlog.Posterior.Parameterization.JSON.decode "parameterization" json)
             |> CCOpt.get_or ~default:(CCList.replicate (CCList.length operator) 1.0) in
         (* build score function *)
         let posterior = Sherlog.Posterior.make operator parameterization in
         (* build filter from parameters *)
         let models = query
             |> Sherlog.Program.models ~width:search_width program posterior
-            |> CCList.map Sherlog.Model.JSON.encode in
+            |> CCList.map Sherlog.Model.JSON.encode 
+            |> shuffle in
         return (`List models)
     | _ -> None
 

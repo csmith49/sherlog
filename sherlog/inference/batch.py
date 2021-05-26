@@ -20,8 +20,8 @@ class Batch:
 
     def objective(self, program : Program, **kwargs) -> Objective:
         # compute total log-prob of the provided evidence
-        marginals = torch.stack([program.likelihood(evidence, **kwargs) for evidence in self.evidence])
-        log_likelihood = marginals.log().sum()
+        marginals = torch.stack([program.log_prob(evidence, **kwargs) for evidence in self.evidence])
+        log_likelihood = marginals.sum()
         
         return Objective(self.name, log_likelihood)
 

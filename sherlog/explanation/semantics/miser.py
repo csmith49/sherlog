@@ -236,10 +236,6 @@ def _or(*args):
         prod *= (1 - arg)
     return 1 - prod
 
-def _satisfy(meet, avoid):
-    return meet * (1 - avoid)
-    # return meet + (1 - avoid) / 2
-
 def _set(x):
     return x
 
@@ -272,7 +268,6 @@ def factory(samples, forcing=None):
         "dirichlet" : batched_random_factory(Dirichlet),
         "tensorize" : lift(_tensorize),
         "equal" : lift(_equal),
-        "satisfy" : lift(_satisfy),
         "set" : lift(_set),
         "or" : lift(_or)
     }

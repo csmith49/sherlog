@@ -27,7 +27,7 @@ class Store:
                     return external_map[key.name]
                 except KeyError: pass
         # otherwise, crash
-        raise KeyError()
+        raise KeyError(str(key))
 
     def __setitem__(self, key, obj):
         # we can only use variables as keys - external maps handled at construction only

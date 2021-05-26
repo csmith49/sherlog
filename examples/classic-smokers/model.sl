@@ -1,3 +1,8 @@
+!parameter stress : unit.
+!parameter spontaneous : unit.
+!parameter comorbid : unit.
+!parameter influence : unit.
+
 # probabilistic rules
 stress :: stress(X) <- person(X).
 spontaneous :: asthma_spontaneous(X) <- person(X).
