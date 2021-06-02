@@ -12,9 +12,17 @@ import torch
 logger = get("explanation")
 
 # TODO - fix this, don't think it's right
+def log_add(x, y):
+    if y.isinf():
+        return x
+    if x.isinf():
+        return y
+    return (x.exp() + y.exp()).log()
+    return max(x, y) + (x - y).abs().exp().mul(-1).log1p()
+
 def log_sub(x, y):
-    return x + (y - x).exp().mul(-1).log1p()
-    return max(x, y) + (x - y).abs().mul(-1).exp().log1p()
+    return x + (1 - (y - x).exp()).log()
+    # return x + (x + y).exp().log1p()
 
 
 class Explanation:
@@ -254,7 +262,7 @@ class Explanation:
         # build negative info
         neg_exp = []
         for o, h in self.negatives():
-            lp = self.miser(o, samples=samples).mean().log() - h.log_prob(parameterization)
+            lp = self.miser(o, samples=samples).log().mean()
             neg_exp.append(lp)
         
         if neg_exp:
@@ -269,5 +277,35 @@ class Explanation:
 
         # and combine it all together
         result = log_sub(p, n) - q
-        print(p, n, q, result)
         return result
+
+    def snakes(self):
+        for n, h in self.negatives():
+            p, _ = self.positive()
+            yield (p, n, h)
+
+    def elbo(self, parameterization, samples=1):
+        exp = []
+
+        for p, n, h in self.snakes():
+            entropy = -h.log_prob(parameterization)
+            reconstruction = (self.miser(p, samples=samples) - self.miser(n, samples=samples)).log().mean()
+            exp.append( reconstruction + entropy )
+
+        return torch.stack(exp).mean()
+
+    def log_likelihood(self, parameterization, samples=1):
+        neg_exp = []
+        for o, _ in self.negatives():
+            lp = self.miser(o, samples=samples).mean().log()
+            neg_exp.append(lp)
+        
+        if neg_exp:
+            n = torch.mean(torch.stack(neg_exp))
+        else:
+            n = torch.tensor(0.0).log()
+        
+        o, _ = self.positive()
+        p = self.miser(o, samples=samples).mean().log()
+
+        return (p.exp() - n.exp()).log()

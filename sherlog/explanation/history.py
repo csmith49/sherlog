@@ -20,6 +20,12 @@ class Record:
     def log_prob(self, parameterization):
         return self.features(parameterization).log() - torch.stack(self.context(parameterization)).sum().log()
 
+    def __str__(self):
+        return str(self._context)
+
+    def __repr__(self):
+        return str(self)
+
 class History:
     def __init__(self, records):
         self._records = records
@@ -41,3 +47,9 @@ class History:
 
     def __add__(self, other):
         return self.join(other)
+    
+    def __str__(self):
+        return str(self._records)
+    
+    def __repr__(self):
+        return str(self)
