@@ -11,41 +11,23 @@ import torch
 
 logger = get("explanation")
 
-# TODO - fix this, don't think it's right
-def log_add(x, y):
-    if y.isinf():
-        return x
-    if x.isinf():
-        return y
-    return (x.exp() + y.exp()).log()
-    return max(x, y) + (x - y).abs().exp().mul(-1).log1p()
-
-def log_sub(x, y):
-    return x + (1 - (y - x).exp()).log()
-    # return x + (x + y).exp().log1p()
-
-
 class Explanation:
     """Explanations are the central explanatory element in Sherlog. They capture sufficient generative properties to ensure a particular outcome."""
 
-    def __init__(self, model, meet, avoids, meet_history, avoid_histories, external=()):
+    def __init__(self, model, meet, history, external=()):
         """Constructs an explanation.
 
         Parameters
         ----------
         model : Model
         meet : Observation
-        avoids : List[Observation]
-        meet_history : History
-        avoid_history : List[History]
+        history : History
         external : Mapping[str, Any] (default={})
         """
         logger.info(f"Explanation {self} built.")
         self.model = model
         self.meet = meet
-        self.avoids = avoids
-        self.meet_history = meet_history
-        self.avoid_histories = avoid_histories
+        self.history = history
         self._external = external
 
     @classmethod
@@ -64,29 +46,8 @@ class Explanation:
         logger.info(f"Building explanation from serialization: {json}...")
         model = Model.of_json(json["assignments"])
         meet = Observation.of_json(json["meet"])
-        avoids = [Observation.of_json(obs) for obs in json["avoid"]]
-        meet_history = History.of_json(json["meet_history"])
-        avoid_histories = [History.of_json(h) for h in json["avoid_history"]]
-        return cls(model, meet, avoids, meet_history, avoid_histories, external=external)
-
-    def positive(self):
-        """Positive aspect of the explanation.
-
-        Returns
-        -------
-        Tuple[Observation, History]
-        """
-        return self.meet, self.meet_history
-    
-    def negatives(self):
-        """Negative aspects of the explanation.
-
-        Returns
-        -------
-        Iterable[Tuple[Observation, History]]
-        """
-        for avoid, avoid_history in zip(self.avoids, self.avoid_histories):
-            yield self.meet + avoid, self.meet_history + avoid_history
+        history = History.of_json(json["history"])
+        return cls(model, meet, history, external=external)
 
     @property
     def store(self):
@@ -125,80 +86,6 @@ class Explanation:
                 fmap_args=fmap_args,
                 parameters=parameters)
         return store
-
-    def objective(self, functor):
-        """Use provided functor to evaluate the explanation and build optimization objective.
-
-        Parameters
-        ----------
-        functor : Functor
-
-        Returns
-        -------
-        Functor.t
-        """
-        # get values
-        store = self.run(functor)
-
-        # build meet and avoid
-        meet = self.meet.equality(store, functor, prefix="sherlog:meet", default=1.0)
-        avoids = [obs.equality(store, functor, prefix=f"sherlog:avoid:{i}", default=0.0) for i, obs in enumerate(self.avoids)]
-        avoid = value.Variable("sherlog:avoid")
-        if avoids:
-            functor.run(avoid, "or", avoids, store)
-        else:
-            functor.run(avoid, "set", [0.0], store)
-
-        # build objective
-        objective = value.Variable("sherlog:objective")
-        functor.run(objective, "satisfy", [meet, avoid], store)
-
-        # just return the computed objective - functor should track all relevant info
-        return store[objective]
-
-    def miser(self, samples=1):
-        """Build a Miser surrogate objective for the story.
-
-        Parameters
-        ----------
-        samples : int (default=1)
-            Number of simultaneous executions to perform.
-
-        Returns
-        -------
-        Tensor
-        """
-
-        logger.info("Evaluating types and forcing values...")
-        # build type info for the forcing
-        # types = self.run(semantics.types.functor)
-        forcing = {}
-
-        # add the values from meet
-        for variable in self.meet.variables:
-            forcing[variable] = self.meet[variable]
-
-        # and, if possible, add values from avoid
-        # for avoid in self.avoids:
-        #     for variable in avoid.variables:
-        #         if types[variable] == semantics.types.Discrete(2):
-        #             forcing[variable] = 1 - avoid[variable]
-
-        logger.info(f"Forcing with observations: {forcing}")
-
-        # build the miser functor with the computed forcings
-        functor = semantics.miser.factory(samples, forcing=forcing)
-        objective = self.objective(functor)
-
-        # build surrogate
-        scale = semantics.miser.forcing_scale(objective.dependencies()).detach() # if we don't detach here, we "overcount" forced instances
-        score = semantics.miser.magic_box(objective.dependencies(), samples)
-        surrogate = objective.value * scale * score
-
-        logger.info(f"Objective, likelihood ratio, and magic box: {objective} / {scale} / {score}")
-        logger.info(f"Miser surrogate objective: {surrogate}")
-
-        return surrogate
 
     def graph(self):
         """Build a graph representation of the story.
@@ -259,53 +146,17 @@ class Explanation:
         return surrogate
 
     def log_prob(self, parameterization, samples=1):
-        # build negative info
-        neg_exp = []
-        for o, h in self.negatives():
-            lp = self.miser(o, samples=samples).log().mean()
-            neg_exp.append(lp)
-        
-        if neg_exp:
-            n = torch.mean(torch.stack(neg_exp))
-        else:
-            n = torch.tensor(0.0).log()
+        """Computes log-likelihood of the explanation.
 
-        # build positive info
-        o, h = self.positive()
-        p = self.miser(o, samples=samples).mean().log()
-        q = h.log_prob(parameterization)
+        Parameters
+        ----------
+        parameterization : Parameterization
+        samples : int (default=1)
 
-        # and combine it all together
-        result = log_sub(p, n) - q
-        return result
-
-    def snakes(self):
-        for n, h in self.negatives():
-            p, _ = self.positive()
-            yield (p, n, h)
-
-    def elbo(self, parameterization, samples=1):
-        exp = []
-
-        for p, n, h in self.snakes():
-            entropy = -h.log_prob(parameterization)
-            reconstruction = (self.miser(p, samples=samples) - self.miser(n, samples=samples)).log().mean()
-            exp.append( reconstruction + entropy )
-
-        return torch.stack(exp).mean()
-
-    def log_likelihood(self, parameterization, samples=1):
-        neg_exp = []
-        for o, _ in self.negatives():
-            lp = self.miser(o, samples=samples).mean().log()
-            neg_exp.append(lp)
-        
-        if neg_exp:
-            n = torch.mean(torch.stack(neg_exp))
-        else:
-            n = torch.tensor(0.0).log()
-        
-        o, _ = self.positive()
-        p = self.miser(o, samples=samples).mean().log()
-
-        return (p.exp() - n.exp()).log()
+        Returns
+        -------
+        Tensor
+        """
+        p = self.miser(self.meet, samples=samples).log()
+        q = self.history.log_prob(parameterization)
+        return p - q
