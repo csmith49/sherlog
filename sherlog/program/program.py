@@ -127,7 +127,7 @@ class Program:
         -------
         Tensor
         """
-        explanations = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts, namepsace=namespace)
+        explanations = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts, namespace=namespace)
         log_probs = [ex.log_prob(self.posterior.parameterization, samples=samples) for ex in explanations]
         # if we didn't find any explanations, default
         if log_probs:

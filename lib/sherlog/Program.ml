@@ -184,9 +184,8 @@ let prove ?width:(width=CCInt.max_int) program posterior goal =
 		|> ontology
 		|> Filter.constraint_avoiding in
 	results |> CCList.filter (Search.State.check constraint_avoiding)
-	
 
-let contradict ?width:(width=CCInt.max_int) program posterior proof =
+(* let contradict ?width:(width=CCInt.max_int) program posterior proof =
 	(* get search domain *)
 	let (module D) = linear_domain program apply posterior in
 	(* initialize worklist *)
@@ -195,16 +194,12 @@ let contradict ?width:(width=CCInt.max_int) program posterior proof =
 	let wl = constraints |> CCList.flat_map (fun c -> initial_worklist c proven_atoms) in
 	(* search *)
 	let results = Search.stochastic_beam_search (module D) width wl [] in
-		results
+		results *)
 
-let models ?width:(width=CCInt.max_int) program posterior goal =
-	let brooms = goal
-		|> prove ~width:width program posterior
-		|> CCList.map (fun state ->
-				let proof = state |> Search.State.value in
-				let contradictions = contradict ~width:width program posterior proof in
-					(state, contradictions)) in
-	brooms |> CCList.map (CCPair.merge Model.of_search_states)
+let models ?width:(width=CCInt.max_int) program posterior goal = goal
+	|> prove ~width:width program posterior
+	|> CCList.map Search.State.to_tuple
+	|> CCList.map (CCPair.fold Model.of_proof)
 
 (* INPUT / OUTPUT *)
 

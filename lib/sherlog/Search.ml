@@ -76,6 +76,7 @@ module State = struct
 	let make value history = (value, history)
 	let value = fst
 	let history = snd
+	let to_tuple state = (value state, history state)
 	let check pred state = state |> fst |> pred
 	let extend_history state record = CCPair.map_snd (fun h -> History.extend h record) state
 	let features state = state |> history |> History.most_recent_features

@@ -43,6 +43,8 @@ module State : sig
     val value : 'a t -> 'a
     val history : 'a t -> History.t
 
+    val to_tuple : 'a t -> ('a * History.t)
+
     val check : ('a -> bool) -> 'a t -> bool
 
     val extend_history : 'a t -> History.Record.t -> 'a t
