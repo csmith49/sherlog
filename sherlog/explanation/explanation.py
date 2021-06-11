@@ -143,6 +143,8 @@ class Explanation:
         score = semantics.miser.magic_box(objective.dependencies(), samples)
         surrogate = objective.value * scale * score
 
+        logger.info(f"MISER cost: {objective.value}, IS score: {scale}, magic box: {score}")
+
         return surrogate
 
     def log_prob(self, parameterization, samples=1):
@@ -159,4 +161,5 @@ class Explanation:
         """
         p = self.miser(self.meet, samples=samples).log()
         q = self.history.log_prob(parameterization)
+        logger.info(f"Log-prob: {p}, posterior scaling: {q}")
         return p - q

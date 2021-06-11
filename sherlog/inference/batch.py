@@ -33,10 +33,8 @@ class NamespaceBatch(Batch, Generic[T]):
         self._to_evidence = to_evidence
         self._to_namespace = to_namespace
 
-    def marginals(self, program : Program, **kwargs):
-        for evidence in self.evidence:
-            yield program.likelihood(self._to_evidence(evidence), namespace=self._to_namespace(evidence), **kwargs)
-
     def objective(self, program : Program, **kwargs) -> Objective:
-        log_likelihood = torch.stack(list(self.marginals(program, **kwargs))).log().sum()
-        return Objective(self.name, log_likelihood)
+        def lls():
+            for evidence in self.evidence:
+                yield program.log_prob(self._to_evidence(evidence), namespace=self._to_namespace(evidence), **kwargs)
+        return Objective(self.name, torch.stack(list(lls())).sum())

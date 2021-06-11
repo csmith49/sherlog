@@ -1,16 +1,10 @@
+# Parameters
 !parameter prior : unit.
 !parameter control : unit.
 !parameter treated : unit.
 !parameter uniform : unit.
 
-effectiveness(true; bernoulli[prior]).
-effective <- effectiveness(_, 1.0).
-ineffective <- effectiveness(_, 0.0).
-
-outcome(P; bernoulli[uniform]) <- ineffective, person(P).
-outcome(P; bernoulli[control]) <- effective, control(P).
-outcome(P; bernoulli[treated]) <- effective, treated(P).
-
+# Facts
 control(p_0).
 control(p_1).
 control(p_2).
@@ -23,9 +17,19 @@ treated(p_7).
 treated(p_8).
 treated(p_9).
 
+# Rules
+effectiveness(true; bernoulli[prior]).
+effective <- effectiveness(_, 1.0).
+ineffective <- effectiveness(_, 0.0).
+
+outcome(P; bernoulli[uniform]) <- ineffective, person(P).
+outcome(P; bernoulli[control]) <- effective, control(P).
+outcome(P; bernoulli[treated]) <- effective, treated(P).
+
 person(P) <- treated(P).
 person(P) <- control(P).
 
+# Evidence
 control_outcome <-
     outcome(p_0, 0.0),
     outcome(p_1, 0.0),

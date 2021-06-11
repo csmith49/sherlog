@@ -1,0 +1,10 @@
+nn(m_digit, X, [0, ..., 9]) :: digit(X, 0); ...; digit(X, 9).
+
+number([], Result, Result).
+number([H | T], Acc, Result) :-
+    digit(H, Nr),
+    Acc2 is Nr + 10 * Acc,
+    number(T, Acc2, Result).
+number(X, Y) :- number(X, 0, Y).
+
+multi_addition(X, Y, Z) :- numebr(X, X2), number(Y, Y2), Z is X2 + Y2.

@@ -1,0 +1,16 @@
+nn(m_swap, X, Y, [0, 1]) :: swap(X, Y, 0); swap(X, Y, 1).
+
+hole(X, Y, X, Y) :- swap(X, Y, 0).
+hole(X, Y, Y, X) :- swap(X, Y, 1).
+
+bubble([X], [], X).
+bubble([H1, H2 | T], [X1 | T1], X) :-
+    hole(H1, H2, X1, X2),
+    bubble([X2 | T], T1, X).
+
+bubblesort([], L, L).
+bubblesort(L, L3, Sorted) :-
+    bubble(L, L2, X),
+    bubblesort(L2, [X | L3], Sorted).
+
+sort(L, L2) :- bubblesort(L, [], L2).

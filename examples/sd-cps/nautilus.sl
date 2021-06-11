@@ -1,6 +1,20 @@
-# AUV Sizing Spreadsheet Conversion
+# Nautilus Phase 1 Mission 2 Encoding
 
-# DRIVING VARIABLES -> PARAMETERS
+# This file uses symbolic driving variables. That is, each variable of interest is
+# represented by a parameter declaration:
+# `!parameter name : domain.`
+# where `name` is a symbolic constant, and `domain` restricts the values `name` can take.
+# This representation keeps rules simple, as the parameter values can be accessed via the
+# global namespace. As an alternative, one can use *relational* driving variables, where
+# the declaration above compiles to a value introduction similar to the expression:
+# `name(Domain[]).`
+
+# Implicitly, each domain is associated with a parametric distribution with support only
+# on that domain. One can make the prior distribution explicit with domain knowledge:
+# `!parameter name : Prior[x, y, z].`
+# in which case each of `x`, `y`, and `z` are the program parameters.
+
+# DRIVING VARIABLES -> SHERLOG PARAMETERS
 
 # geometry (in meters)
 !parameter diameter : positive.
@@ -36,7 +50,10 @@
 # averages out at 1,027 (kg/m^3)
 !parameter density_of_seawater : positive.
 
-# REFERENCE GEOMETRY FOR PV
+# number of survey vehicles to use
+!parameter number_of_vehicles : integer.
+
+# REFERENCE GEOMETRY FOR PRESSURE VESSEL
 # only transcribing the relevant values
 # from the MBARI Tethys LRAUV Design
 
@@ -55,7 +72,7 @@ ref_wetted_tail_area(0.5854).
 ref_nose_volume(0.0271).
 ref_tail_volume(0.0349).
 
-# GEOMETRY CALCULATIONS FOR PV
+# GEOMETRY CALCULATIONS FOR PRESSURE VESSEL
 
 total_wetted_area(N + P + T) <- wetted_nose_area(N), wetted_pv_area(P), wetted_tail_area(T).
 fairing_displacement(N + P + T) <- nose_volume(N), pv_volume(P), tail_volume(T).
@@ -145,15 +162,6 @@ nose_displacement(D) <-
 
 pv_excess_bouyancy(D - P - W) <- pv_displacement(D), pv_weight(P), battery_weight(W).
 
-# WARNING PANEL
-
-pv_length_ok <- pv_length(L), L > 0.
-battery_weight_ok <- battery_weight(W), W > 0.
-fineness_ok <- fineness_ratio(R), R >= 5.5, R <= 7.5.
-depth_ok <- depth_rating < 11,030.
-
-all_ok <- pv_length_ok, battery_weight_ok, fineness_ok, depth_ok.
-
 # RANGE TABLE COMPUTATIONS
 
 # assume speed is given in m/s
@@ -166,40 +174,111 @@ drag(S, D)
 # power (W) required to move at speed S
 prop_power(S, W) <- drag(S, D), W = S * D / propulsion_efficiency.
 
-# range (R) of LRAUV at speed S with hotel load W
-range(S, W, R) <-
+# range (R) of LRAUV at speed S
+range(S, R) <-
     battery_capacity(C), prop_power(S, P), 
-    R = S * C * 3.6 / (W + P).
+    R = S * C * 3.6 / (hotel_power_draw + P).
 
-# the most efficient speed (S) given hotel load W
-most_efficient_speed(W, S) <-
+# the most efficient speed
+most_efficient_speed(S) <-
     total_wetted_area(A), F = 1 + appendage_added_area,
     D = drag_coefficient * total_wetted_area * F * density_of_seawater,
-    S = propulsion_efficiency * W / D^(1/3).
+    S = propulsion_efficiency * hotel_power_draw / D^(1/3).
 
-# vehicle range (R) at the most efficient speed for hotel load W
-range_at_most_efficient_speed(W, R) <-
-    battery_capacity(C), most_efficient_speed(W, S),
+# vehicle range (R) at the most efficient speed
+range_at_most_efficient_speed(R) <-
+    battery_capacity(C), most_efficient_speed(S),
     R = C / (1.5 * W) * S * 3.6
+
+# SURVEY COMPUTATIONS
+
+# We make a strong simplifying assumption: all sorties are uniform.
+# This lets us express survey information fully as a function of the
+# design, ignoring the geography of the launch point and trackline.
+
+# To remove this assumption, we can use access to an external
+# optimization engine that, when given the trackline geometry
+# and performance characteristics of the design, computes the minimum
+# number of sorties (and their length!) to survey the entirety of
+# the trackline.
+
+sortie_survey_distance(D) <-
+    range_at_most_efficient_speed(R),
+    S = R - 2 * transit_distance.
+
+sortie_duration(D) <-
+    range_at_most_efficient_speed(R),
+    most_efficient_speed(W, S),
+    D = R / S.
+
+sortie_quantity(Q) <-
+    sortie_survey_distance(D),
+    R = trackline_distance / D,
+    Q = ceil(R).
+
+survey_time(T) <-
+    sortie_quantity(Q), sortie_duration(D),
+    B = floor(Q / number_of_vehicles),
+    T = B * D + (B - 1) * shoreside_turnaround_time.
+
+# WARNING PANEL
+
+total_weight(W) <- pv_weight(P), battery_weight(B), W = B + P.
+
+# non-negative length
+pv_length_ok <- pv_length(L), L > 0.
+
+# non-negative battery weight
+battery_weight_ok <- battery_weight(W), W > 0.
+
+# restricts length/width ratio
+fineness_ok <- fineness_ratio(R), R >= 5.5, R <= 7.5.
+
+# make sure we don't dive too deep
+depth_ok <- depth_rating < 11,030.
+
+# make sure total weight < 2000kg
+weight_ok <- total_weight(W), T = number_of_vehicles * W, T < 2000.
+
+# make sure most efficient speed within sonar operational ranges
+# this assumes we're attempting to maximize range - could travel at one speed,
+# and survey at another
+sonar_ok <- most_efficient_speed(S), S <= 3.08.     # 6 kts to m/s
+
+# makes sure all checks pass
+all_ok <-
+    pv_length_ok,
+    battery_weight_ok,
+    fineness_ok,
+    depth_ok,
+    weight_ok,
+    sonar_ok.
 
 # EXAMPLE OPTIMIZATION TASK
 
 # encodes the following task:
-# 1. find values of the non-observed parameters
-# 2. such that the constraint is satisfied and
-# 3. the objective is maximized.
+# 1. find values of the non-observed parameters,
+# 2. such that the constraint is satisfied, and
+# 3. the objective is minimized.
 
+# observe statements fix the value of the given parameters
 !observe
     depth_rating : 300,
     safety_factor : 1.5,
     battery_specific_energy : 360,
     battery_bouyancy_fraction : 0.5,
-    hotel_power_draw : 20,
     drag_coefficient : 0.0079,
     appendage_added_area : 0.1,
     propulsion_efficiency : 0.5,
     density_of_seawater : 1027.
 
-!constrain all_ok.
+# hard constraints defining the solution space
+!constrain
+    all_ok,                                     # our warning panel holds, and
+    hotel_power_draw > 176.8 * safety_factor    # hotel power draw sufficient for sonar and related systems
+                                                # Kraken AquaPic MiniSAS 120 with RTSAS: 145 W
+                                                # Teledyne Marine Tasman DVL 300 kHz: 11.8 W
+                                                # iXblue Phins C7 INS: 20 W
 
-!optimize R : range_at_most_efficient_speed(8, R).
+# the value to optimize in the constrained solution space
+!optimize T : survey_time(T).

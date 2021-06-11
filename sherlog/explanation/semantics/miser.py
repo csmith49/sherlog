@@ -225,6 +225,7 @@ def _tensorize(*args):
     return torch.tensor(list(args))
 
 def _equal(v1, v2):
+    return torch.dist(v1.float(), v2.float()).pow(2).div(-2.0).exp()
     if torch.equal(v1, v2):
         return torch.tensor(1.0)
     else:
