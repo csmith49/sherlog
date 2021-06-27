@@ -1,16 +1,54 @@
-from . import sample, DPLModel, SherlogModel
+from . import DPLModel, SherlogModel, mnist, samples
+
 from sherlog.logs import enable, get_external
 from sherlog import console
-from sherlog.interface import initialize
 from sherlog.tooling.instrumentation import seed, Timer
+
 from json import dumps
 from statistics import mean
+
 import click
 
-logger = get_external("npi.mnist")
+logger = get_external("examples.mnist")
 
-@click.group()
-def cli(): pass
+@click.command()
+@click.option("-l", "--log", type=str, help="JSONL file for appending results.")
+@click.option("-v", "--verbose", is_flag=True, help="Enable verbose output.")
+@click.option("-t", "--tool", default="dpl",
+    type=click.Choice(["dpl", "sherlog"], case_sensitive=False),
+    help="Tool for evaluating.")
+def cli(log, verbose, tool):
+    """CLI for the MNIST benchmark."""
+    if verbose:
+        enable("examples.mnist")
+
+    # initialize the necessary framework
+    logger.info(f"Loading the {tool} model...")
+    model = {
+        "dpl" : DPLModel(mnist),
+        "sherlog" : SherlogModel()
+    }[tool]
+    timer = Timer()
+    result = {
+        "seed" : seed(),
+        "tool" : tool,
+        "epochs" : epochs,
+        "lr" : lr
+    }
+
+    # do fit
+    with timer:
+        convergence_results = model.fit(training_samples, epochs=epochs, lr=lr)
+    result["training_time"] = timer.elapsed
+
+    # do test
+
+    # process the final results
+    if log is not None:
+        with open(log, 'a') as f:
+            f.write(dumps(result))
+    
+    console.print(result)
 
 @cli.command()
 @click.option("-l", "--log", type=str,
@@ -25,13 +63,11 @@ def cli(): pass
     type=click.Choice(["deepproblog", "sherlog"], case_sensitive=False),
     help="Tool to be evaluated.")
 @click.option("-e", "--epochs", type=int, default=1)
-@click.option("-l", "--learning-rate", type=float, default=0.001)
+@click.option("-l", "--learning-rate", type=float, default=0.01)
 def evaluate(log, train, test, verbose, tool, epochs, learning_rate):
     """Evaluate a tool on the NPI MNIST benchmark."""
 
-    if verbose: enable("npi.mnist", "program", "explanation")
-
-    initialize()
+    if verbose: enable("npi.mnist")
 
     # select the correct interface
     logger.info(f"Loading the {tool} model.")

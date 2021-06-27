@@ -5,7 +5,15 @@ T = TypeVar('T')
 U = TypeVar('U')
 
 class Product(DataSource):
+    """Data source combining other sources with a Cartesian product."""
+
     def __init__(self, *sources : DataSource[T]):
+        """Constructs a data source by combining all provided sources with a Cartesian product.
+
+        Parameters
+        ----------
+        *sources : DataSource[T]
+        """
         self._sources = sources
 
     def training_data(self, *args, **kwargs) -> Iterable[Tuple[T]]:

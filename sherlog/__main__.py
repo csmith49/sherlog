@@ -2,9 +2,12 @@ import click
 from .interface import console
 from .interface import initialize
 from . import logs
+
+from .tooling.instrumentation import Instrumenter, seed
+from .tooling.evaluation import minibatch
 from .tooling import instrumentation
 from .program import load
-from .inference import Optimizer, minibatch, Batch
+from .inference import Optimizer, BatchObjective
 from torch.optim import SGD, Adam
 from rich.progress import track
 
@@ -46,8 +49,8 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
     optimizer = Optimizer(program, optimizer=optimizer, learning_rate=learning_rate)
 
     # build the instrumenter
-    instrumenter = instrumentation.Instrumenter(instrument, context={
-        "seed" : instrumentation.seed(),
+    instrumenter = Instrumenter(instrument, context={
+        "seed" : seed(),
         "benchmark" : filename,
         "epochs" : epochs,
         "optimizer" : optimizer,
@@ -56,10 +59,17 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
     })
 
     for epoch in range(epochs):
-        for batch in minibatch(evidence, batch_size):
+        for i, batch in enumerate(minibatch(evidence, batch_size)):
             with optimizer as o:
-                batch = Batch(batch)
-                o.maximize(batch.objective(program, explanations=1, samples=samples))
+                objective = BatchObjective(
+                    f"obj_{i}_{epoch}",
+                    program,
+                    batch,log_prob_kwargs={
+                        "explanations" : 1,
+                        "samples" : samples
+                    }
+                )
+                o.maximize(objective)
 
         if epoch % resolution == 0:
             log = {"epoch" : epoch}

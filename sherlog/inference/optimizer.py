@@ -5,8 +5,13 @@ from ..logs import get
 logger = get("optimizer")
 
 class Optimizer:
+    """Context manager for registering and optimizing objectives.
+    
+    See also: `sherlog.inference.Objective`.
+    """
+
     def __init__(self, program, optimizer : str = "sgd", learning_rate : float = 0.1):
-        """Context manager for optimizing registered objectives.
+        """Constructs an optimization context manager with the indicated Torch optimizer.
 
         Parameters
         ----------

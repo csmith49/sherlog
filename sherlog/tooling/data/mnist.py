@@ -22,6 +22,8 @@ def _load(location, train=True):
     )
 
 class Image:
+    """MNIST image and all associated metadata."""
+
     def __init__(self, data, label, index, train):
         self.data = data
         self.label = label
@@ -41,11 +43,27 @@ class Image:
             return f"image_test_{self.index}"
 
 class MNISTDataSource(DataSource):
+    """Data source for MNIST images."""
+
     def __init__(self, location="/tmp"):
+        """Import and wrap data source around TorchVision MNIST data.
+
+        Parameters
+        ----------
+        location : str (default="/tmp")
+        """
         self._distributions = {
             "train" : _load(location, train=True),
             "test" : _load(location, train=False)
         }
+
+    def get(self, index, train=True):
+        key = "train" if train else "test"
+        distribution = self._distributions[key]
+
+        data, label = distribution[index]
+
+        return Image(data, label, index, train)
 
     def _sample(self, train=True):
         if train:

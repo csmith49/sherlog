@@ -1,18 +1,12 @@
 import torch
 import torch.nn as nn
-from .image import Image
 
-def add(x, y): return x + y
+def add(x, y):
+    return x + y
 
-def neural_predicate(network, image):
-    dataset = str(image.functor)
-    index = int(image.args[0])
-    image = Image(dataset, index).vector
-    return network.net(image.unsqueeze(0)).squeeze(0)
-
-class MNISTModule(nn.Module):
+class MNISTNetwork(nn.Module):
     def __init__(self, squeeze=False):
-        super(MNISTModule, self).__init__()
+        super(MNISTNetwork, self).__init__()
         self.encoder = nn.Sequential(
             nn.Conv2d(1, 6, 5),
             nn.MaxPool2d(2, 2),

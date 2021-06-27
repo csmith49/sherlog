@@ -4,4 +4,5 @@
 # from .distribution import Distribution
 
 from .model import Model
+from .utility import minibatch
 from . import datasource
