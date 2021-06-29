@@ -34,13 +34,11 @@ def main(log, port):
     help="Optimization strategy for training parameters.")
 @click.option("-l", "--learning-rate", default=0.01, show_default=True,
     help="Optimizer learning rate.")
-@click.option("-s", "--samples", default=100, show_default=True,
-    help="Samples-per-explanation in gradient estimation.")
 @click.option("-i", "--instrument", type=click.Path(),
     help="Output file for instrumentation logs.")
 @click.option("-r", "--resolution", default=5, help="Instrumentation resolution (in epochs).")
 @click.option("-b", "--batch-size", default=10, help="Batch size.")
-def train(filename, epochs, optimizer, learning_rate, samples, instrument, resolution, batch_size):
+def train(filename, epochs, optimizer, learning_rate, instrument, resolution, batch_size):
     """Train FILENAME with the provided parameters."""
     
     # load the problem and build the optimizer
@@ -55,7 +53,6 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
         "epochs" : epochs,
         "optimizer" : optimizer,
         "learning rate" : learning_rate,
-        "samples" : samples
     })
 
     for batch in minibatch(evidence, batch_size, epochs=epochs):
@@ -66,13 +63,12 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
                 batch.data,
                 log_prob_kwargs = {
                     "explanations" : 1,
-                    "samples" : samples
                 }
             )
             opt.maximize(objective)
 
-        if epoch % resolution == 0:
-            log = {"epoch" : epoch}
+        if batch.epoch % resolution == 0:
+            log = {"epoch" : batch.epoch}
             for k, v in program.parameter_map.items():
                 log[k] = v
                 log[f"{k} grad"] = v.grad

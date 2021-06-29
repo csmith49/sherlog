@@ -1,13 +1,13 @@
-from ..engine import value
+from typing import Dict, Iterable, Any
+
+from ..engine import Functor, Store, Value, Variable, value
 from ..engine.value import Variable
 from ..logs import get
-from . import semantics
-import torch
 
 logger = get("story.observation")
 
 class Observation:
-    def __init__(self, mapping):
+    def __init__(self, mapping : Dict[str, Value]):
         """Observation of variable assignemnts for a story.
 
         Parameters
@@ -22,11 +22,11 @@ class Observation:
         self.mapping = mapping
 
     @property
-    def size(self):
+    def size(self) -> int:
         return len(self.mapping)
 
     @property
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return self.size == 0
 
     @classmethod
@@ -47,7 +47,7 @@ class Observation:
         return cls(mapping)
 
     @property
-    def variables(self):
+    def variables(self) -> Iterable[Variable]:
         """Compute the domain of the observation.
 
         Returns
@@ -55,10 +55,10 @@ class Observation:
         Variable iterable
         """
         for k, _ in self.mapping.items():
-            yield value.Variable(k)
+            yield Variable(k)
 
     @property
-    def values(self):
+    def values(self) -> Iterable[Value]:
         """Compute the codomain of the observation.
 
         Returns
@@ -68,7 +68,7 @@ class Observation:
         for _, v in self.mapping.items():
             yield v
 
-    def evaluate(self, store, functor, wrap_args={}):
+    def evaluate(self, store : Store, functor : Functor, wrap_args={}) -> Iterable[Any]:
         """Evaluate the observation.
 
         Parameters
@@ -84,8 +84,8 @@ class Observation:
         for _, v in self.mapping.items():
             yield functor.evaluate(v, store, wrap_args=wrap_args)
 
-    def equality(self, store, functor, prefix="", default=1.0):
-        """Check if the store matches the observation in the given functor.
+    def target(self, store : Store, functor : Functor, prefix : str = "", default : float = 1.0) -> Variable:
+        """Compute the optimization target of the expected and observed values.
 
         Parameters
         ----------
@@ -102,9 +102,9 @@ class Observation:
         Variable
         """
         # build variables
-        keys = value.Variable(f"{prefix}:keys")
-        vals = value.Variable(f"{prefix}:vals")
-        result = value.Variable(f"{prefix}:is_equal")
+        keys = Variable(f"{prefix}:keys")
+        vals = Variable(f"{prefix}:vals")
+        result = Variable(f"{prefix}:is_equal")
 
         # if we don't have any observations, default
         if self.is_empty:
@@ -114,7 +114,7 @@ class Observation:
             functor.run(keys, "tensorize", self.variables, store)
             functor.run(vals, "tensorize", self.values, store)
 
-            functor.run(result, "equal", [keys, vals], store)
+            functor.run(result, "target", [keys, vals], store)
 
         # return the variable storing the result
         return result

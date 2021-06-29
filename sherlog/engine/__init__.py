@@ -7,4 +7,5 @@
 from .model import Model
 from .store import Store
 from .functor import Functor
+from .value import Value, Variable, Symbol
 from . import value

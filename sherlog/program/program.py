@@ -109,14 +109,13 @@ class Program:
         
         yield from islice(gen(), quantity)
 
-    def log_prob(self, evidence, explanations=1, samples=100, attempts=100, width=100, namespace=None):
+    def log_prob(self, evidence, explanations=1, attempts=100, width=100, namespace=None):
         """Compute the marginal log-likelihood of the provided evidence.
 
         Parameters
         ----------
         evidence : Evidence
         explanations : int (default=1)
-        samples : int (default=100)
         attempts : int (default=100)
         width : int (default=100)
         namepsace : Optional[Namespace]
@@ -126,7 +125,7 @@ class Program:
         Tensor
         """
         explanations = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts, namespace=namespace)
-        log_probs = [ex.log_prob(self.posterior.parameterization, samples=samples) for ex in explanations]
+        log_probs = [ex.log_prob(self.posterior.parameterization) for ex in explanations]
         # if we didn't find any explanations, default
         if log_probs:
             return torch.mean(torch.stack(log_probs))

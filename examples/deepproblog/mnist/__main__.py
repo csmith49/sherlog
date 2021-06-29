@@ -38,7 +38,6 @@ def cli(log, verbose, tool, train, test, epochs):
             "epochs" : epochs,
             "batch_size" : 1,
             "explanations" : 1,
-            "samples" : 500
         },
         log_prob_kwargs={}
     )

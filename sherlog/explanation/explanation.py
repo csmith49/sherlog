@@ -14,7 +14,12 @@ logger = get("explanation")
 class Explanation:
     """Explanations are the central explanatory element in Sherlog. They capture sufficient generative properties to ensure a particular outcome."""
 
-    def __init__(self, model, meet, history, external=()):
+    def __init__(self,
+        model : Model,
+        meet : Observation,
+        history : History, 
+        external=()
+    ):
         """Constructs an explanation.
 
         Parameters
@@ -114,23 +119,23 @@ class Explanation:
         """
         store = self.run(functor, namespace=namespace)
 
-        obs = observation.equality(store, functor, prefix="sherlog:observation", default=1.0)
+        obs = observation.target(store, functor, prefix="sherlog:observation", default=1.0)
         objective = value.Variable("sherlog:objective")
         functor.run(objective, "set", [obs], store)
 
         return store[objective]
 
-    def miser(self, observation, samples=1, namespace={}):
+    def miser(self, observation, target, namespace={}):
         """Builds a Miser surrogate objective for the satisfaction of the given observation.
 
         Parameters
         ----------
         observation : Observation
-        samples : int (default=1)
+        target : Target
 
         Returns
         -------
-        Miser.t (with batch dimension of size `samples`)
+        Miser
         """
         # force all the observed variables
         forcing = {}
@@ -138,31 +143,26 @@ class Explanation:
             forcing[variable] = observation[variable]
 
         # construct the objective
-        functor = semantics.miser.factory(samples, forcing=forcing)
+        functor = semantics.miser.factory(target, forcing=forcing)
         objective = self.objective(functor, observation, namespace=namespace)
+        
+        # scaling and whatnot handled by .surrogate property
+        return objective.surrogate
 
-        # scale and score appropriately
-        scale = semantics.miser.forcing_scale(objective.dependencies()).detach() # if we don't detach, we seem to "overcount" forced instances
-        score = semantics.miser.magic_box(objective.dependencies(), samples)
-        surrogate = objective.value * scale * score
-
-        logger.info(f"MISER cost: {objective.value}, IS score: {scale}, magic box: {score}")
-
-        return surrogate
-
-    def log_prob(self, parameterization, samples=1, namespace={}):
-        """Computes log-likelihood of the explanation.
+    def log_prob(self, parameterization, namespace={}):
+        """Compute the log-probability of the explanation.
 
         Parameters
         ----------
         parameterization : Parameterization
-        samples : int (default=1)
+        namespace : Dict[str, Any] (default={})
 
         Returns
         -------
         Tensor
         """
-        p = self.miser(self.meet, samples=samples, namespace=namespace).log()
-        q = self.history.log_prob(parameterization)
-        logger.info(f"Log-prob: {p}, posterior scaling: {q}")
-        return p - q
+        target = semantics.target.EqualityIndicator()
+        surrogate_log_prob = self.miser(self.meet, target, namespace=namespace).log()
+        posterior_log_prob = self.history.log_prob(parameterization)
+
+        return surrogate_log_prob - posterior_log_prob

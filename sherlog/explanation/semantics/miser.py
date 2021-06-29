@@ -1,19 +1,28 @@
 """Miser gradient estimation functor. Based on DiCE."""
 
 from functools import partial
-import torch
 from torch.distributions import Bernoulli, Normal, Beta, Categorical, Dirichlet
+from typing import Optional, Iterable, Any
+from torch import Tensor, tensor, stack
+from torch.distributions import Distribution
+import torch
 
+from .target import Target
+from ..observation import Observation
 from ...engine import Functor
 from ...logs import get
-from . import batch
 
 logger = get("explanation.semantics.miser")
 
 class Miser:
-    """Miser values."""
+    """Miser values maintain local dependencies and forcing behavior."""
 
-    def __init__ (self, value, dependencies=(), distribution=None, forced=False):
+    def __init__ (self,
+        value : Tensor,
+        dependencies : Iterable["Miser"] = (),
+        distribution : Optional[Distribution] = None,
+        forced : bool = False
+    ):
         """A value wrapped by the Miser functor.
 
         Parameters
@@ -34,50 +43,37 @@ class Miser:
         self._dependencies = dependencies
 
     @property
-    def is_stochastic(self):
+    def is_stochastic(self) -> bool:
         """True if a distribution has been provided.
 
         Returns
         -------
         bool
         """
-        if self.distribution:
-            return True
-        return False
+        return self.distribution is not None
 
     @property
-    def forced_log_prob(self):
-        """Computes the log-probability of the forcing.
+    def is_forced(self) -> bool:
+        """True iff the value has been forced.
 
-        If the value is not forced, assume the 'forcing' always holds (so the forced log-prob is 0).
+        Returns
+        -------
+        bool
+        """
+        return self.forced
 
-        See also `Miser.log_prob`.
+    def log_prob(self) -> Tensor:
+        """The log-probability of having sampled the value from the provided distribution.
+
+        If the value is not stochastic, the returned log-prob is 0.
 
         Returns
         -------
         Tensor
         """
-        if self.distribution and self.forced:
-            return batch.sum_collapse(self.distribution.log_prob(self.value))
-        else:
-            return torch.zeros(batch.batches(self.value))
+        return self.distribution.log_prob(self.value) if self.is_stochastic else tensor(0.0)
 
-    @property
-    def log_prob(self):
-        """Computes the log-probability of having sampled the value from the provided distribution.
-
-        If no distribution is provided, assume the value is deterministic (hence the log-prob is 0).
-
-        Returns
-        -------
-        Tensor
-        """
-        if self.distribution:
-            return batch.sum_collapse(self.distribution.log_prob(self.value))
-        else:
-            return torch.zeros(batch.batches(self.value))
-
-    def dependencies(self):
+    def dependencies(self) -> Iterable["Miser"]:
         """Recursively compute all dependencies.
 
         Returns
@@ -96,55 +92,36 @@ class Miser:
                     yield miser
                 seen.add(miser)
 
-    def batch_values(self):
-        yield from self.value.unbind()
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.value)
 
-def magic_box(values, batches):
-    """Computes the magic box of the provided values.
+    @property
+    def surrogate(self) -> Tensor:
+        """Surrogate value for optimization.
 
-    Parameters
-    ----------
-    values : Iterable[Miser]
+        Returns
+        -------
+        Tensor
+        """
+        # step 1: compute forcing likelihood
+        forced_dependencies = filter(lambda v: v.is_forced, self.dependencies())
+        forcing_likelihood = stack([v.log_prob() for v in forced_dependencies]).sum().exp()
 
-    Returns
-    -------
-    Tensor
-    """
-    tau = torch.stack([v.log_prob for v in values]).sum(0)
-    result = torch.exp(tau - tau.detach())
+        # step 2: compute magic box of dependencies
+        tau = stack([v.log_prob() for v in self.dependencies()]).sum()
+        magic_box = (tau - tau.detach()).exp()
 
-    # a check to ensure gradients are being propagated
-    if result.grad_fn is None:
-        logger.warning(f"Magic box of {values} has no gradient.")
-    
-    return result
-
-def forcing_scale(values):
-    """Computes the likelihood of the forcing on all provided values.
-
-    Parameters
-    ----------
-    values : Iterable[Miser]
-
-    Returns
-    -------
-    Tensor
-    """
-    return torch.stack([v.forced_log_prob for v in values]).sum(0).exp()
+        # step 3: put it all together
+        return self.value * magic_box * forcing_likelihood
 
 # FUNCTOR OPS -----------------------------------------------------------
 
-def wrap(obj, batches=1, **kwargs):
+def wrap(obj : Any, **kwargs) -> Miser:
     """Wraps a value in the Miser functor.
 
     Parameters
     ----------
     obj : Any
-
-    batches : int (default=1)
 
     kwargs : ignored
 
@@ -152,27 +129,40 @@ def wrap(obj, batches=1, **kwargs):
     -------
     Miser
     """
+    # convert to tensor, if needed
     if torch.is_tensor(obj):
         value = obj
     else:
         value = torch.tensor(obj)
-    # make sure we've expanded!
-    return Miser(batch.expand(value, batches))
+    
+    # make sure we've fully wrapped
+    return Miser(value)
 
-def fmap(callable, args, kwargs, **fmap_args):
+def fmap(callable, args : Iterable[Miser], kwargs, **fmap_args) -> Miser:
+    """
+    Parameters
+    ----------
+    callable : Callable[]
+    args
+    kwargs
+
+    **fmap_args
+
+    Returns
+    -------
+    Miser
+    """
     logger.info(f"Calling {callable} on {args}.")
-    value = batch.batch_map(callable, *[arg.value for arg in args])
+    value = callable(*[arg.value for arg in args])
     logger.info(f"Call to {callable} produced result {value}.")
     return Miser(value, dependencies=args)
 
-def random_factory(distribution, batches=1, forcing=None):
+def distribution_factory(distribution : Distribution, forcing : Optional[Observation] = None):
     """Builds a Miser builtin (F v -> F v) from a distribution class.
 
     Parameters
     ----------
     distribution : distribution.Distribution
-
-    batches : int (default=1)
 
     forcing : Optional[Observation]
 
@@ -188,7 +178,7 @@ def random_factory(distribution, batches=1, forcing=None):
         assignment = kwargs["assignment"]
         if forcing and assignment.target in forcing:
             # this is a fresh value, so we have to lift first
-            value = wrap(forcing[assignment.target], batches=batches).value
+            value = wrap(forcing[assignment.target]).value
 
             # give a warning if we're forcing a reparameterizable distribution
             if dist.has_rsample:
@@ -212,23 +202,26 @@ def random_factory(distribution, batches=1, forcing=None):
         return Miser(value, dependencies=list(args), distribution=dist)
     return builtin
 
-# DETERMINISTIC BUILTINS ---------------------------------------------------------
+def builtin_factory(callable):
+    """Lifts a callable to operate over MIser values.
 
-def lift(callable):
+    Parameters
+    ----------
+    callable : Tensors -> Tensor
+
+    Returns
+    -------
+    Functor builtin
+    """
     def builtin(*args, **kwargs):
-        value = batch.batch_map(callable, *[arg.value for arg in args])
+        value = callable(*[arg.value for arg in args])
         return Miser(value, dependencies=list(args))
     return builtin
 
-def _tensorize(*args):
-    return torch.tensor(list(args))
+# DETERMINISTIC BUILTINS ---------------------------------------------------------
 
-def _equal(v1, v2):
-    return torch.dist(v1.float(), v2.float()).pow(2).div(-2.0).exp()
-    if torch.equal(v1, v2):
-        return torch.tensor(1.0)
-    else:
-        return torch.tensor(0.0)
+def _tensorize(*args):
+    return torch.stack(args) # stack maintains gradients, tensor construction doesn't
 
 def _or(*args):
     prod = torch.tensor(1.0)
@@ -241,12 +234,12 @@ def _set(x):
 
 # FACTORY ------------------------------------------------------------------------
 
-def factory(samples, forcing=None):
+def factory(target : Target, forcing : Optional[Observation] = None) -> Functor:
     """Builds a Miser execution functor.
 
     Parameters
     ----------
-    samples : int
+    target : Target
 
     forcing : Optional[Observation]
 
@@ -254,25 +247,18 @@ def factory(samples, forcing=None):
     -------
     Functor
     """
-    # encode the samples parameter in the wrap function
-    batched_wrap = partial(wrap, batches=samples)
-
-    # construct the builtins with the appropriate forcing (if provided)
-    batched_random_factory = partial(random_factory, batches=samples, forcing=forcing)
-    
+    # construct the builtins with the appropriate forcing (if provided)    
     builtins = {
-        "beta" : batched_random_factory(Beta),
-        "bernoulli" : batched_random_factory(Bernoulli),
-        "normal" : batched_random_factory(Normal),
-        "categorical" : batched_random_factory(Categorical),
-        "dirichlet" : batched_random_factory(Dirichlet),
-        "tensorize" : lift(_tensorize),
-        "equal" : lift(_equal),
-        "set" : lift(_set),
-        "or" : lift(_or)
+        "beta" : distribution_factory(Beta, forcing=forcing),
+        "bernoulli" : distribution_factory(Bernoulli, forcing=forcing),
+        "normal" : distribution_factory(Normal, forcing=forcing),
+        "categorical" : distribution_factory(Categorical, forcing=forcing),
+        "dirichlet" : distribution_factory(Dirichlet, forcing=forcing),
+        "tensorize" : builtin_factory(_tensorize),
+        "target" : builtin_factory(target),
+        "set" : builtin_factory(_set),
+        "or" : builtin_factory(_or)
     }
 
     # use constructed operations
-    return Functor(batched_wrap, fmap, builtins)
-
-functor = factory
+    return Functor(wrap, fmap, builtins)

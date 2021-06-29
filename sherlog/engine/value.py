@@ -1,4 +1,10 @@
-class Variable:
+from abc import ABC
+
+class Value(ABC):
+    """Value abstract base class."""
+    pass
+
+class Variable(Value):
     def __init__(self, name):
         """Variable from a Sherlog program.
 
@@ -20,7 +26,7 @@ class Variable:
     def __repr__(self):
         return f"<Variable: {self.name}>"
 
-class Symbol:
+class Symbol(Value):
     def __init__(self, name):
         """Symbolic constant from a Sherlog program.
 
