@@ -33,7 +33,6 @@ class Miser:
         # we'll add some extra checks instead of revealing dependencies outright
         self._dependencies = dependencies
 
-
     @property
     def is_stochastic(self):
         """True if a distribution has been provided.

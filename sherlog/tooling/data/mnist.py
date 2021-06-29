@@ -71,15 +71,15 @@ class MNISTDataSource(DataSource):
         else:
             distribution = self._distributions["test"]
 
-        index = randint(0, len(distribution))
+        index = randint(0, len(distribution) - 1)
         data, label = distribution[index]
 
         return Image(data, label, index, train)
 
-    def training_data(self, *args, quantity=1, **kwargs):
-        for _ in range(quantity):
+    def training_data(self, *args, **kwargs):
+        while True:
             yield self._sample(train=True)
 
-    def testing_data(self, *args, quantity=1, **kwargs):
-        for _ in range(quantity):
-            yield self._sample(train=True)
+    def testing_data(self, *args, **kwargs):
+        while True:
+            yield self._sample(train=False)

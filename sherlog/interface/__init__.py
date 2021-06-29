@@ -1,4 +1,4 @@
-"""Sherlog.Interface"""
+"""Contains infrastructure facilitating communication with the OCaml Sherlog server."""
 
 from .socket import connect
 from .server import initialize_server
@@ -10,6 +10,12 @@ from rich.console import Console
 _SOCKET = None
 
 def initialize(port=PORT):
+    """Initialize the Sherlog server. A necessary prerequisite before executing functions in `sherlog.interface`.
+
+    Parameters
+    ----------
+    port : int (default=PORT in `config.py`)
+    """
     global _SOCKET
     initialize_server(port=port)
     while not _SOCKET:

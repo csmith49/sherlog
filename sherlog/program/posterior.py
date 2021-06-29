@@ -21,7 +21,7 @@ class Posterior:
     
     @property
     def weights(self):
-        yield from self._weights.item()
+        yield from self._weights.tolist()
 
     @property
     def parameterization(self):

@@ -28,8 +28,8 @@ class MNISTNetwork(nn.Module):
     def forward(self, x):
         if self._squeeze:
             x = x.unsqueeze(0)
-        x = self.encoder(x).view(-1, 16 * 4 * 4)
-        result = self.classifier(x)
+        z = self.encoder(x).view(-1, 16 * 4 * 4)
+        result = self.classifier(z)
         if self._squeeze:
             return result.squeeze(0)
         else:

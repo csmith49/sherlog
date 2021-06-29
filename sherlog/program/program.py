@@ -67,7 +67,7 @@ class Program:
         else:
             return cls(parameters, program_source, {})
 
-    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, namespace = None, posterior = None):
+    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, namespace=None):
         """Samples explanations for the provided evidence.
 
         Parameters
@@ -77,7 +77,6 @@ class Program:
         attempts : int (default=100)
         width : Optional[int]
         namespace : Optional[Mapping[str, Any]]
-        posterior : Optional[Posterior]
 
         Returns
         -------
@@ -94,9 +93,8 @@ class Program:
         # interface kwargs
         kwargs = {}
         kwargs["width"] = width
-        if posterior:
-            kwargs["contexts"] = list(posterior.contexts)
-            kwargs["parameterization"] = list(posterior.weights)
+        kwargs["contexts"] = list(self.posterior.contexts)
+        kwargs["parameterization"] = list(self.posterior.weights)
 
         # build the explanation generator
         def gen():

@@ -62,3 +62,23 @@ class FunctionalEmbedding(Embedding):
 
     def to_namespace(self, value):
         return self._namespace(value)
+
+class UniformEmbedding(Embedding):
+    """Embeds values into programs uniformly across evidence."""
+
+    def __init__(self, evidence : Evidence, namespace : Callable[[T], Dict[str, Any]]):
+        """COnstructs a functional embedding with the provided evidence and namespace generator.
+
+        Parameters
+        ----------
+        evidence : Evidence
+        namespace : Callable[[T], Dict[str, Any]]
+        """
+        self._evidence = evidence
+        self._namespace = namespace
+
+    def to_evidence(self, value):
+        return self._evidence
+    
+    def to_namespace(self, value):
+        return self._namespace(value)

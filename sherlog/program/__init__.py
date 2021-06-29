@@ -34,3 +34,7 @@ def loads(contents: str, namespace=None) -> Tuple[Program, Iterable[Evidence]]:
     evidence = [Evidence.of_json(ev) for ev in json["evidence"]]
     problem = Program.of_json(json, namespace)
     return (problem, evidence)
+
+def load_evidence(evidence : str) -> Evidence:
+    _, evidences = loads(evidence)
+    return evidences[0]

@@ -1,12 +1,12 @@
 """Explanation."""
 
-from sherlog.program import parameter
 from ..engine import Store, value
 from .observation import Observation
 from ..engine import Model
 from .history import History
 from ..logs import get
 from . import semantics
+from itertools import chain
 import torch
 
 logger = get("explanation")
@@ -49,17 +49,20 @@ class Explanation:
         history = History.of_json(json["history"])
         return cls(model, meet, history, external=external)
 
-    @property
-    def store(self):
+    def store(self, *namespaces):
         """Store initialized with external mapping.
+
+        Parameters
+        ----------
+        *namespaces : Dict[str, Any]
 
         Returns
         -------
         Store
         """
-        return Store(external=self._external)
+        return Store(external=chain(self._external, namespaces))
 
-    def run(self, functor, wrap_args={}, fmap_args={}, parameters={}):
+    def run(self, functor, wrap_args={}, fmap_args={}, parameters={}, namespace={}):
         """Evaluate the explanation in the given functor.
 
         Parameters
@@ -77,7 +80,7 @@ class Explanation:
         Store[Functor.t]
 
         """
-        store = self.store
+        store = self.store(namespace)
         for assignment in self.model.assignments:
             functor.run_assignment(
                 assignment,
@@ -97,7 +100,7 @@ class Explanation:
         objective = self.objective(semantics.graph.functor)
         return semantics.graph.to_graph(objective)
 
-    def objective(self, functor, observation):
+    def objective(self, functor, observation, namespace={}):
         """Build computation graph for the satisfaction of the given observation in the given functor.
 
         Parameters
@@ -109,7 +112,7 @@ class Explanation:
         -------
         Functor.t
         """
-        store = self.run(functor)
+        store = self.run(functor, namespace=namespace)
 
         obs = observation.equality(store, functor, prefix="sherlog:observation", default=1.0)
         objective = value.Variable("sherlog:objective")
@@ -117,7 +120,7 @@ class Explanation:
 
         return store[objective]
 
-    def miser(self, observation, samples=1):
+    def miser(self, observation, samples=1, namespace={}):
         """Builds a Miser surrogate objective for the satisfaction of the given observation.
 
         Parameters
@@ -136,7 +139,7 @@ class Explanation:
 
         # construct the objective
         functor = semantics.miser.factory(samples, forcing=forcing)
-        objective = self.objective(functor, observation)
+        objective = self.objective(functor, observation, namespace=namespace)
 
         # scale and score appropriately
         scale = semantics.miser.forcing_scale(objective.dependencies()).detach() # if we don't detach, we seem to "overcount" forced instances
@@ -147,7 +150,7 @@ class Explanation:
 
         return surrogate
 
-    def log_prob(self, parameterization, samples=1):
+    def log_prob(self, parameterization, samples=1, namespace={}):
         """Computes log-likelihood of the explanation.
 
         Parameters
@@ -159,7 +162,7 @@ class Explanation:
         -------
         Tensor
         """
-        p = self.miser(self.meet, samples=samples).log()
+        p = self.miser(self.meet, samples=samples, namespace=namespace).log()
         q = self.history.log_prob(parameterization)
         logger.info(f"Log-prob: {p}, posterior scaling: {q}")
         return p - q

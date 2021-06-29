@@ -58,18 +58,18 @@ def train(filename, epochs, optimizer, learning_rate, samples, instrument, resol
         "samples" : samples
     })
 
-    for epoch in range(epochs):
-        for i, batch in enumerate(minibatch(evidence, batch_size)):
-            with optimizer as o:
-                objective = BatchObjective(
-                    f"obj_{i}_{epoch}",
-                    program,
-                    batch,log_prob_kwargs={
-                        "explanations" : 1,
-                        "samples" : samples
-                    }
-                )
-                o.maximize(objective)
+    for batch in minibatch(evidence, batch_size, epochs=epochs):
+        with optimizer as opt:
+            objective = BatchObjective(
+                batch.identifier,
+                program,
+                batch.data,
+                log_prob_kwargs = {
+                    "explanations" : 1,
+                    "samples" : samples
+                }
+            )
+            opt.maximize(objective)
 
         if epoch % resolution == 0:
             log = {"epoch" : epoch}
