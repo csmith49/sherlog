@@ -1,12 +1,14 @@
 """Explanation."""
 
-from ..engine import Store, value
+from ..engine import Store, Functor, value
 from .observation import Observation
 from ..engine import Model
 from .history import History
 from ..logs import get
 from . import semantics
+from .semantics.target import Target
 from itertools import chain
+from torch import Tensor
 import torch
 
 logger = get("explanation")
@@ -67,7 +69,7 @@ class Explanation:
         """
         return Store(external=chain(self._external, namespaces))
 
-    def run(self, functor, wrap_args={}, fmap_args={}, parameters={}, namespace={}):
+    def run(self, functor : Functor, wrap_args={}, fmap_args={}, parameters={}, namespace={}) -> Store:
         """Evaluate the explanation in the given functor.
 
         Parameters
@@ -105,7 +107,7 @@ class Explanation:
         objective = self.objective(semantics.graph.functor)
         return semantics.graph.to_graph(objective)
 
-    def objective(self, functor, observation, namespace={}):
+    def objective(self, functor : Functor, observation : Observation, namespace={}):
         """Build computation graph for the satisfaction of the given observation in the given functor.
 
         Parameters
@@ -125,12 +127,13 @@ class Explanation:
 
         return store[objective]
 
-    def miser(self, observation, target, namespace={}):
+    def miser(self, observation : Observation, target : Target, namespace={}) -> Tensor:
         """Builds a Miser surrogate objective for the satisfaction of the given observation.
 
         Parameters
         ----------
         observation : Observation
+
         target : Target
 
         Returns
@@ -149,12 +152,13 @@ class Explanation:
         # scaling and whatnot handled by .surrogate property
         return objective.surrogate
 
-    def log_prob(self, parameterization, namespace={}):
+    def log_prob(self, parameterization=None, namespace={}) -> Tensor:
         """Compute the log-probability of the explanation.
 
         Parameters
         ----------
-        parameterization : Parameterization
+        parameterization : Optional[Parameterization]
+
         namespace : Dict[str, Any] (default={})
 
         Returns
@@ -163,6 +167,51 @@ class Explanation:
         """
         target = semantics.target.EqualityIndicator()
         surrogate_log_prob = self.miser(self.meet, target, namespace=namespace).log()
-        posterior_log_prob = self.history.log_prob(parameterization)
 
-        return surrogate_log_prob - posterior_log_prob
+        if parameterization is not None:
+            posterior_log_prob = self.history.log_prob(parameterization)
+            return surrogate_log_prob - posterior_log_prob
+        else:
+            return surrogate_log_prob
+
+    def relaxed_log_prob(self, parameterization=None, temperature : float = 1.0, namespace={}) -> Tensor:
+        """Compute the relaxed log-probability of the explanation.
+
+        Converges to `self.log_prob` as temperature tends towards 0.
+
+        Parameters
+        ----------
+        parameterization : Optional[Parameterization]
+
+        namespace : Dict[str, Any] (default=[])
+
+        temperature : float (default=1.0)
+
+        Returns
+        -------
+        Tensor
+        """
+        target = semantics.target.RBF(sdev=temperature)
+        surrogate_log_prob = self.miser(self.meet, target, namespace=namespace).log()
+
+        if parameterization is not None:
+            posterior_log_prob = self.history.log_prob(parameterization)
+            return surrogate_log_prob - posterior_log_prob
+        else:
+            return surrogate_log_prob
+
+    def observation_loss(self, namespace={}) -> Tensor:
+        """Compute the MSE between the observation and the generated values.
+
+        Parameters
+        ----------
+        namespace : Dict[str, Any] (default={})
+
+        Returns
+        -------
+        Tensor
+        """
+        target = semantics.target.MSE()
+        surrogate_loss = self.miser(self.meet, target, namespace=namespace)
+
+        return surrogate_loss
