@@ -1,11 +1,18 @@
 import torch
 from torch.optim import SGD, Adam
+from enum import Enum
 from ..logs import get
+from .objective import Objective
 
 logger = get("optimizer")
 
+# objective intent
+Intent = Enum("Intent", "MAXIMIZE MINIMIZE")
+
 class Optimizer:
     """Context manager for registering and optimizing objectives.
+
+    Handles PyTorch optimizers so you don't have to.
     
     See also: `sherlog.inference.Objective`.
     """
@@ -30,6 +37,19 @@ class Optimizer:
         }[optimizer](program.parameters(), lr=learning_rate)
 
         self._maximize, self._minimize = [], []
+
+    def register(self, objective : Objective, intent : Intent = Intent.MAXIMIZE):
+        """Registers objectives.
+
+        Parameters
+        ----------
+        objective : Objective
+        intent : Intent
+        """
+        if intent == Intent.MAXIMIZE:
+            self.maximize(objective)
+        elif intent == Intent.MINIMIZE:
+            self.minimize(objective)
 
     def maximize(self, *args):
         """Registers objectives to be maximized.

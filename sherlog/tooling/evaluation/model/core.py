@@ -1,23 +1,11 @@
 from typing import TypeVar, Generic, Iterable, Dict, Any
-from abc import ABC, abstractmethod
 from torch import Tensor, stack
 
-from ...program import loads
-from ...inference import Optimizer, BatchObjective, BatchEmbeddingObjective, Embedding, Objective
-from .utility import minibatch
+from .model import Model
+from ....program import loads
+from ....inference import Optimizer, BatchObjective, BatchEmbeddingObjective, Embedding, Objective
+from ..utility import minibatch
 
-T = TypeVar('T')
-
-class Model(ABC, Generic[T]):
-    """Abstract class defining the smallest interface needed to train and evaluate a model."""
-
-    @abstractmethod
-    def fit(self, data : Iterable[T], *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def log_prob(self, datum : T, *args, **kwargs) -> Tensor:
-        pass
 
 # build a few kinds of sherlog models
 class DirectModel(Model):
@@ -122,7 +110,7 @@ class SingletonModel(Model):
         # we need the posterior weights, even if they don't do much here
         parameterization = self._program.posterior.parameterization
         # construct the log probs
-        log_probs = [ex.log_prob(parameterization, namespace=namespace) for ex in self._explanations]
+        log_probs = [ex.relaxed_log_prob(parameterization=parameterization, namespace=namespace) for ex in self._explanations]
         # stack and return
         return stack(log_probs).mean()
 

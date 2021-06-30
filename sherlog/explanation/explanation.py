@@ -1,6 +1,6 @@
 """Explanation."""
 
-from ..engine import Store, Functor, value
+from ..engine import Store, Functor, value, Variable
 from .observation import Observation
 from ..engine import Model
 from .history import History
@@ -9,6 +9,7 @@ from . import semantics
 from .semantics.target import Target
 from itertools import chain
 from torch import Tensor
+from typing import Any
 import torch
 
 logger = get("explanation")
@@ -68,6 +69,9 @@ class Explanation:
         Store
         """
         return Store(external=chain(self._external, namespaces))
+
+    def observe(self, key : str, value : Any):
+        self.meet[Variable(key)] = value
 
     def run(self, functor : Functor, wrap_args={}, fmap_args={}, parameters={}, namespace={}) -> Store:
         """Evaluate the explanation in the given functor.
