@@ -1,5 +1,6 @@
 from abc import ABC
 from typing import Any
+from torch import Tensor, tensor
 
 class Value(ABC):
     """Value ABC."""
@@ -32,6 +33,9 @@ class Identifier(Value):
 
 class Literal(Value):
     """Value subclass representing everything that *isn't* an identifier."""
+
+    def to_tensor(self) -> Tensor:
+        return tensor(self.value)
 
     def __init__(self, value : Any):
         self.value = value

@@ -2,7 +2,7 @@
 
 from functools import partial
 from torch.distributions import Bernoulli, Normal, Beta, Categorical, Dirichlet
-from typing import Optional, Iterable, Any, List
+from typing import Optional, Iterable, Any, List, Callable
 from torch import Tensor, tensor, stack
 from torch.distributions import Distribution
 import torch
@@ -93,7 +93,7 @@ class Miser:
                 seen.add(miser)
 
     def __repr__(self) -> str:
-        return repr(self.value)
+        return f"<Miser: {repr(self.value)}>"
 
     @property
     def surrogate(self) -> Tensor:
@@ -116,12 +116,12 @@ class Miser:
 
 # FUNCTOR OPS -----------------------------------------------------------
 
-def wrap(obj : Any, **kwargs) -> Miser:
-    """Wraps a value in the Miser functor.
+def wrap(obj : Tensor, **kwargs) -> Miser:
+    """Wraps a tensor in the Miser functor.
 
     Parameters
     ----------
-    obj : Any
+    obj : Tensor
 
     **kwargs
         Necessary for interface, but unused here.
@@ -130,20 +130,13 @@ def wrap(obj : Any, **kwargs) -> Miser:
     -------
     Miser
     """
-    # convert to tensor, if needed
-    if torch.is_tensor(obj):
-        value = obj
-    else:
-        value = torch.tensor(obj)
-    
-    # make sure we've fully wrapped
-    return Miser(value)
+    return Miser(obj)
 
-def fmap(callable, args : List[Miser], **kwargs) -> Miser:
+def fmap(callable : Callable[..., Tensor], args : List[Miser], **kwargs) -> Miser:
     """
     Parameters
     ----------
-    callable : Callable[..., Any]
+    callable : Callable[..., Tensor]
     
     args : List[Miser]
 
@@ -162,23 +155,32 @@ def distribution_factory(distribution : Distribution, forcing : Optional[Observa
 
     Parameters
     ----------
-    distribution : distribution.Distribution
+    distribution : Distribution
 
     forcing : Optional[Observation]
 
     Returns
     -------
-    Functor builtin
+    Functor builting (of type Callable[..., Miser])
     """
     def builtin(*args, **kwargs):
+        """
+        Parameters
+        ----------
+        *args
+            All of type Miser.
+
+        **kwargs
+            Unused.
+        """
         parameters = [arg.value for arg in args]
         dist = distribution(*parameters)
 
         # check if the assignment is forced
         assignment = kwargs["assignment"]
         if forcing and assignment.target in forcing:
-            # this is a fresh value, so we have to lift first
-            value = wrap(forcing[assignment.target]).value
+            # this is a fresh value, so we have to wrap real quick
+            value = forcing[assignment.target].to_tensor()
 
             # give a warning if we're forcing a reparameterizable distribution
             if dist.has_rsample:

@@ -25,6 +25,9 @@ class Parameter(ABC):
         """
         pass
 
+    def to_tensor(self) -> Tensor:
+        return self.value
+
     # MAGIC METHODS
 
     def __str__(self):

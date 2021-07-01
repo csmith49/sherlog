@@ -5,6 +5,7 @@ from .store import Store
 from .assignment import Assignment
 
 from typing import Generic, TypeVar, Callable, List, Dict
+from torch import Tensor
 
 T = TypeVar('T')
 
@@ -13,45 +14,57 @@ class Functor(Generic[T]):
 
     def __init__(
         self,
-        wrap : Callable[..., T],
-        fmap : Callable[[Callable, List], T],
+        wrap : Callable[[Tensor], T],
+        fmap : Callable[[Callable[..., Tensor], List[T]], T],
         builtins : Dict[str, Callable[..., T]]
     ):
         """Construct a functor from `wrap` and `fmap`.
 
         Parameters
         ----------
-        wrap : Callable[..., T]
+        wrap : Callable[[Tensor], T]
 
-        fmap : Callable[Callable, List], T]
+        fmap : Callable[Callable[..., Tensor], List[T]], T]
+            Transforms functions over tensors to a function over `T`s.
+            Cannot give more precise codomain, as `typing` does not support variadic signatures.
 
         builtins : Dict[str, Callable[..., T]]
+            Builtin functions map `T`s to a `T`.
+            Cannot give more precise codomain, as `typing` does not support variadic signatures.
         """
         self.wrap, self.fmap, self.builtins = wrap, fmap, builtins
 
-    def evaluate(self, obj, store : Store, **kwargs) -> T:
+    def evaluate(self, obj, store : Store[T], **kwargs) -> T:
         """Evaluate an object in the context of the provided store.
         
         Parameters
         ----------
         obj : Any
         
-        store : Store
+        store : Store[T]
         
         **kwargs
-            Passed to `self.wrap` on execution
+            Passed to `self.wrap` on execution.
             
         Returns
         -------
         T
         """
-        if isinstance(obj, Identifier):
-            print(store)
+        # if obj is an identifier and is bound locally in the store, just return
+        if isinstance(obj, Identifier) and store.is_result(obj):
             return store[obj]
-        elif isinstance(obj, Literal):
-            return self.wrap(obj.value, **kwargs)
-        else:
-            return self.wrap(obj, **kwargs)
+
+        # if obj is an identifer and is a constant, return and wrap
+        if isinstance(obj, Identifier) and store.is_constant(obj):
+            value = store.constant(obj)
+            return self.wrap(value, **kwargs)
+
+        # if obj is a literal, unpack to tensor *then* wrap
+        if isinstance(obj, Literal):
+            return self.wrap(obj.to_tensor(), **kwargs)
+
+        # otherwise, just wrap and hope for the best
+        return self.wrap(obj, **kwargs)
             
     def run_assignment(self, assignment : Assignment, store : Store, **kwargs) -> T:
         """Evaluate an assignment in the context of the given store.

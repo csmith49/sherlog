@@ -1,39 +1,83 @@
-from .value import Value, Identifier, Literal
-from typing import Callable
+from .value import Identifier
+from typing import Callable, Generic, TypeVar
+from torch import Tensor, tensor
 
-class Store:
-    def __init__(self, *builtins):
-        self._builtins = list(builtins)
-        self._internal = {}
+from ..logs import get
 
-    def __get_from_builtin(self, key : str):
-        """Searches for an object in the builtin namespaces.
+logger = get("engine.store")
 
-        For internal use only.
+T = TypeVar('T')
 
+class Store(Generic[T]):
+    def __init__(self, **bindings):
+        """Construct a store from a set of bindings.
+        
+        Parameters
+        ----------
+        **bindings
+        """
+        self._callables = {}
+        self._constants = {}
+        
+        # sort the bindings into the above
+        for key, value in bindings.items():
+            # callable?
+            if hasattr(value, "__call__"):
+                self._callables[key] = value
+            
+            # tensorable?
+            elif hasattr(value, "to_tensor") or isinstance(value, Tensor):
+                self._constants[key] = value
+
+            # otherwise, raise a warning and treat as a constant anyways
+            else:
+                logger.warning(f"Binding {key}:{value} not a tensor or callable. Tensor conversion may fail.")
+                self._constants[key] = value
+
+        # no results to begin with!
+        self._results = {}
+
+    def is_callable(self, key : str) -> bool:
+        """Check if the provided key is associated with a callable.
+        
         Parameters
         ----------
         key : str
-
-        Raises
-        ------
-        KeyError
-
+        
         Returns
         -------
-        Any
+        bool
         """
-        for builtins in self._builtins:
-            try:
-                return builtins[key]
-            except KeyError:
-                pass
-        raise KeyError(key)
+        return key in self._callables
 
-    def __get_from_internal(self, key : str):
-        """Searches for an object in the internal namespace.
+    def is_constant(self, key : Identifier) -> bool:
+        """Check if the provided key is associated with a constant.
         
-        For internal use only.
+        Parameters
+        ----------
+        key : Identifier
+        
+        Returns
+        -------
+        bool
+        """
+        return key.name in self._constants
+
+    def is_result(self, key : Identifier) -> bool:
+        """Check if the provided key is associated with a result.
+        
+        Parameters
+        ----------
+        key : Identifier
+        
+        Returns
+        -------
+        bool
+        """
+        return key.name in self._results
+
+    def callable(self, key : str) -> Callable[..., Tensor]:
+        """Return the callable with the indicated name, if it exists.
         
         Parameters
         ----------
@@ -42,53 +86,83 @@ class Store:
         Raises
         ------
         KeyError
-        
+            If no such callable exists.
+
         Returns
         -------
-        Any
+        Callable[..., Tensor]
+            Maps tensors to a tensor; variadic codomains not supported yet.
         """
-        return self._internal[key]
+        return self._callables[key]
 
-    def lookup_callable(self, name : str) -> Callable:
-        """Look for a callable with the given name in the store.
-
+    def constant(self, key : Identifier) -> Tensor:
+        """Return the constant with the indicated name, if it exists.
+        
         Parameters
         ----------
-        name : str
+        key : Identifier
 
         Raises
         ------
         KeyError
+            If no such constant exists.
 
         Returns
         -------
-        Callable
+        Tensor
+            Relies on `torch.tensor` and instance `to_tensor` methods to convert objects.
         """
-        obj = self.get_from_builtin(self, name)
-        if hasattr(obj, "__call__"):
-            return obj
-        else:
-            raise KeyError(name)
+        value = self._constants[key.name]
+        
+        # if value is a tensor, just return
+        if isinstance(value, Tensor):
+            return value
+
+        # otherwise, check for a to_tensor instance method
+        if hasattr(value, "to_tensor"):
+            return value.to_tensor()
+
+        # or cross your fingers and hope for the best
+        return tensor(value)
+
+    def result(self, key : Identifier) -> T:
+        """Return the result associated with the indicated name, if it exists.
+        
+        Parameters
+        ----------
+        key : Identifier
+        
+        Raises
+        ------
+        KeyError
+            If no such result exists.
+            
+        Returns
+        -------
+        T
+        """
+        return self._results[key.name]
+
+    def register(self, key : Identifier, result : T):
+        """Register a result in the store. Modifies the instance in-place.
+        
+        Parameters
+        ----------
+        key : Identifier
+
+        result : T
+        """
+        self._results[key.name] = result
 
     # MAGIC METHODS
-    def __getitem__(self, key : Identifier):
-        # try the internals
-        try:
-            return self.__get_from_internal(key.name)
-        except KeyError:
-            pass
+    def __getitem__(self, key : Identifier) -> T:
+        return self.result(key)
 
-        # try the builtins
-        try:
-            return self.__get_from_builtin(key.name)
-        except KeyError:
-            pass
+    def __setitem__(self, key : Identifier, result : T):
+        self.register(key, result)
 
-        # fail
-        raise KeyError(key.name)
+    def __contains__(self, key : Identifier) -> bool:
+        return key.name in self._results
 
-    def __setitem__(self, key : Identifier, obj):
-        self._internal[key.name] = obj
-
-    def __str__(self):
-        return str(self._internal)
+    def __str__(self) -> str:
+        return str(self._results)

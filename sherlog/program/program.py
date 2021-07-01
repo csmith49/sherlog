@@ -1,6 +1,7 @@
 from .parameter import Parameter
 from .evidence import Evidence
-from .posterior import LinearPosterior, Posterior
+from .posterior import LinearPosterior
+from ..engine import Store
 
 from ..explanation import Explanation
 from ..interface import query
@@ -63,7 +64,7 @@ class Program:
         # pull together
         return cls(source, parameters, namespace)
 
-    def explanations(self, evidence : Evidence, quantity : int = 1, attempts : int = 100, width : Optional[int] = None, namespace : Optional[Dict[str, Any]] = None) -> Iterable[Explanation]:
+    def explanations(self, evidence : Evidence, quantity : int = 1, attempts : int = 100, width : Optional[int] = None) -> Iterable[Explanation]:
         """Sample explanations for the provided evidence.
 
         Parameters
@@ -75,8 +76,6 @@ class Program:
         attempts : int (default=100)
 
         width : Optional[int]
-
-        namespace : Optional[Dict[str, Any]]
 
         Returns
         -------
@@ -90,25 +89,34 @@ class Program:
         kwargs["contexts"] = list(self._posterior.contexts)
         kwargs["parameterization"] = self._posterior.parameterization()
 
-        builtins = (
-            {name : parameter.value for name, parameter in self._parameters.items()},
-            self._namespace,
-            namespace
-        )
-
         # build generator
         def gen():
             for attempt in range(attempts):
                 logger.info("Starting explanation generation attempt %i...", attempt)
                 try:
                     for json in query(self._source, evidence.json, **kwargs):
-                        yield Explanation.of_json(json, *builtins)
+                        yield Explanation.of_json(json)
                 except TimeoutError:
                     logger.warning("Explanation generation attempt %i timed out. Restarting...", attempt)
 
+        # get at most quantity explanations
         yield from islice(gen(), quantity)
 
-    def log_prob(self, evidence : Evidence, explanations : int = 1, attempts : int = 100, width : Optional[int] = None, namespace : Optional[Dict[str, Any]] = None) -> Tensor:
+    def store(self, **locals) -> Store:
+        """Construct a store for evaluating explanations of the program.
+        
+        Parameters
+        ----------
+        **locals
+            Any extra bindings to be added to the store.
+        
+        Returns
+        -------
+        Store
+        """
+        return Store(**self._parameters, **self._namespace, **locals)
+
+    def log_prob(self, evidence : Evidence, explanations : int = 1, attempts : int = 100, width : Optional[int] = None, **locals) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence.
         
         Parameters
@@ -121,26 +129,29 @@ class Program:
 
         width : Optional[int]
 
-        namespace : Optional[Dict[str, Any]]
+        **locals
+            Local bindings to pass to the explanation during execution.
 
         Returns
         -------
         Tensor
         """
-        exs = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts, namespace=namespace)
-        log_probs = [ex.log_prob(namespace=namespace) - self._posterior.log_prob(ex) for ex in exs]
+        store = self.store(**locals)
+        exs = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts)
+        log_probs = [ex.log_prob(store) - self._posterior.log_prob(ex) for ex in exs]
         # if no explanations, default
         if log_probs:
             return stack(log_probs).mean()
         else:
             return tensor(0.0)
 
-    def parameters(self, namespace : Optional[Dict[str, Any]] = None) -> Iterable[Tensor]:
+    def parameters(self, **locals) -> Iterable[Tensor]:
         """Returns all tuneable parameters in the program and namespace, if provided.
         
         Parameters
         ----------
-        namespace : Optional[Dict[str, Any]]
+        **locals
+            Local bindings to explore.
 
         Returns
         -------
@@ -154,10 +165,9 @@ class Program:
             if hasattr(obj, "parameters"):
                 yield from obj.parameters()
         # handle external namespace
-        if namespace is not None:
-            for _, obj in namespace.items():
-                if hasattr(obj, "parameters"):
-                    yield from obj.parameters()
+        for _, obj in locals.items():
+            if hasattr(obj, "parameters"):
+                yield from obj.parameters()
         # handle posterior
         yield from self._posterior.parameters()
 
