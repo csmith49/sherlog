@@ -106,7 +106,7 @@ class Optimizer:
         else:
             cost.backward()
             self.optimizer.step()
-            self.program.clamp_parameters()
+            self.program.clamp()
 
-        for p, v in self.program.parameter_map.items():
-            logger.info(f"Gradient for {p}: {v.grad}.")
+        for p, v in self.program._parameters.items():
+            logger.info(f"Gradient for {p}: {v.value.grad}.")

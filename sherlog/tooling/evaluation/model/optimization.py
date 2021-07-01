@@ -17,8 +17,7 @@ class Task(Generic[T]):
     def __init__(self,
         evidence : Evidence,
         target : str,
-        input_map : Callable[[T], Dict[str, Any]],
-        target_map : Callable[[T], Any]
+        input_map : Callable[[T], Dict[str, Any]]
     ):
         """Build an optimization task.
 
@@ -35,10 +34,9 @@ class Task(Generic[T]):
         self.evidence = evidence
         self.target = target
         self.input_map = input_map
-        self.target_map = target_map
 
     def get(self, datum):
-        return (self.input_map(datum), self.target_map(datum))
+        return self.input_map(datum)
 
 class OptimizationModel(Model):
     """Optimization-based model with uniform evidence and MSE loss."""
@@ -74,11 +72,9 @@ class OptimizationModel(Model):
         datum : Any
         """
         results = []
-        namespace, target_value = self.task.get(datum)
+        namespace = self.task.get(datum)
         
         for explanation in self.explanations:
-            # observe the target, modifying explanation in-place
-            explanation.observe(self.task.target, target_value)
             loss = explanation.observation_loss(namespace=namespace)
             results.append(loss)
 
@@ -126,11 +122,10 @@ class OptimizationModel(Model):
         datum : T
         """
         results = []
-        namespace, target_value = self.task.get(datum)
+        namespace = self.task.get(datum)
         parameterization = self.program.posterior.paraeterization
 
         for explanation in self.explanations:
-            explanation.observe(self.task.target, target_value)
             log_prob = explanation.log_prob(parameterization, namespace=namespace)
             results.append(log_prob)
         

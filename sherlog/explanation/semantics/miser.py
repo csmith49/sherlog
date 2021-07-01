@@ -2,7 +2,7 @@
 
 from functools import partial
 from torch.distributions import Bernoulli, Normal, Beta, Categorical, Dirichlet
-from typing import Optional, Iterable, Any
+from typing import Optional, Iterable, Any, List
 from torch import Tensor, tensor, stack
 from torch.distributions import Distribution
 import torch
@@ -123,7 +123,8 @@ def wrap(obj : Any, **kwargs) -> Miser:
     ----------
     obj : Any
 
-    kwargs : ignored
+    **kwargs
+        Necessary for interface, but unused here.
 
     Returns
     -------
@@ -138,23 +139,22 @@ def wrap(obj : Any, **kwargs) -> Miser:
     # make sure we've fully wrapped
     return Miser(value)
 
-def fmap(callable, args : Iterable[Miser], kwargs, **fmap_args) -> Miser:
+def fmap(callable, args : List[Miser], **kwargs) -> Miser:
     """
     Parameters
     ----------
-    callable : Callable[]
-    args
-    kwargs
+    callable : Callable[..., Any]
+    
+    args : List[Miser]
 
-    **fmap_args
+    **kwargs
+        Necessary for interface, but unused here.
 
     Returns
     -------
     Miser
     """
-    logger.info(f"Calling {callable} on {args}.")
     value = callable(*[arg.value for arg in args])
-    logger.info(f"Call to {callable} produced result {value}.")
     return Miser(value, dependencies=args)
 
 def distribution_factory(distribution : Distribution, forcing : Optional[Observation] = None):
@@ -234,7 +234,7 @@ def _set(x):
 
 # FACTORY ------------------------------------------------------------------------
 
-def factory(target : Target, forcing : Optional[Observation] = None) -> Functor:
+def factory(target : Target, forcing : Optional[Observation] = None) -> Functor[Miser]:
     """Builds a Miser execution functor.
 
     Parameters

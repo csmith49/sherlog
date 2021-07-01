@@ -1,23 +1,21 @@
-from typing import Dict, Iterable, Any
-
-from ..engine import Functor, Store, Value, Variable, value
-from ..engine.value import Variable
+from ..engine import Functor, Store, Value, Identifier, Literal
 from ..logs import get
+
+from typing import Dict, Iterable, TypeVar
 
 logger = get("story.observation")
 
+T = TypeVar('T')
+
 class Observation:
+    """Observations match identifiers with logical values."""
+
     def __init__(self, mapping : Dict[str, Value]):
-        """Observation of variable assignemnts for a story.
+        """Construct an observation from a map.
 
         Parameters
         ----------
         mapping : Dict[str, Value]
-            Each key-value pair maps a string to a value
-
-        Returns
-        -------
-        Observation
         """
         self.mapping = mapping
 
@@ -30,7 +28,7 @@ class Observation:
         return self.size == 0
 
     @classmethod
-    def of_json(cls, json):
+    def of_json(cls, json) -> 'Observation':
         """Build an observation from a JSON representation.
 
         Parameters
@@ -42,20 +40,20 @@ class Observation:
         Observation
         """
         mapping = {}
-        for k, v in json.items():
-            mapping[k] = value.of_json(v)
+        for key, value in json.items():
+            mapping[key] = Value.of_json(value)
         return cls(mapping)
 
     @property
-    def variables(self) -> Iterable[Variable]:
+    def identifiers(self) -> Iterable[Identifier]:
         """Compute the domain of the observation.
 
         Returns
         -------
-        Variable iterable
+        Iterable[Identifier]
         """
-        for k, _ in self.mapping.items():
-            yield Variable(k)
+        for key, _ in self.mapping.items():
+            yield Identifier(key)
 
     @property
     def values(self) -> Iterable[Value]:
@@ -65,92 +63,84 @@ class Observation:
         -------
         Iterable[Value]
         """
-        for _, v in self.mapping.items():
-            yield v
+        for _, value in self.mapping.items():
+            yield value
 
-    def evaluate(self, store : Store, functor : Functor, wrap_args={}) -> Iterable[Any]:
+    def evaluate(self, functor : Functor[T], store : Store, **kwargs) -> Iterable[T]:
         """Evaluate the observation.
 
         Parameters
         ----------
+        functor : Functor[T]
+
         store : Store
 
-        functor : Functor
+        **kwargs
+            Passed to functor during evaluation.
 
         Returns
         -------
-        Functor.t
+        Iterable[T]
         """
-        for _, v in self.mapping.items():
-            yield functor.evaluate(v, store, wrap_args=wrap_args)
+        for _, value in self.mapping.items():
+            yield functor.evaluate(value, store, **kwargs)
 
-    def target(self, store : Store, functor : Functor, prefix : str = "", default : float = 1.0) -> Variable:
+    def target(self, functor : Functor, store : Store, prefix : str = "sherlog", default : float = 1.0) -> Identifier:
         """Compute the optimization target of the expected and observed values.
 
+        Returns the identifier pointing to the target in the store.
+        
         Parameters
         ----------
-        store : Store
-
         functor : Functor
-
-        prefix : str (default="")
-
+        
+        store : Store
+            Modified in-place.
+        
+        prefix : str (default='sherlog')
+        
         default : float (default=1.0)
-
+        
         Returns
         -------
-        Variable
+        Identifier
         """
-        # build variables
-        keys = Variable(f"{prefix}:keys")
-        vals = Variable(f"{prefix}:vals")
-        result = Variable(f"{prefix}:is_equal")
+        # build the identifiers
+        keys = Identifier(f"{prefix}:keys")
+        values = Identifier(f"{prefix}:values")
+        target = Identifier(f"{prefix}:target")
 
-        # if we don't have any observations, default
+        # if the observation is somehow empty, default
         if self.is_empty:
-            functor.run(result, "set", [default], store)
+            functor.run(target, "set", [Literal(default)], store)
+        # otherwise tensorize and compare
         else:
-            # convert to tensors and evaluate
-            functor.run(keys, "tensorize", self.variables, store)
-            functor.run(vals, "tensorize", self.values, store)
-
-            functor.run(result, "target", [keys, vals], store)
-
-        # return the variable storing the result
-        return result
-
-    def join(self, other):
-        mapping = {}
-        for k, v in self.mapping.items():
-            mapping[k] = v
-        for k, v in other.mapping.items():
-            mapping[k] = v
-        return Observation(mapping)
+            functor.run(keys, "tensorize", self.identifiers, store)
+            functor.run(values, "tensorize", self.values, store)
+            functor.run(target, "target", [keys, values], store)
+        
+        # and return the identifier
+        return target
 
     # MAGIC METHODS ------------------------------------------------------
 
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            return self.mapping[key]
-        elif isinstance(key, Variable):
+    def __getitem__(self, key : Identifier) -> Value:
+        if isinstance(key, Identifier):
             return self.mapping[key.name]
         else:
-            raise KeyError(key)
+            raise TypeError(key)
 
-    def __setitem__(self, key, value):
-        if isinstance(key, Variable):
+    def __setitem__(self, key : Identifier, value : Value):
+        if isinstance(key, Identifier):
             self.mapping[key.name] = value
         else:
-            raise KeyError() # this isn't quite semantic, is it?
+            raise TypeError(key)
 
-    def __contains__(self, key):
-        if isinstance(key, Variable):
+    def __contains__(self, key : Identifier):
+        if isinstance(key, Identifier):
             return key.name in self.mapping.keys()
         else:
-            return False
+            raise TypeError(key)
 
     def __str__(self):
         return str(self.mapping)
-    
-    def __add__(self, other):
-        return self.join(other)

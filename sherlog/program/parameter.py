@@ -1,59 +1,132 @@
-import torch
-import torch.distributions.constraints as constraints
+from abc import ABC, abstractmethod
+from torch import Tensor, tensor
 
-class Parameter:
-    def __init__(self, name, domain, epsilon=0.001):
-        '''A parameter is a tuneable symbolic constant in a Sherlog program.
+# ABSTRACT PARAMETER CLASS
 
+class Parameter(ABC):
+    """Parameters are tuneable constants in Sherlog programs."""
+
+    def __init__(self, name : str, value : Tensor):
+        """Create a parameter by name and value.
+        
         Parameters
         ----------
-        name : string
+        name : str
+        
+        value : Tensor
+        """
+        self.name, self.value = name, value
+    
+    @abstractmethod
+    def clamp(self):
+        """Clamp value of the parameter to the relevant domain.
+        
+        Modifies the object in-place.
+        """
+        pass
 
-        domain : string
+    # MAGIC METHODS
 
-        epsilon : float (default 0.001)
-        '''
-        self.name = name
-        self.domain = domain
-        self.value = torch.tensor(0.5, requires_grad=True)
-        self._epsilon = epsilon
+    def __str__(self):
+        return f"<Parameter {self.name}: {self.value}>"
 
-    def constraint(self):
-        '''Converts the domain of the parameter to a torch constraint.
+# CONCRETE PARAMETER CLASSES
 
-        Returns
-        -------
-        torch.constraint
-        '''
-        if self.domain == "unit":
-            return constraints.unit_interval
-        elif self.domain == "positive":
-            return constraints.positive
-        elif self.domain == "real":
-            return constraints.real
-        else: raise NotImplementedError()
+class UnitIntervalParameter(Parameter):
+    """Parameter restricted to the interval [0, 1]."""
 
-    @classmethod
-    def of_json(cls, json):
-        '''Constructs a parameter from a JSON-like object.
-
+    def __init__(self, name : str, default : float = 0.5):
+        """Construct a unit parameter.
+        
         Parameters
         ----------
-        json : JSON-like object
-
-        Returns
-        -------
-        Parameter
-        '''
-        name = json["name"]
-        domain = json["domain"]
-        return cls(name, domain)
+        name : str
+        
+        default : float (default=0.5)
+        """
+        value = tensor(default)
+        super().__init__(name, value)
 
     def clamp(self):
-        '''Clamps the value of the parameter in-place to satisfy the constraint.'''
-        if self.domain == "unit":
-            self.value.clamp_(0, 1)
-        elif self.domain == "positive":
-            self.value.clamp_(self._epsilon, float("inf"))
-        else:
-            pass
+        """Clamp parameter to the unit interval.
+        
+        Modifies the parameter in-place.
+        """
+        self.value.clamp_(0, 1)
+
+class PositiveRealParameter(Parameter):
+    """Parameter restricted to the ray (0, infty]."""
+
+    def __init__(self, name : str, default : float = 0.5):
+        """Construct a positive real parameter.
+        
+        Parameters
+        ----------
+        name : str
+        
+        default : float (default=0.5)
+        """
+        value = tensor(default)
+        super().__init__(name, value)
+    
+    def clamp(self):
+        """Clamp parameter to positive ray (0, infty].
+        
+        Modifies the parameter in-place.
+        """
+        self.value.clamp_(self._epsilon, float("inf"))
+
+class RealParameter(Parameter):
+    """Parameter on the real line."""
+
+    def __init__(self, name : str, default : float = 0.5):
+        """Construct a real parameter.
+        
+        Parameters
+        ----------
+        name : str
+        
+        default : float (default=0.5)
+        """
+        value = tensor(default)
+        super().__init__(name, value)
+
+    def clamp(self):
+        """Clamp parameter to the real line.
+        
+        Does nothing.
+        """
+        pass
+
+# MONKEY PATCH
+
+def of_json(json, epsilon : float = 1e-10) -> Parameter:
+    """Construct a parameter from a JSON-like representation.
+    
+    Parameters
+    ----------
+    json : JSON-like object
+    
+    epsilon : float (default=1e-10)
+        Close-to-zero value to prevent underflows.
+
+    Raises
+    ------
+    NotImplementedError
+
+    Returns
+    -------
+    Parameter
+    """
+    name, domain = json["name"], json["domain"]
+
+    if domain == "unit":
+        return UnitIntervalParameter(name)
+    elif domain == "positive":
+        return PositiveRealParameter(name)
+    elif domain == "real":
+        return RealParameter(name)
+    else:
+        raise NotImplementedError(f"No implementation for domain {domain}.")
+
+Parameter.of_json = of_json

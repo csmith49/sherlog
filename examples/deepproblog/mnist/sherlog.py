@@ -1,6 +1,6 @@
 from .nn import MNISTNetwork, add
 
-from sherlog.tooling.evaluation.model import SingletonModel
+from sherlog.tooling.evaluation.model import Task, OptimizationModel
 from sherlog.program import load_evidence
 from sherlog import initialize
 
@@ -22,15 +22,19 @@ _namespace = {
     "digit_nn" : MNISTNetwork(squeeze=True)
 }
 
+# optimization task
+task = Task(
+    evidence=load_evidence("!evidence addition(left, right, total)."),
+    target="total",
+    input_map=lambda i: {
+        "left" : i.left.data,
+        "right" : i.right.data,
+        "total" : i.total
+    }
+)
+
 # embedding for samples
 evidence = load_evidence("!evidence addition(left, right, total).")
 
-def namespace_generator(sample):
-    return {
-        "left" : sample.left.data,
-        "right" : sample.right.data,
-        "total" : sample.total
-    }
-
-# and build the desired model
-model = SingletonModel(SOURCE, _namespace, evidence, namespace_generator)
+# build desired model
+model = OptimizationModel(SOURCE, _namespace, task)

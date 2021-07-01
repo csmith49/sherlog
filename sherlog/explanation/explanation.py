@@ -1,64 +1,65 @@
-"""Explanation."""
+"""Explanations are the central explanatory element in Sherlog. They capture sufficient generative constraints to ensure a particular outcome."""
 
-from ..engine import Store, Functor, value, Variable
-from .observation import Observation
-from ..engine import Model
-from .history import History
+from ..engine import Store, Functor, Identifier, Model
 from ..logs import get
-from . import semantics
+from .observation import Observation
+from .history import History
 from .semantics.target import Target
-from itertools import chain
+from . import semantics
+
+from typing import Dict, Optional, TypeVar, Any
 from torch import Tensor
-from typing import Any
-import torch
+from networkx import DiGraph
 
 logger = get("explanation")
 
-class Explanation:
-    """Explanations are the central explanatory element in Sherlog. They capture sufficient generative properties to ensure a particular outcome."""
+T = TypeVar('T')
 
-    def __init__(self,
-        model : Model,
-        meet : Observation,
-        history : History, 
-        external=()
-    ):
-        """Constructs an explanation.
+class Explanation:
+    """Explanations combine generative models with observations on identifiers."""
+
+    def __init__(self, model : Model, meet : Observation, history : History, *builtins):
+        """Construct an explanation.
 
         Parameters
         ----------
         model : Model
+
         meet : Observation
+
         history : History
-        external : Mapping[str, Any] (default={})
+
+        *builtins : Dict[str, Any]
         """
         logger.info(f"Explanation {self} built.")
-        self.model = model
-        self.meet = meet
-        self.history = history
-        self._external = external
+        self.model, self.meet, self.history = model, meet, history
+        # may not always get builtins, need a default
+        self.builtins = list(builtins) if builtins else []
 
     @classmethod
-    def of_json(cls, json, external=()):
+    def of_json(cls, json, *builtins) -> 'Explanation':
         """Constructs an explanation from a JSON encoding.
 
         Parameters
         ----------
         json : JSON-like object
-        external : Mapping[str, Any] (default={})
+
+        *builtins : Dict[str, Any]
 
         Returns
         -------
         Explanation
         """
         logger.info(f"Building explanation from serialization: {json}...")
+        # delegate to the relevant sub-component JSON parsers
         model = Model.of_json(json["assignments"])
         meet = Observation.of_json(json["meet"])
         history = History.of_json(json["history"])
-        return cls(model, meet, history, external=external)
+        # and just pull it all together
+        return cls(model, meet, history, *builtins)
 
-    def store(self, *namespaces):
-        """Store initialized with external mapping.
+    def store(self, *namespaces) -> Store:
+        """Store initialized with builtin mapping.
 
         Parameters
         ----------
@@ -68,125 +69,116 @@ class Explanation:
         -------
         Store
         """
-        return Store(external=chain(self._external, namespaces))
+        return Store(*self.builtins, *namespaces)
 
-    def observe(self, key : str, value : Any):
-        self.meet[Variable(key)] = value
-
-    def run(self, functor : Functor, wrap_args={}, fmap_args={}, parameters={}, namespace={}) -> Store:
+    def run(self, functor : Functor, namespace : Optional[Dict[str, Any]] = None, **kwargs) -> Store:
         """Evaluate the explanation in the given functor.
 
         Parameters
         ----------
         functor : Functor
 
-        wrap_args : Optional[Dict[string, Any]]
+        namespace : Optional[Dict[str, Any]]
 
-        fmap_args : Optional[Dict[string, Any]]
-
-        parameters : Optional[Dict[string, Dict[string, Any]]]
+        **kwargs
+            Passed to the functor on execution.
 
         Returns
         -------
-        Store[Functor.t]
-
+        Store
         """
-        store = self.store(namespace)
+        # build the store as normal
+        store = self.store(namespace) if namespace else self.store()
+        # and evaluate every assignment in order
         for assignment in self.model.assignments:
-            functor.run_assignment(
-                assignment,
-                store,
-                wrap_args=wrap_args,
-                fmap_args=fmap_args,
-                parameters=parameters)
+            functor.run_assignment(assignment, store, **kwargs)
         return store
 
-    def graph(self):
-        """Build a graph representation of the story.
+    def objective(self, functor : Functor[T], namespace : Optional[Dict[str, Any]] = None, **kwargs) -> T:
+        """
+        Parameters
+        ----------
+        functor : Functor[T]
 
+        namespace : Optional[Dict[str, Any]]
+
+        **kwargs
+            Passed to the functor during execution.
+        
         Returns
         -------
-        networkx.DiGraph
+        T
+        """
+        store = self.run(functor, namespace=namespace)
+        observation = self.meet.target(store, functor, prefix="sherlog:observation", default=1.0)
+        objective = Identifier("sherlog:objective")
+        functor.run(objective, "set", [observation], store, **kwargs)
+        return store[objective]
+
+    # APPLICATIONS OF OBJECTIVE BUILDING
+
+    def graph(self) -> DiGraph:
+        """Build a directed graph representation of the explanation.
+        
+        Returns
+        -------
+        DiGraph
         """
         objective = self.objective(semantics.graph.functor)
         return semantics.graph.to_graph(objective)
 
-    def objective(self, functor : Functor, observation : Observation, namespace={}):
-        """Build computation graph for the satisfaction of the given observation in the given functor.
-
-        Parameters
-        ----------
-        functor : Functor
-        observation : Observation
-
-        Returns
-        -------
-        Functor.t
-        """
-        store = self.run(functor, namespace=namespace)
-
-        obs = observation.target(store, functor, prefix="sherlog:observation", default=1.0)
-        objective = value.Variable("sherlog:objective")
-        functor.run(objective, "set", [obs], store)
-
-        return store[objective]
-
-    def miser(self, observation : Observation, target : Target, namespace={}) -> Tensor:
+    def miser(self, target : Target, namespace : Optional[Dict[str, Any]] = None, **kwargs) -> Tensor:
         """Builds a Miser surrogate objective for the satisfaction of the given observation.
 
         Parameters
         ----------
-        observation : Observation
-
         target : Target
+
+        namespace : Optional[Dict[str, Any]]
+
+        **kwargs:
+            Passed to the functor during execution.
 
         Returns
         -------
-        Miser
+        Tensor
         """
         # force all the observed variables
         forcing = {}
-        for variable in observation.variables:
-            forcing[variable] = observation[variable]
+        for identifier in self.meet.identifiers:
+            forcing[identifier] = self.meet[identifier]
 
         # construct the objective
         functor = semantics.miser.factory(target, forcing=forcing)
-        objective = self.objective(functor, observation, namespace=namespace)
+        objective = self.objective(functor, namespace=namespace, **kwargs)
         
         # scaling and whatnot handled by .surrogate property
         return objective.surrogate
 
-    def log_prob(self, parameterization=None, namespace={}) -> Tensor:
+    def log_prob(self, namespace : Optional[Dict[str, Any]] = None) -> Tensor:
         """Compute the log-probability of the explanation.
 
         Parameters
         ----------
-        parameterization : Optional[Parameterization]
-
         namespace : Dict[str, Any] (default={})
 
         Returns
         -------
         Tensor
         """
+        # log-prob done via expectation of indicator function
         target = semantics.target.EqualityIndicator()
-        surrogate_log_prob = self.miser(self.meet, target, namespace=namespace).log()
+        surrogate_log_prob = self.miser(target, namespace=namespace).log()
 
-        if parameterization is not None:
-            posterior_log_prob = self.history.log_prob(parameterization)
-            return surrogate_log_prob - posterior_log_prob
-        else:
-            return surrogate_log_prob
+        return surrogate_log_prob
 
-    def relaxed_log_prob(self, parameterization=None, temperature : float = 1.0, namespace={}) -> Tensor:
+    def relaxed_log_prob(self, temperature : float = 1.0, namespace={}) -> Tensor:
         """Compute the relaxed log-probability of the explanation.
 
         Converges to `self.log_prob` as temperature tends towards 0.
 
         Parameters
         ----------
-        parameterization : Optional[Parameterization]
-
         namespace : Dict[str, Any] (default=[])
 
         temperature : float (default=1.0)
@@ -198,11 +190,7 @@ class Explanation:
         target = semantics.target.RBF(sdev=temperature)
         surrogate_log_prob = self.miser(self.meet, target, namespace=namespace).log()
 
-        if parameterization is not None:
-            posterior_log_prob = self.history.log_prob(parameterization)
-            return surrogate_log_prob - posterior_log_prob
-        else:
-            return surrogate_log_prob
+        return surrogate_log_prob
 
     def observation_loss(self, namespace={}) -> Tensor:
         """Compute the MSE between the observation and the generated values.

@@ -1,67 +1,94 @@
-from .value import Variable, Symbol
+from .value import Value, Identifier, Literal
+from typing import Callable
 
 class Store:
-    def __init__(self, external=()):
-        """A store mapping variables and constants to values.
-
-        Parameters
-        ----------
-        external : iterable of mappables, default `()`
-            Iterable of external maps defining the intended namespace.
-
-        Returns
-        -------
-        Store
-        """
-        self._external = list(external)
+    def __init__(self, *builtins):
+        self._builtins = list(builtins)
         self._internal = {}
 
-    def __getitem__(self, key):
-        # for variables, look up in the internal store
-        if isinstance(key, Variable):
-            return self._internal[key.name]
-        # for constants, check the external maps in order
-        elif isinstance(key, Symbol):
-            for external_map in self._external:
-                try:
-                    return external_map[key.name]
-                except KeyError: pass
-        # otherwise, crash
-        raise KeyError(str(key))
+    def __get_from_builtin(self, key : str):
+        """Searches for an object in the builtin namespaces.
 
-    def __setitem__(self, key, obj):
-        # we can only use variables as keys - external maps handled at construction only
-        if isinstance(key, Variable):
-            self._internal[key.name] = obj
-        else: raise ValueError()
-
-    def lookup_callable(self, name):
-        """Look up a callable object in the external maps.
-
-        Does *not* check the existence of a `__call__` method.
+        For internal use only.
 
         Parameters
         ----------
-        name : string
-            Exact name of the callable
-
-        Returns
-        -------
-        callable
-            Note - as of now, may not actually return a callable object
+        key : str
 
         Raises
         ------
         KeyError
+
+        Returns
+        -------
+        Any
         """
-        for external_map in self._external:
+        for builtins in self._builtins:
             try:
-                return external_map[name]
-            except KeyError: pass
-        raise KeyError()
+                return builtins[key]
+            except KeyError:
+                pass
+        raise KeyError(key)
+
+    def __get_from_internal(self, key : str):
+        """Searches for an object in the internal namespace.
+        
+        For internal use only.
+        
+        Parameters
+        ----------
+        key : str
+        
+        Raises
+        ------
+        KeyError
+        
+        Returns
+        -------
+        Any
+        """
+        return self._internal[key]
+
+    def lookup_callable(self, name : str) -> Callable:
+        """Look for a callable with the given name in the store.
+
+        Parameters
+        ----------
+        name : str
+
+        Raises
+        ------
+        KeyError
+
+        Returns
+        -------
+        Callable
+        """
+        obj = self.get_from_builtin(self, name)
+        if hasattr(obj, "__call__"):
+            return obj
+        else:
+            raise KeyError(name)
+
+    # MAGIC METHODS
+    def __getitem__(self, key : Identifier):
+        # try the internals
+        try:
+            return self.__get_from_internal(key.name)
+        except KeyError:
+            pass
+
+        # try the builtins
+        try:
+            return self.__get_from_builtin(key.name)
+        except KeyError:
+            pass
+
+        # fail
+        raise KeyError(key.name)
+
+    def __setitem__(self, key : Identifier, obj):
+        self._internal[key.name] = obj
 
     def __str__(self):
         return str(self._internal)
-
-    def items(self):
-        return self._internal.items()

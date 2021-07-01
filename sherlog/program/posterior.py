@@ -1,28 +1,72 @@
-import torch
+from ..explanation import Explanation
 
-class Posterior:
-    def __init__(self, contexts=None, weights=None):
-        if contexts is None:
-            self._contexts = []
-        else:
-            self._contexts = contexts
+from abc import ABC, abstractmethod
+from typing import List, Optional, Iterable
+from torch import ones, tensor, Tensor
 
-        if weights is None:
-            self._weights = torch.ones(len(self._contexts) + 3, requires_grad=True)
-        else:
-            self._weights = torch.tensor(weights, requires_grad=True)
-
-    def parameters(self):
-        yield self._weights
-
-    @property
-    def contexts(self):
-        yield from self._contexts
+# ABC for posteriors
+class Posterior(ABC):
+    """Posteriors provide likelihoods to explanations."""
     
-    @property
-    def weights(self):
-        yield from self._weights.tolist()
+    @abstractmethod
+    def log_prob(self, explanation : Explanation) -> Tensor:
+        pass
 
-    @property
-    def parameterization(self):
-        return self._weights
+    @abstractmethod
+    def parameters(self) -> Iterable[Tensor]:
+        pass
+
+    @abstractmethod
+    def parameterization(self) -> List[float]:
+        pass
+
+# Concrete implementations
+class LinearPosterior:
+    """Posterior that linearly combines features to compute a score."""
+
+    def __init__(self, contexts : List[str] = [], weights : Optional[List[float]] = None):
+        """Construct a linear posterior.
+        
+        Parameters
+        ----------
+        contexts : List[str] (default=[])
+
+        weights : Optional[List[float]]
+            If not provided, instantiated uniformly.
+        """
+        self.contexts = contexts
+        if weights is None:
+            self.weights = ones(len(self.contexts) + 3, requires_grad=True)
+        else:
+            self.weights = tensor(weights, requires_grad=True)
+
+    def log_prob(self, explanation : Explanation) -> Tensor:
+        """Compute the log-likelihood of the explanation in the posterior.
+        
+        Parameters
+        ----------
+        explanation : Explanation
+
+        Returns
+        -------
+        Tensor
+        """
+        return explanation.history.log_prob(self.weights)
+
+    def parameters(self) -> Iterable[Tensor]:
+        """Iterates over all tuneable parameters of the posterior.
+        
+        Returns
+        -------
+        Iterable[Tensor]
+        """
+        yield self.weights
+
+    def parameterization(self) -> List[float]:
+        """Linearizes the parameters for serialization purposes.
+        
+        Returns
+        -------
+        List[float]
+        """
+        return self.weights.tolist()

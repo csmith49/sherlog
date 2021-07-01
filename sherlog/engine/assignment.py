@@ -1,55 +1,52 @@
-from .value import Variable
-from .value import of_json as value_of_json
+from .value import Value, Identifier
+from typing import List, Iterable
 
 class Assignment:
-    def __init__(self, target, guard, arguments):
-        """An assignment statement of the form `target = function(arguments)`.
+    """Exectuable statement of the form `target <- function(arguments)`."""
 
+    def __init__(self, target : Identifier, guard : str, arguments : List[Value]):
+        """Construct an assignment.
+        
         Parameters
         ----------
-        target : Variable
-        guard : string
-        arguments : list of values
-
-        Returns
-        -------
-        Statement
+        target : Identifier
+        
+        guard : str
+        
+        arguments : List[Value]
         """
-        self.target = target
-        self.guard = guard
-        self.arguments = arguments
+        self.target, self.guard, self.arguments = target, guard, arguments
 
-    def dependencies(self):
-        """Compute variable dependencies.
-
-        A dependency is a variable whose value must be known to evaluate the statement.
-
+    def dependencies(self) -> Iterable[Identifier]:
+        """Compute identifier dependencies. A dependency is any identifier whose value must be known in order to evaluate statement.
+        
         Returns
         -------
-        Variable iterable
+        Iterable[Identifier]
         """
         for arg in self.arguments:
-            if isinstance(arg, Variable):
+            if isinstance(arg, Identifier):
                 yield arg
 
-    def __str__(self):
-        args = ", ".join(str(arg) for arg in self.arguments)
-        return f"{self.target} <- {self.guard}({args})"
-
+    # CONSTRUCTION
     @classmethod
-    def of_json(cls, json):
-        """Build a statement from a JSON encoding.
-
+    def of_json(cls, json) -> 'Assignment':
+        """Build an assignment statement from a JSON representation.
+        
         Parameters
         ----------
         json : JSON-like object
-
+        
         Returns
         -------
-        Statement
+        Assignment
         """
-
-        target = Variable(json["target"])        
+        target = Identifier(json["target"])
         guard = json["guard"]
-        arguments = [value_of_json(p) for p in json["parameters"]]
+        arguments = [Value.of_json(p) for p in json["parameters"]]
         return cls(target, guard, arguments)
+
+    # MAGIC METHODS
+    def __str__(self):
+        args = ", ".join(str(arg) for arg in self.arguments)
+        return f"{self.target} <- {self.guard}({args})"

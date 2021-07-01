@@ -1,159 +1,200 @@
 from .parameter import Parameter
 from .evidence import Evidence
-from .posterior import Posterior
-from .. import interface
+from .posterior import LinearPosterior, Posterior
+
 from ..explanation import Explanation
+from ..interface import query
 from ..logs import get
 
-from itertools import islice, chain, repeat
-from typing import Iterable, Optional
+from typing import Iterable, Any, Dict, Optional
+from torch import tensor, Tensor, stack, no_grad
+from itertools import islice
 
-import torch
 import pickle
 import random
 
 logger = get("program")
 
 class Program:
-    def __init__(self, parameters, program_source, namespace, contexts=None):
-        """Object representing a Sherlog problem file.
+    """Programs coordinate generation of explanations."""
 
+    def __init__(self, source, parameters : Iterable[Parameter], namespace : Dict[str, Any], contexts : Iterable[str] = ()):
+        """Construct a program from source.
+        
         Parameters
         ----------
+        source : JSON-like object
+
         parameters : Iterable[Parameter]
 
-        namespaces : Iterable[str]
+        namespace : Dict[str, Any]
 
-        posterior : Optional[List[str]]
-
-        program_source : JSON
+        contexts : Iterable[str] (default=())
         """
-        # convert params to name-param map
-        self._parameters = {p.name : p for p in parameters}
-        
+        # convert parameters to map
+        self._parameters = {parameter.name : parameter for parameter in parameters}
         self._namespace = namespace
-        
-        # just record the rest
-        self.program_source = program_source
-
-        # and set the posterior
-        if contexts:
-            self.posterior = Posterior(contexts=contexts)
-        else:
-            self.posterior = Posterior()
+        self._source = source
+        self._posterior = LinearPosterior(contexts=contexts)
 
     @classmethod
-    def of_json(cls, json, namespace=None):
+    def of_json(cls, json, namespace : Optional[Dict[str, Any]] = None) -> 'Program':
         """Build a program from a JSON-like object.
-
+        
         Parameters
         ----------
-        json : JSON
+        json : JSON-like objectt
         
+        namespace : Optional[Dict[str, Any]]
+
         Returns
         -------
         Program
         """
-        parameters = [Parameter.of_json(p) for p in json["parameters"]]
-        # namespaces = json["namespaces"]
-        program_source = {
+        parameters = [Parameter.of_json(parameter) for parameter in json["parameters"]]
+        source = {
             "rules" : json["rules"],
             "parameters" : json["parameters"],
             "ontology" : json["ontology"],
-            "evidence" : [] # we split the evidence out into a different iterable, but the server expects this
+            # evidence split out elsewhere, but server expects this
+            "evidence" : []
         }
-        if namespace:
-            return cls(parameters, program_source, namespace)
-        else:
-            return cls(parameters, program_source, {})
+        namespace = namespace if namespace else {}
+        # pull together
+        return cls(source, parameters, namespace)
 
-    def explanations(self, evidence : Evidence, quantity : int, attempts : int = 100, width : Optional[int] = None, namespace=None):
-        """Samples explanations for the provided evidence.
+    def explanations(self, evidence : Evidence, quantity : int = 1, attempts : int = 100, width : Optional[int] = None, namespace : Optional[Dict[str, Any]] = None) -> Iterable[Explanation]:
+        """Sample explanations for the provided evidence.
 
         Parameters
         ----------
         evidence : Evidence
-        quantity : int
+
+        quantity : int (default=1)
+
         attempts : int (default=100)
+
         width : Optional[int]
-        namespace : Optional[Mapping[str, Any]]
+
+        namespace : Optional[Dict[str, Any]]
 
         Returns
         -------
         Iterable[Explanation]
         """
-        logger.info("Sampling explanations for evidence %s...", evidence)
+        logger.info("Sampling explanations for evidence: %s...", evidence)
 
-        # build the external evaluation context w/ namespaces
-        if namespace:
-            external = (self.parameter_map, self._namespace, namespace)
-        else:
-            external = (self.parameter_map, self._namespace)
-
-        # interface kwargs
+        # build kwargs for queries
         kwargs = {}
         kwargs["width"] = width
-        kwargs["contexts"] = list(self.posterior.contexts)
-        kwargs["parameterization"] = list(self.posterior.weights)
+        kwargs["contexts"] = list(self._posterior.contexts)
+        kwargs["parameterization"] = self._posterior.parameterization()
 
-        # build the explanation generator
+        builtins = (
+            {name : parameter.value for name, parameter in self._parameters.items()},
+            self._namespace,
+            namespace
+        )
+
+        # build generator
         def gen():
             for attempt in range(attempts):
                 logger.info("Starting explanation generation attempt %i...", attempt)
                 try:
-                    for json in interface.query(self.program_source, evidence.json, **kwargs):
-                        logger.info("Explanation found.")
-                        yield Explanation.of_json(json, external=external)
+                    for json in query(self._source, evidence.json, **kwargs):
+                        yield Explanation.of_json(json, *builtins)
                 except TimeoutError:
-                    logger.warning("Explanation generation timed out. Restarting...")
-        
+                    logger.warning("Explanation generation attempt %i timed out. Restarting...", attempt)
+
         yield from islice(gen(), quantity)
 
-    def log_prob(self, evidence, explanations=1, attempts=100, width=100, namespace=None):
+    def log_prob(self, evidence : Evidence, explanations : int = 1, attempts : int = 100, width : Optional[int] = None, namespace : Optional[Dict[str, Any]] = None) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence.
-
+        
         Parameters
         ----------
         evidence : Evidence
+
         explanations : int (default=1)
+
         attempts : int (default=100)
-        width : int (default=100)
-        namepsace : Optional[Namespace]
+
+        width : Optional[int]
+
+        namespace : Optional[Dict[str, Any]]
 
         Returns
         -------
         Tensor
         """
-        explanations = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts, namespace=namespace)
-        log_probs = [ex.log_prob(self.posterior.parameterization) for ex in explanations]
-        # if we didn't find any explanations, default
+        exs = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts, namespace=namespace)
+        log_probs = [ex.log_prob(namespace=namespace) - self._posterior.log_prob(ex) for ex in exs]
+        # if no explanations, default
         if log_probs:
-            return torch.mean(torch.stack(log_probs))
+            return stack(log_probs).mean()
         else:
-            return torch.ones(samples)
+            return tensor(0.0)
 
-    def sample_explanation(self, evidence : Evidence, burn_in : int = 100, samples : int = 100, **kwargs):
+    def parameters(self, namespace : Optional[Dict[str, Any]] = None) -> Iterable[Tensor]:
+        """Returns all tuneable parameters in the program and namespace, if provided.
+        
+        Parameters
+        ----------
+        namespace : Optional[Dict[str, Any]]
+
+        Returns
+        -------
+        Iterable[Tensor]
+        """
+        # handle parameters
+        for _, parameter in self._parameters.items():
+            yield parameter.value
+        # handle internal namespace
+        for _, obj in self._namespace.items():
+            if hasattr(obj, "parameters"):
+                yield from obj.parameters()
+        # handle external namespace
+        if namespace is not None:
+            for _, obj in namespace.items():
+                if hasattr(obj, "parameters"):
+                    yield from obj.parameters()
+        # handle posterior
+        yield from self._posterior.parameters()
+
+    def clamp(self):
+        """Update parameters in-place to satisfy the constraints of their domain."""
+        logger.info("Clamping parameters...")
+        with no_grad():
+            for _, parameter in self._parameters.items():
+                parameter.clamp()
+
+    def sample_explanation(self, evidence : Evidence, burn_in : int = 100, namespace : Optional[Dict[str, Any]] = None, **kwargs) -> Explanation:
         """Sample an explanation from the posterior.
 
         Parameters
         ----------
         evidence : Evidence
+        
         burn_in : int (default=100)
-        samples : int (default=100)
+
+        namespace : Optional[Dict[str, Any]]
+
+        **kwargs
+            Passed to explanation generation during execution.
 
         Returns
         -------
         Explanation
         """
-
         logger.info(f"Sampling explanation for {evidence} with {burn_in} burn-in steps.")
+        
         sample, sample_likelihood = None, 0.00001
 
         for step in range(burn_in):
             # sample a new explanation and compute likelihood
             explanation = next(self.explanations(evidence, quantity=1, **kwargs))
-            # compute the likelihood
-            explanation_likelihood = explanation.miser(samples=samples).mean().item()
+            explanation_likelihood = explanation.log_prob(self._posterior.parameterization, namespace=namespace).exp()
+
             # accept/reject
             ratio = explanation_likelihood / sample_likelihood
             if random.random() <= ratio:
@@ -162,11 +203,14 @@ class Program:
 
         if sample is None:
             logger.warning(f"No sample accepted after {burn_in} burn-in steps.")
+        
         return sample
 
-    # TODO - save and load posterior parameters with this contraption
+    # SAVING AND LOADING
+    # probably broken wrt external models...
+    # oh, and no posterior saved
 
-    def save_parameters(self, filepath):
+    def save_parameters(self, filepath : str):
         """Write all parameter values in scope to a file.
 
         Parameters
@@ -182,7 +226,7 @@ class Program:
         with open(filepath, "wb") as f:
             pickle.dump(output, f)
 
-    def load_parameters(self, filepath):
+    def load_parameters(self, filepath : str):
         """Update (in-place) all parameter values in scope with the values contained in the file.
 
         Paramters
@@ -196,28 +240,3 @@ class Program:
         for name, state_dict in params["models"].items():
             model = self._namespace[name]
             model.load_state_dict(state_dict)
-
-    def clamp_parameters(self):
-        """Update the value of all parameters in-place to satisfy the constraints of their domain."""
-        logger.info("Clamping parameters.")
-        with torch.no_grad():
-            for _, parameter in self._parameters.items():
-                parameter.clamp()
-
-    def parameters(self):
-        """Return an iterable over all tuneable parameters in-scope.
-
-        Returns
-        -------
-        Iterable[Tensor]
-        """
-        for _, parameter in self._parameters.items():
-            yield parameter.value
-        for _, obj in self._namespace.items():
-            if hasattr(obj, "parameters"):
-                yield from obj.parameters()
-        yield from self.posterior.parameters()
-
-    @property
-    def parameter_map(self):
-        return {n : p.value for n, p in self._parameters.items()}

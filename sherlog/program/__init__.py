@@ -1,6 +1,5 @@
 from .program import Program
 from .evidence import Evidence
-from .namespace import Register
 from ..interface import parse
 from typing import Tuple, Iterable
 

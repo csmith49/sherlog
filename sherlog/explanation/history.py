@@ -1,49 +1,150 @@
+from sherlog.program import parameter
+from torch import tensor, stack, Tensor
+from typing import List, Iterable
+
 import torch
 
 class Record:
-    def __init__(self, features, context):
-        self._features = features
-        self._context = context
+    """A record captures the features and context of an explanation during a single point of the stochastic search process."""
+
+    def __init__(self, features : Tensor, context : List[Tensor]):
+        """Construct a record directly from tensors.
+        
+        Parameters
+        ----------
+        features : Tensor
+
+        context : List[Tensor]        
+        """
+        self.features = features
+        self.context = context
 
     @classmethod
-    def of_json(cls, json):
+    def of_json(cls, json) -> 'Record':
+        """Construct a record from a JSON-like record.
+        
+        Parameters
+        ----------
+        json : JSON-like object
+        
+        Returns
+        -------
+        Record
+        """
         features = torch.tensor(json["features"])
         context = [torch.tensor(c) for c in json["context"]]
         return cls(features, context)
 
-    def features(self, parameterization):
-        return self._features.dot(parameterization)
-    
-    def context(self, parameterization):
-        return [ctx.dot(parameterization) for ctx in self._context]
+    def score(self, parameterization : Tensor) -> Tensor:
+        """Score the record by combining the features.
 
-    def log_prob(self, parameterization):
-        return self.features(parameterization).log() - torch.stack(self.context(parameterization)).sum().log()
+        Parameters
+        ----------
+        parameterization : Tensor
+            Linear parameterization of the features.
 
-    def __str__(self):
+        Returns
+        -------
+        Tensor
+        """
+        return self.features.dot(parameterization)
+
+    def normalization_constant(self, parameterization : Tensor) -> Tensor:
+        """Compute the normalization constant by which the record's score is convertible into a likelihood.
+
+        Parameters
+        ----------
+        parameterization : Tensor
+            Linear parameterization of the features.
+
+        Returns
+        -------
+        Tensor
+        """
+        return stack([context.dot(parameterization) for context in self.context]).sum()
+
+    def log_prob(self, parameterization : Tensor) -> Tensor:
+        """The log-likelihood the record was chosen from the context.
+
+        Parameters
+        ----------
+        parameterization : Tensor
+            Linear parameterization of the features.
+
+        Returns
+        -------
+        Tensor
+        """
+        return self.score(parameterization).log() - self.normalization_constant(parameterization).log()
+
+    # MAGIC METHODS
+
+    def __str__(self) -> str:
         return str(self._context)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self)
 
 class History:
-    def __init__(self, records):
-        self._records = records
+    """Histories are sequences of records explaining the derivation of an explanation."""
+    
+    def __init__(self, records : Iterable[Record]):
+        """Construct a history from a list of records.
+        
+        Parameters
+        ----------
+        records : Iterable[Record]
+
+        """
+        self._records = list(records)
     
     @classmethod
-    def of_json(cls, json):
+    def of_json(cls, json) -> 'History':
+        """Construct a history from a JSON-like object.
+        
+        Parameters
+        ----------
+        json : JSON-like object
+        
+        Returns
+        -------
+        History
+        """
         records = [Record.of_json(r) for r in json["records"]]
         return cls(records)
 
-    def log_prob(self, parameterization):
-        if self._records:
-            return torch.stack([r.log_prob(parameterization) for r in self._records]).sum()
+    def log_prob(self, parameterization : Tensor) -> Tensor:
+        """Log-likelihood of the history being derived.
+        
+        Parameters
+        ----------
+        parameterization : Tensor
+            Linear parameterization of the features.
+            
+        Returns
+        -------
+        Tensor
+        """
+        if self.records:
+            return stack([record.log_prob(parameterization) for record in self.records]).sum()
         else:
-            return torch.tensor(1.0)
+            return tensor(0.0)
 
-    def join(self, other):
-        records = self._records + other._records
+    def join(self, other : 'History') -> 'History':
+        """Append a history to the end of this history.
+        
+        Parameters
+        ----------
+        other : History
+        
+        Returns
+        -------
+        History
+        """
+        records = self.records + other.records
         return History(records)
+
+    # MAGIC METHODS
 
     def __add__(self, other):
         return self.join(other)
