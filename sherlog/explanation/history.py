@@ -96,7 +96,7 @@ class History:
         records : Iterable[Record]
 
         """
-        self._records = list(records)
+        self.records = list(records)
     
     @classmethod
     def of_json(cls, json) -> 'History':

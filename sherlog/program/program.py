@@ -136,14 +136,21 @@ class Program:
         -------
         Tensor
         """
+        logger.info(f"Evaluating log-prob for {evidence}...")
+        # build -> sample -> evaluate
         store = self.store(**locals)
         exs = self.explanations(evidence, quantity=explanations, width=width, attempts=attempts)
         log_probs = [ex.log_prob(store) - self._posterior.log_prob(ex) for ex in exs]
+        
         # if no explanations, default
         if log_probs:
-            return stack(log_probs).mean()
+            result = stack(log_probs).mean()
+            logger.info(f"Log-prob for {evidence}: {result:f}.")
         else:
-            return tensor(0.0)
+            logger.info("No explanatios generated. Defaulting...")
+            result = tensor(0.0)
+
+        return result
 
     def parameters(self, **locals) -> Iterable[Tensor]:
         """Returns all tuneable parameters in the program and namespace, if provided.
@@ -173,7 +180,7 @@ class Program:
 
     def clamp(self):
         """Update parameters in-place to satisfy the constraints of their domain."""
-        logger.info("Clamping parameters...")
+        logger.info(f"Clamping parameters for {self}...")
         with no_grad():
             for _, parameter in self._parameters.items():
                 parameter.clamp()

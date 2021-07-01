@@ -69,9 +69,9 @@ def train(filename, epochs, optimizer, learning_rate, instrument, resolution, ba
 
         if batch.epoch % resolution == 0:
             log = {"epoch" : batch.epoch}
-            for k, v in program.parameter_map.items():
+            for k, v in program._parameters.items():
                 log[k] = v
-                log[f"{k} grad"] = v.grad
+                log[f"{k} grad"] = v.value.grad
             instrumenter.emit(**log)
 
     if instrument:
@@ -79,8 +79,8 @@ def train(filename, epochs, optimizer, learning_rate, instrument, resolution, ba
 
     # print the values of the learned parameters
     console.print("MLE Results")
-    for name, parameter in program.parameter_map.items():
-        console.print(f"{name}: {parameter:f}")
+    for name, parameter in program._parameters.items():
+        console.print(f"{name}: {parameter.value:f}")
 
 @main.command()
 @click.argument("filename", type=click.Path(exists=True))

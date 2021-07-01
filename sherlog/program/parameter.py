@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 from torch import Tensor, tensor
+from ..logs import get
+
+logger = get("program.parameter")
 
 # ABSTRACT PARAMETER CLASS
 
@@ -16,6 +19,12 @@ class Parameter(ABC):
         value : Tensor
         """
         self.name, self.value = name, value
+        
+        # make sure the value will accumulate gradients
+        if not self.value.requires_grad:
+            self.value.requires_grad = True
+
+        logger.info(f"Parameter {repr(self)} constructed.")
     
     @abstractmethod
     def clamp(self):
@@ -31,7 +40,7 @@ class Parameter(ABC):
     # MAGIC METHODS
 
     def __str__(self):
-        return f"<Parameter {self.name}: {self.value}>"
+        return f"{self.value:f}"
 
 # CONCRETE PARAMETER CLASSES
 
@@ -57,6 +66,9 @@ class UnitIntervalParameter(Parameter):
         """
         self.value.clamp_(0, 1)
 
+    def __repr__(self):
+        return f"<Unit {self.name}: {self.value}>"
+
 class PositiveRealParameter(Parameter):
     """Parameter restricted to the ray (0, infty]."""
 
@@ -79,6 +91,9 @@ class PositiveRealParameter(Parameter):
         """
         self.value.clamp_(self._epsilon, float("inf"))
 
+    def __repr__(self):
+        return f"<Pos {self.name}: {self.value}>"
+
 class RealParameter(Parameter):
     """Parameter on the real line."""
 
@@ -100,6 +115,9 @@ class RealParameter(Parameter):
         Does nothing.
         """
         pass
+
+    def __repr__(self):
+        return f"<Real {self.name}: {self.value}>"
 
 # MONKEY PATCH
 
