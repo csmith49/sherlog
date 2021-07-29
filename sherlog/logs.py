@@ -38,6 +38,21 @@ def get(module_name):
     LOGGERS[module_name] = logger
     return logger
 
+def get_external(module_name : str):
+    """Acquires a logger for an external module.
+
+    Parameters
+    ----------
+    module_name : str
+
+    Returns
+    -------
+    logger
+    """
+    logger = logging.getLogger(f"{PREFIX}.external.{module_name}")
+    LOGGERS[module_name] = logger
+    return logger
+
 def logged_modules():
     """A list of all module names used to acquire a logger.
 
@@ -52,7 +67,7 @@ def enable(*args):
 
     Parameters
     ----------
-    *args : list[str]
+    *args : str
 
     Notes
     -----

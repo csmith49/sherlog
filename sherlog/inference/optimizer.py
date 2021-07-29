@@ -1,22 +1,55 @@
 import torch
+from torch.optim import SGD, Adam
+from enum import Enum
 from ..logs import get
+from .objective import Objective
 
 logger = get("optimizer")
 
+# objective intent
+Intent = Enum("Intent", "MAXIMIZE MINIMIZE")
+
 class Optimizer:
-    def __init__(self, problem, optimizer):
-        """Context manager for optimizing registered objectives.
+    """Context manager for registering and optimizing objectives.
+
+    Handles PyTorch optimizers so you don't have to.
+    
+    See also: `sherlog.inference.Objective`.
+    """
+
+    def __init__(self, program, optimizer : str = "sgd", learning_rate : float = 0.1):
+        """Constructs an optimization context manager with the indicated Torch optimizer.
 
         Parameters
         ----------
         problem : Problem
 
-        optimizer : torch.optim.Optimizer
+        optimizer : str (default='sgd')
+            One of ['sgd', 'adam']
+
+        learning_rate : float (default=0.1)
         """
-        self.problem = problem
-        self.optimizer = optimizer
+        self.program = program
+
+        self.optimizer = {
+            "sgd" : SGD,
+            "adam" : Adam
+        }[optimizer](program.parameters(), lr=learning_rate)
 
         self._maximize, self._minimize = [], []
+
+    def register(self, objective : Objective, intent : Intent = Intent.MAXIMIZE):
+        """Registers objectives.
+
+        Parameters
+        ----------
+        objective : Objective
+        intent : Intent
+        """
+        if intent == Intent.MAXIMIZE:
+            self.maximize(objective)
+        elif intent == Intent.MINIMIZE:
+            self.minimize(objective)
 
     def maximize(self, *args):
         """Registers objectives to be maximized.
@@ -73,7 +106,7 @@ class Optimizer:
         else:
             cost.backward()
             self.optimizer.step()
-            self.problem.clamp_parameters()
+            self.program.clamp()
 
-        for p, v in self.problem.parameter_map.items():
-            logger.info(f"Gradient for {p}: {v.grad}.")
+        for p, v in self.program._parameters.items():
+            logger.info(f"Gradient for {p}: {v.value.grad}.")

@@ -1,14 +1,15 @@
 module State : sig
     type t
+    (** an intermediate proof state storing 1. the atoms to be proven and 2. the ground facts already derived *)
 
     val goal : t -> Atom.t list
     val cache : t -> Atom.t list
     
-    val of_atoms : Atom.t list -> t
+    val of_atoms : Atom.t list -> Atom.t list -> t
     val discharge: t -> (Atom.t * t) option
 
     val apply : Substitution.t -> t -> t
-    val extend : Atom.t list -> t -> t
+    val extend : Atom.t list -> Atom.t list -> t -> t
     val variables : t -> string list
 
     val is_empty : t -> bool
@@ -46,8 +47,8 @@ val witnesses : t -> Witness.t list
 val state : t -> State.t
 (** [state proof] returns the proof state containing the unproven obligations *)
 
-val of_atoms : Atom.t list -> t
-(** [of_atoms goal] builds a proof obligation for [goal] *)
+val of_atoms : Atom.t list -> Atom.t list -> t
+(** [of_atoms goal cache] builds a proof obligation for [goal] having seen [cache] before *)
 
 val of_state : State.t -> t
 
@@ -62,3 +63,5 @@ val is_resolved : t -> bool
 
 val pp : t Fmt.t
 (** pretty printer for proofs *)
+
+val weak_compare : t -> t -> int

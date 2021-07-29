@@ -1,0 +1,3 @@
+nn(m_digit, X, [0, ..., 9]) :: digit(X, 0); ...; digit(X, 9).
+
+addition(X, Y, Z) :- digit(X, X2), digit(Y, Y2), Z is X2 + Y2.

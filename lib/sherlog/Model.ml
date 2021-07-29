@@ -61,30 +61,33 @@ end
 type t = {
     assignments : Assignment.t list;
     meet : Observation.t;
-    avoid : Observation.t;
+    history : Search.History.t;
 }
 
-let make assignments meet avoid = {
-    assignments = assignments ; meet = meet ; avoid = avoid ;
+let make assignments meet history = {
+    assignments = assignments;
+    meet = meet;
+    history = history;
 }
 
 let assignments m = m.assignments
 let meet m = m.meet
-let avoid m = m.avoid
+let history m = m.history
 
 module JSON = struct
     let encode model = `Assoc [
         ("type", `String "model");
         ("assignments", `List (model |> assignments |> CCList.map Assignment.JSON.encode));
         ("meet",  model |> meet |> Observation.JSON.encode);
-        ("avoid", model |> avoid |> Observation.JSON.encode);
+        ("history", model |> history |> Search.History.JSON.encode);
     ]
 
+    (* TODO - this drops the histories, but that's okay for now *)
     let decode json = let open CCOpt in
         let* assignments = JSON.Parse.(find (list Assignment.JSON.decode) "assignments" json) in
         let* meet = JSON.Parse.(find Observation.JSON.decode "meet" json) in
-        let* avoid = JSON.Parse.(find Observation.JSON.decode "avoid" json) in
-            return (make assignments meet avoid)
+        let* history = JSON.Parse.(find Search.History.JSON.decode "history" json) in
+            return (make assignments meet history)
 end
 
 module Compile = struct
@@ -157,25 +160,21 @@ module Compile = struct
 
 end
 
-let of_explanation positive negative =
-    let pa = positive
-        |> Compile.of_explanation
-        |> Compile.associate_names
-        |> Compile.assignments in
-    let na = negative
+let of_proof proof history =
+    let story = proof
+        |> Explanation.of_proof
         |> Compile.of_explanation
         |> Compile.associate_names
         |> Compile.assignments in
     {
-        assignments = pa @ na |> CCList.map fst;
-        meet = pa |> Compile.observation;
-        avoid = na |> Compile.observation;
+        assignments = story |> CCList.map fst;
+        meet = story |> Compile.observation;
+        history = history;
     }
 
 let pp ppf model = let open Fmt in
-    pf ppf "{%a@,; +: %a@,; -: %a}"
+    pf ppf "{%a@,; +: %a@,}"
     (list ~sep:comma Assignment.pp) (model |> assignments)
     Observation.pp (model |> meet)
-    Observation.pp (model |> avoid)
 
 let to_string = Fmt.to_to_string pp

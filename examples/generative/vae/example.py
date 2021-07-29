@@ -1,0 +1,80 @@
+import torchvision
+import torchvision.transforms as transforms
+from dataclasses import dataclass
+from random import randint
+from sherlog.logs import get_external
+
+logger = get_external("vae.example")
+
+# load the datasets
+logger.info("Loading MNIST data...")
+TRANSFORM = transforms.Compose([transforms.ToTensor()])
+DATA_DIR = "/tmp"
+TRAIN = torchvision.datasets.MNIST(
+    root=f"{DATA_DIR}/MNIST",
+    train=True,
+    download=True,
+    transform=TRANSFORM
+)
+TEST = torchvision.datasets.MNIST(
+    root=f"{DATA_DIR}/MNIST",
+    train=False,
+    download=True,
+    transform=TRANSFORM
+)
+logger.info("MNIST data loaded from {DATA_DIR}/MNIST.")
+
+
+# images are just references indexing above
+@dataclass
+class Image:
+    dataset : str
+    index : int
+
+    def get(self):
+        if self.dataset == "train": return TRAIN[self.index]
+        elif self.dataset == "test": return TEST[self.index]
+        else: raise KeyError()
+
+    @property
+    def vector(self):
+        return self.get()[0]
+
+    @property    
+    def label(self):
+        return self.get()[1]
+
+    @property
+    def atom(self):
+        return f"{self.dataset}({self.index})"
+
+    @property
+    def symbol(self):
+        return f"image_{self.dataset}_{self.index}"
+
+# examples pair images and results
+@dataclass
+class Example:
+    image : Image
+
+    @property
+    def vector(self):
+        return self.image.vector.view(-1)
+
+    @property
+    def symbol(self):
+        return self.image.symbol
+
+# random access into train and test
+def random_image(dataset):
+    if dataset == "train":
+        index = randint(0, len(TRAIN) - 1)
+    elif dataset == "test":
+        index = randint(0, len(TEST) - 1)
+    else: raise KeyError()
+
+    return Image(dataset, index)
+
+def sample(quantity : int, dataset : str):
+    for _ in range(quantity):
+        yield Example(random_image(dataset))

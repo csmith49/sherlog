@@ -30,18 +30,18 @@ end
 
 type t
 
-val make : Assignment.t list -> Observation.t -> Observation.t -> t
+val make : Assignment.t list -> Observation.t -> Search.History.t -> t
 
 val assignments : t -> Assignment.t list
 val meet : t -> Observation.t
-val avoid : t -> Observation.t
+val history : t -> Search.History.t
 
 module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option
 end
 
-val of_explanation : Explanation.t -> Explanation.t -> t
+val of_proof : Watson.Proof.t -> Search.History.t -> t
 
 val pp : t Fmt.t
 val to_string : t -> string

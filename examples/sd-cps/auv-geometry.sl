@@ -161,7 +161,7 @@ all_ok <- pv_length_ok, battery_weight_ok, fineness_ok, depth_ok.
 # drag (D) at speed S
 drag(S, D)
     total_wetted_area(A), F = 1 + appendage_added_area,
-    D = A * drag * F * density_of_seawater * S^2 / 2.
+    D = A * drag_coefficient * F * density_of_seawater * S^2 / 2.
 
 # power (W) required to move at speed S
 prop_power(S, W) <- drag(S, D), W = S * D / propulsion_efficiency.

@@ -1,13 +1,24 @@
-class Variable:
-    def __init__(self, name):
-        """Variable from a Sherlog program.
+from abc import ABC
+from typing import Any
+from torch import Tensor, tensor
 
+class Value(ABC):
+    """Value ABC."""
+    pass
+
+class Identifier(Value):
+    """Value subclass representing Sherlog variables and symbols, i.e. things that should be given a concrete value on execution."""
+
+    def __init__(self, name : str):
+        """Construct an identifier with a given name.
+        
         Parameters
         ----------
-        name : string
+        name : str
         """
         self.name = name
 
+    # MAGIC METHODS
     def __hash__(self):
         return hash(self.name)
 
@@ -18,41 +29,42 @@ class Variable:
         return self.name
 
     def __repr__(self):
-        return f"<Variable: {self.name}>"
+        return f"<ID: {self.name}>"
 
-class Symbol:
-    def __init__(self, name):
-        """Symbolic constant from a Sherlog program.
+class Literal(Value):
+    """Value subclass representing everything that *isn't* an identifier."""
 
-        Parameters
-        ----------
-        name : string
-        """
-        self.name = name
-    
-    def __eq__(self, other):
-        return self.name == other.name
+    def to_tensor(self) -> Tensor:
+        return tensor(self.value)
+
+    def __init__(self, value : Any):
+        self.value = value
 
     def __str__(self):
-        return self.name
+        return str(self.value)
 
-def of_json(json):
-    """Construct a Python object from a JSON representation.
+    def __repr__(self):
+        return f"<Lit: {self.value}>"
 
+# MONKEY PATCHING JSON CONSTRUCTOR INTO ABC
+
+def of_json(json) -> Value:
+    """Construct a Value from a JSON representation.
+    
     Parameters
     ----------
     json : JSON-like object
-
+    
     Returns
     -------
-    Python object
+    Value
     """
-    # variable
-    if json["type"] == "variable":
-        return Variable(json["value"])
-    # constant
-    elif json["type"] == "symbol":
-        return Symbol(json["value"])
-    # otherwise, just return the value
+    # pull the value to be wrapped
+    value = json["value"]
+    # check if we're an identifier
+    if json["type"] in ("variable", "symbol"):
+        return Identifier(value)
     else:
-        return json["value"]
+        return Literal(value)
+
+Value.of_json = of_json

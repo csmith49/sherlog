@@ -1,0 +1,11 @@
+nn(m_result, D1, D2, Carry, [0, ..., 9]) :: result(D1, D2, Carry, 0); ...; result(D1, D2, Carry, 9).
+nn(m_carry, D1, D2, Carry, [0, 1]) :: carry(D1, D2, Carry, 0); carry(D1, D2, Carry, 1).
+
+slot(I1, I2, Carry, NewCarry, Result) :-
+    result(I1, I2, Carry, Result),
+    carry(I1, I2, Carry, NewCarry).
+
+add([], [], [C], C, []).
+add([H1 | T1], [H2 | T2], C, Carry, [Digit | Res]) :-
+    add(T1, T2, C, NewCarry, Res),
+    slot(H1, H2, NewCarry, Carry, Digit).

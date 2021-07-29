@@ -32,6 +32,7 @@ let variables atom = atom
 let apply h atom = { atom with
     terms = atom.terms |> CCList.map (Substitution.apply h);
 }
+let apply_all h atoms = CCList.map (apply h) atoms
 
 let unifiable left right =
     (CCString.equal_caseless (relation left) (relation right)) &&
@@ -43,6 +44,24 @@ let unify left right =
             Substitution.Unification.resolve_equalities constraints
     else 
         None
+
+let embed small large = large
+    |> CCList.map (unify small)
+    |> CCList.keep_some
+
+let rec embed_all small large = match small with
+    (* nothing to unify, no resulting susb *)
+    | [] -> []
+    (* the base case *)
+    | atom :: [] -> embed atom large
+    (* inductive case *)
+    | atom :: rest ->
+        let subs = embed atom large in
+        let subs_rest = subs
+            |> CCList.map (fun s -> apply_all s rest)
+            |> CCList.map (fun r -> embed_all r large) in
+        let extend sub subs = CCList.map (Substitution.compose sub) subs in
+        CCList.map2 extend subs subs_rest |> CCList.flatten
 
 let pp ppf atom = let open Fmt in
     pf ppf "%s(@[<0>%a@])" atom.relation (list ~sep:comma Term.pp) atom.terms

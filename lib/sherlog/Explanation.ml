@@ -18,6 +18,11 @@ module Introduction = struct
 		parameters = parameters;
 	}
 
+	let equal left right = 
+		CCString.equal left.mechanism right.mechanism &&
+		(CCList.equal Watson.Term.equal) left.context right.context &&
+		(CCList.equal Watson.Term.equal) left.parameters right.parameters
+
 	module Key = struct
 		let mechanism = "sl:mech"
 		let parameters = "sl:args"
@@ -55,6 +60,14 @@ module Introduction = struct
 				return (make mechanism parameters context target)
 			| _ -> None
 
+	let tag intro =
+		let mech = Watson.Term.Symbol intro.mechanism in
+		mech :: (intro.parameters @ intro.context)
+
+	let is_constrained intro = match intro.target with
+		| Watson.Term.Variable _ -> false
+		| _ -> true
+
 	let to_string intro =
 		let t = intro |> target |> Watson.Term.to_string in
 		let f = intro |> mechanism in
@@ -75,9 +88,6 @@ type t = Introduction.t list
 let introductions ex = ex
 
 let empty = []
-let of_proof proof = proof
-	|> Watson.Proof.to_atoms
-	|> CCList.filter_map Introduction.of_atom
 
 let join = CCList.append
 
@@ -86,4 +96,18 @@ let to_string ex = ex
 	|> CCList.map Introduction.to_string
 	|> CCString.concat ", "
 
-let pp = Fmt.list Introduction.pp
+let is_extension base ex =
+	let contained intro = CCList.mem ~eq:Introduction.equal intro ex in
+	base |> CCList.for_all contained
+
+let extension_witness base ex =
+	if is_extension base ex then
+		let not_contained intro = not (CCList.mem ~eq:Introduction.equal intro base) in
+		ex |> CCList.filter not_contained |> CCOpt.return
+	else None
+
+let pp = Fmt.list ~sep:Fmt.comma Introduction.pp
+
+let of_proof proof = proof
+		|> Watson.Proof.to_atoms
+		|> CCList.filter_map Introduction.of_atom

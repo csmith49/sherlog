@@ -1,5 +1,7 @@
 open Watson
 
+(* BASICS *)
+
 type t = {
 	rules : Rule.t list;
 	parameters : Parameter.t list;
@@ -7,7 +9,19 @@ type t = {
 	ontology : Ontology.t;
 }
 
+let is_intro_rule rule = rule
+	|> Rule.head
+	|> Atom.relation
+	|> CCString.equal Explanation.Introduction.Key.introduction
+
 let rules program = program.rules
+let introduction_rules program = program
+	|> rules
+	|> CCList.filter is_intro_rule
+let non_introduction_rules program = program
+	|> rules
+	|> CCList.filter (fun r -> not (is_intro_rule r))
+
 let parameters program = program.parameters
 let evidence program = program.evidence
 let ontology program = program.ontology
@@ -19,80 +33,175 @@ let make rules parameters evidence ontology = {
 	ontology = ontology;
 }
 
-let apply program proof =
-	(* try applying rules *)
-	let proofs = program
-		|> rules
-		|> CCList.filter_map (Watson.Proof.resolve proof) in
-	(* otherwise use the ontology *)
-	if (CCList.length proofs) != 0 then proofs
-	else let proofs = program
-		|> ontology
-		|> Ontology.dependencies
-		|> CCList.filter_map (Watson.Proof.resolve proof) in
-	proofs
+(* SEMANTICS *)
 
-module Filter = struct
-	type t = Watson.Proof.t list -> Watson.Proof.t list
+module Semantics = struct	
+	type t = Proof.t -> Proof.t list
 
-	let total proofs = proofs
-	
-	(* TODO - fix this to ensure consistency wrt params and contexts *)
-	let rec intro_consistent proofs = CCList.filter is_intro_consistent proofs
-	and is_intro_consistent proof =
-		let intros = proof
-			|> Watson.Proof.to_atoms
-			|> CCList.filter_map Explanation.Introduction.of_atom in
-		let size = intros |> CCList.length in
-		let unique_intros = intros
-			|> CCList.map intro_hash
-			|> CCList.uniq ~eq:(CCList.equal Watson.Term.equal)
-			|> CCList.length in
-		CCInt.equal size unique_intros
-	and intro_hash intro =
-		let mechanism = Watson.Term.Symbol (Explanation.Introduction.mechanism intro) in
-		let parameters = Explanation.Introduction.parameters intro in
-		let context = Explanation.Introduction.context intro in
-			mechanism :: (parameters @ context)
-	
-	let length l proofs = proofs
-		|> CCList.filter (fun p -> (p |> Watson.Proof.witnesses |> CCList.length) <= l)
-	
-	let width w proofs =
-		if CCList.length proofs <= w then proofs else
-		let random_proofs = proofs
-			|> CCRandom.pick_list
-			|> CCRandom.sample_without_duplicates ~cmp:Stdlib.compare w in
-		CCRandom.run random_proofs
+	module M = struct
+		let return = CCList.return
+		let bind xs f = CCList.flat_map f xs
+		let (>>=) = bind
+		let zero = []
+		let plus = (@)
+		let (++) = plus
+	end
 
-	let compose f g proofs = proofs |> f |> g
-	let (>>) f g = compose f g
+	(* CONSTRUCTION *)
+	
+	let result xs = fun _ -> xs
+	
+	let of_rule rule proof = match Proof.resolve proof rule with
+	| Some result -> M.return result
+	| None -> M.zero
+
+	(* COMBINATORS *)
+
+	module Combinator = struct
+		(* DISJUNCTIVE *)
+		let try_or l r = fun p -> match l p with
+			| [] -> r p
+			| results -> results
+		let (<|>) = try_or
+		let choice ss = CCList.fold_left try_or (result M.zero) ss
+
+		(* CONJUNCTIVE *)
+		let try_and l r = fun p -> M.(l p ++ r p)
+		let (<&>) = try_and
+		let union ss = CCList.fold_left try_and (result M.zero) ss
+
+		(* SEQUENCING *)
+		let seq l r = fun p -> M.(l p >>= r)
+		let (>>) = seq
+
+		(* FAILURE *)
+		let attempt (sem : t) : t = sem <|> M.return
+
+		(* RECURSION *)
+		let rec fixpoint sem proof = match sem proof with
+			| [] -> [proof]
+			| results -> M.(results >>= fixpoint sem)
+	end
 end
 
-let rec prove program filter goal =
-	let worklist = [Watson.Proof.of_atoms goal] in
-		explore_tr program filter worklist []
-and explore_tr program filter worklist proven = match worklist with
-	| [] -> proven
-	| proof :: rest ->
-		if Watson.Proof.is_resolved proof then
-			explore_tr program filter rest (proof :: proven)
-		else
-			let proofs = proof
-				|> apply program
-				|> filter in
-			explore_tr program filter (proofs @ rest) proven
+module Filter = struct
+	type t = Watson.Proof.t -> bool
 
-let (|=) program goal = prove program Filter.total goal
+	let negate filter = fun x -> not (filter x)
 
-let contradict program filter proof =
-	let state = proof |> Watson.Proof.state in
-	let proofs = program
+	let constraint_avoiding ontology proof =
+		let constraints = ontology |> Ontology.constraints in
+		let atoms = proof |> Watson.Proof.to_atoms in
+		constraints
+			|> CCList.map (fun c -> Watson.Atom.embed_all c atoms)
+			|> CCList.for_all CCList.is_empty
+
+	let intro_consistent proof =
+		let intro_tags = proof
+			|> Explanation.of_proof
+			|> Explanation.introductions
+			|> CCList.map Explanation.Introduction.tag in
+		let num_intros = CCList.length intro_tags in
+		let num_unique_intros = intro_tags
+			|> CCList.sort_uniq ~cmp:(CCList.compare Watson.Term.compare)
+			|> CCList.length in
+		CCInt.equal num_intros num_unique_intros
+
+	let length k proof = 
+		let l = proof
+			|> Watson.Proof.witnesses
+			|> CCList.length in
+		l <= k
+
+	let join l r = fun proof -> (l proof) && (r proof)
+
+	let ( ++ ) = join
+end
+
+(* APPLICATION *)
+
+let apply program =
+	let classical = program
+		|> non_introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in (* choice here doesn't quite do what you want... *)
+	let introduction = program
+		|> introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	Semantics.Combinator.(
+		let fp = fixpoint classical in
+		fp >> introduction >> fp
+	)
+
+let apply_with_dependencies program =
+	let classical = program
+		|> non_introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	let introduction = program
+		|> introduction_rules
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	let ontological = program
 		|> ontology
-		|> Ontology.constraints
-		|> CCList.map (Watson.Proof.State.reset_goal state)
-		|> CCList.map (Watson.Proof.of_state) in
-	explore_tr program filter proofs []
+		|> Ontology.dependencies
+		|> CCList.map Semantics.of_rule
+		|> Semantics.Combinator.union in
+	Semantics.Combinator.(
+		let fp = fixpoint classical in
+		fp >> (introduction <|> ontological) >> fp
+	)
+
+(* SEARCH *)
+
+let linear_domain : t -> (t -> Watson.Proof.t -> Watson.Proof.t list) -> Posterior.t -> (module Search.Domain with type t = Watson.Proof.t) = fun program successor posterior ->
+	(module struct
+		type t = Watson.Proof.t
+
+		let features = Posterior.Operator.apply (Posterior.operator posterior)
+		let score = Posterior.Parameterization.linear_combination (Posterior.parameterization posterior)
+		let accept = Watson.Proof.is_resolved
+		let reject = fun _ -> false
+		let successors = successor program
+	end)
+
+let initial_worklist goal cache =
+	let history = Search.History.empty in
+	let proof = Watson.Proof.of_atoms goal cache in
+		[Search.State.make proof history]
+
+(* MODEL BUILDING *)
+let prove ?width:(width=CCInt.max_int) program posterior goal =
+	(* get search domain *)
+	let (module D) = linear_domain program apply_with_dependencies posterior in
+	(* initialize worklist *)
+	let wl = initial_worklist goal [] in
+	(* search *)
+	let results = Search.stochastic_beam_search (module D) width wl [] in
+	(* and remove anything with a contradiction *)
+	let constraint_avoiding = program
+		|> ontology
+		|> Filter.constraint_avoiding in
+	results |> CCList.filter (Search.State.check constraint_avoiding)
+
+(* let contradict ?width:(width=CCInt.max_int) program posterior proof =
+	(* get search domain *)
+	let (module D) = linear_domain program apply posterior in
+	(* initialize worklist *)
+	let proven_atoms = proof |> Watson.Proof.to_atoms in
+	let constraints = program |> ontology |> Ontology.constraints in
+	let wl = constraints |> CCList.flat_map (fun c -> initial_worklist c proven_atoms) in
+	(* search *)
+	let results = Search.stochastic_beam_search (module D) width wl [] in
+		results *)
+
+let models ?width:(width=CCInt.max_int) program posterior goal = goal
+	|> prove ~width:width program posterior
+	|> CCList.map Search.State.to_tuple
+	|> CCList.map (CCPair.fold Model.of_proof)
+
+(* INPUT / OUTPUT *)
 
 let pp ppf program = let open Fmt in
 	pf ppf "Parameters: %a@, Rules: %a@,%a"
@@ -109,17 +218,15 @@ module JSON = struct
 		("ontology", program |> ontology |> Ontology.JSON.encode);
 	]
 
-	let decode json =
-		let rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
-		let parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
-		let evidence = JSON.Parse.(find (list Evidence.JSON.decode) "evidence" json) in
-		let ontology = JSON.Parse.(find Ontology.JSON.decode "ontology" json) in
-		match rules, parameters, evidence, ontology with
-			| Some rules, Some parameters, Some evidence, Some ontology -> Some {
+	let decode json = let open CCOpt in
+		let* rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
+		let* parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
+		let* evidence = JSON.Parse.(find (list Evidence.JSON.decode) "evidence" json) in
+		let* ontology = JSON.Parse.(find Ontology.JSON.decode "ontology" json) in
+			return {
 				rules = rules;
 				parameters = parameters;
 				evidence = evidence;
 				ontology = ontology;
 			}
-			| _ -> None
 end

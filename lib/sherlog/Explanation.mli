@@ -6,7 +6,12 @@ module Introduction : sig
     val context : t -> Watson.Term.t list
     val parameters : t -> Watson.Term.t list
 
+    val equal : t -> t -> bool
     val make : string -> Watson.Term.t list -> Watson.Term.t list -> Watson.Term.t -> t
+
+    val tag : t -> Watson.Term.t list
+
+    val is_constrained : t -> bool
 
     val to_atom : t -> Watson.Atom.t
     val of_atom : Watson.Atom.t -> t option
@@ -14,6 +19,14 @@ module Introduction : sig
     val to_string : t -> string
 
     val pp : t Fmt.t
+
+    module Key : sig
+        val mechanism : string
+        val parameters : string
+        val context : string
+        val target : string
+        val introduction : string
+    end
 end
 
 type t
@@ -24,6 +37,9 @@ val empty : t
 val of_proof : Watson.Proof.t -> t
 
 val join : t -> t -> t
+
+val is_extension : t -> t -> bool
+val extension_witness : t -> t -> t option
 
 val to_string : t -> string
 

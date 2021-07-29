@@ -63,6 +63,11 @@ value :
 term :
     | v = value { v }
     | LBRACKET; RBRACKET { Term.Unit }
+    | v = value; DOUBLECOLON; t = term; { Term.Function ("cons", [v; t]) }
+    | LBRACKET; vs = separated_list(COMMA, value); RBRACKET { 
+        let cons x y = Term.Function ("cons", [x ; y]) in
+        CCList.fold_right cons vs Term.Unit
+    }
     | BLANK { Term.Wildcard }
     | LPARENS; t = term; RPARENS { t }
     ;
@@ -104,10 +109,10 @@ intro_clause :
     ;
 
 fuzzy_clause :
-    | w = term; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
+    | w = value; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
         Line.encode_fuzzy ~head:head ~body:body ~weight:w
     }
-    | w = term; DOUBLECOLON; head = atom; PERIOD {
+    | w = value; DOUBLECOLON; head = atom; PERIOD {
         Line.encode_fuzzy ~head:head ~body:[] ~weight:w
     }
     ;

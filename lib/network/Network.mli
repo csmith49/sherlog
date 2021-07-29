@@ -39,7 +39,7 @@ val socket : address -> port -> socket
 A server is an infinite process that handles incoming JSON objects with a {!type:handler}. Regardless of the behavior of the handler, the server will continue to process JSON until an exception is thrown or the process is terminated.
 *)
 
-val server : handler -> socket -> server
+val server : ?timeout:float -> handler -> socket -> server
 (** [server h sock] builds a process that communicates over [sock] by processing JSON objects with [handler]. *)
 
 (** {1 Running Servers} *)
