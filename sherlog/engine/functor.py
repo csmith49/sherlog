@@ -96,7 +96,7 @@ class Functor(Generic[T]):
             result = callable(*args, **kwargs)
         # lifted case
         except KeyError:
-            callable = store.lookup_callable(assignment.guard)
+            callable = store.callable(assignment.guard)
             result = self.fmap(callable, args, **kwargs)
 
         # update the store in-place

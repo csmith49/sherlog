@@ -15,7 +15,8 @@ logger = get_external("examples.mnist")
 @click.option("--train", default=1000, type=int, help="Number of training samples.")
 @click.option("--test", default=100, type=int, help="Number of testing samples.")
 @click.option("-e", "--epochs", default=1, type=int, help="Number of training epochs.")
-def cli(log, verbose, tool, train, test, epochs):
+@click.option("-s", "--size", type=int, default=1, help="Size of numbers being added.")
+def cli(log, verbose, tool, train, test, epochs, size):
     """CLI for the MNIST benchmark."""
     if verbose:
         enable("examples.mnist", "tooling.evaluation")
@@ -31,7 +32,7 @@ def cli(log, verbose, tool, train, test, epochs):
     logger.info(f"Beginning evaluation...")
     results = evaluate(
         model,
-        samples,
+        samples(size),
         train_size=train,
         test_size=test,
         fit_kwargs={
@@ -44,6 +45,7 @@ def cli(log, verbose, tool, train, test, epochs):
 
     # append some extra info to the results
     results["tool"] = tool
+    results["size"] = size
 
     # process the final results
     if log is not None:

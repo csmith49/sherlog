@@ -54,7 +54,7 @@ class RBF(Target):
 class MSE(Target):
     """Mean squared error target."""
     def evaluate(self, left : Tensor, right : Tensor, *args, **kwargs) -> Tensor:
-        return (left - right).pow(2).mean()
+        return (left.float() - right.float()).pow(2).mean()
 
 class EqualityIndicator(Target):
     """Equality indicator target.

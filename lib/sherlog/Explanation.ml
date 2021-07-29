@@ -88,9 +88,6 @@ type t = Introduction.t list
 let introductions ex = ex
 
 let empty = []
-let of_proof proof = proof
-	|> Watson.Proof.to_atoms
-	|> CCList.filter_map Introduction.of_atom
 
 let join = CCList.append
 
@@ -109,4 +106,8 @@ let extension_witness base ex =
 		ex |> CCList.filter not_contained |> CCOpt.return
 	else None
 
-let pp = Fmt.list Introduction.pp
+let pp = Fmt.list ~sep:Fmt.comma Introduction.pp
+
+let of_proof proof = proof
+		|> Watson.Proof.to_atoms
+		|> CCList.filter_map Introduction.of_atom

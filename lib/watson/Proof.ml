@@ -84,10 +84,10 @@ let state = function O (state, _) -> state
 
 let of_state state = O (state, None)
 
-(* 
+
 let to_atoms proof = proof
     |> witnesses
-    |> CCList.map Witness.atom *)
+    |> CCList.map Witness.atom
 (* 
 let substitution proof = proof
     |> witnesses
@@ -105,7 +105,7 @@ let to_atoms proof =
     |> state
     |> State.cache *)
 
-let to_atoms proof =
+(* let to_atoms proof =
     let witnesses = proof |> rev_witnesses in
     let sub = witnesses
         |> CCList.map Witness.substitution
@@ -113,7 +113,7 @@ let to_atoms proof =
     let atoms = witnesses
         |> CCList.map Witness.atom
         |> CCList.map (Atom.apply sub) in
-    CCList.rev atoms
+    CCList.rev atoms *)
 
 let resolve proof rule = let open CCOpt in
     (* change the rule variables to avoid those in the state *)

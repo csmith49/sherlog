@@ -103,9 +103,12 @@ class Miser:
         -------
         Tensor
         """
-        # step 1: compute forcing likelihood
-        forced_dependencies = filter(lambda v: v.is_forced, self.dependencies())
-        forcing_likelihood = stack([v.log_prob() for v in forced_dependencies]).sum().exp()
+        # step 1: compute forcing likelihood (if anything has been forced...)
+        forced_dependencies = list(filter(lambda v: v.is_forced, self.dependencies()))
+        if forced_dependencies:
+            forcing_likelihood = stack([v.log_prob() for v in forced_dependencies]).sum().exp()
+        else:
+            forcing_likelihood = tensor(1.0)
 
         # step 2: compute magic box of dependencies
         tau = stack([v.log_prob() for v in self.dependencies()]).sum()
@@ -132,7 +135,7 @@ def wrap(obj : Tensor, **kwargs) -> Miser:
     """
     return Miser(obj)
 
-def fmap(callable : Callable[..., Tensor], args : List[Miser], **kwargs) -> Miser:
+def fmap(callable : Callable[..., Tensor], args : List[Miser], assignment=None, **kwargs) -> Miser:
     """
     Parameters
     ----------
@@ -147,6 +150,7 @@ def fmap(callable : Callable[..., Tensor], args : List[Miser], **kwargs) -> Mise
     -------
     Miser
     """
+    logger.info(f"Evaluation {assignment} with {callable} on {args}...")
     value = callable(*[arg.value for arg in args])
     return Miser(value, dependencies=args)
 
