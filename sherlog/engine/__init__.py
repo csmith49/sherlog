@@ -11,4 +11,5 @@ Functors provide the necessary structure. Let `T` be an execution context; funct
 from .model import Model
 from .store import Store
 from .functor import Functor
+from .assignment import Assignment
 from .value import Value, Identifier, Literal
