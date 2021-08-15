@@ -1,6 +1,7 @@
-from typing import TypeVar, Generic, Iterable
+from typing import TypeVar, Generic, Iterable, Callable, Dict, Any
 from abc import ABC, abstractmethod
 from torch import Tensor
+from ....program import Evidence
 
 T = TypeVar('T')
 
@@ -14,3 +15,13 @@ class Model(ABC, Generic[T]):
     @abstractmethod
     def log_prob(self, datum : T, *args, **kwargs) -> Tensor:
         pass
+
+class Task(Generic[T]):
+    """An optimization task."""
+
+    def __init__(self, evidence : Evidence, injection : Callable[[T], Dict[str, Any]]):
+        self.evidence = evidence
+        self.injection = injection
+
+    def inject(self, datum : T) -> Dict[str, Any]:
+        return self.injection(datum)

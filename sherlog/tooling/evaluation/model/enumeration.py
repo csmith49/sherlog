@@ -12,11 +12,11 @@ from torch import stack, Tensor
 
 T = TypeVar('T')
 
-class OptimizationModel(Model[T]):
-    """Optimization-based model with uniform evidence and MSE loss."""
+class EnumerationModel(Model[T]):
+    """Enumeration-based model with uniform evidence and indicator loss."""
 
     def __init__(self, source : str, task : Task[T], bindings : Dict[str, Any], explanations : int = 1):
-        """Build an optimization mode.
+        """Build an enumeration model.
         
         Parameters
         ----------
@@ -46,20 +46,6 @@ class OptimizationModel(Model[T]):
         Store
         """
         return self.program.store(**self.task.inject(datum))
-
-    def loss(self, datum : T) -> Tensor:
-        """MSE loss for the given datum.
-        
-        Parameters
-        ----------
-        datum : T
-        
-        Returns
-        -------
-        Tensor
-        """
-        store = self.store(datum)
-        return stack([ex.observation_loss(store) for ex in self.explanations]).mean()
 
     def log_prob(self, datum : T, *args, samples : int = 100, **kwargs) -> Tensor:
         """Log-likelihood of the given datum.
@@ -112,6 +98,6 @@ class OptimizationModel(Model[T]):
 
         for batch in minibatch(data, batch_size, epochs):
             with optimizer as opt:
-                loss = stack([self.loss(datum) for datum in batch.data]).mean()
-                objective = Objective(batch.identifier, loss)
-                opt.minimize(objective)
+                lp = stack([self.log_prob(datum) for datum in batch.data]).mean()
+                objective = Objective(batch.identifier, lp)
+                opt.maximize(objective)

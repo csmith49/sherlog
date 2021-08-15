@@ -89,6 +89,7 @@ class Explanation:
         -------
         T
         """
+        logger.info(f"{self} building objective in {store} using {functor}.")
         store = self.run(functor, store)
         obs = self.observation.target(functor, store, prefix="sherlog:observation", default=1.0)
         objective = Identifier("sherlog:objective")
@@ -141,12 +142,6 @@ class Explanation:
         objective = self.objective(functor, store, **kwargs)
         return objective.surrogate
 
-    def forcing(self) -> Observation:
-        forcing = {}
-        for identifier in self.observation.identifiers:
-            forcing[identifier] = self.observation[identifier]
-        return forcing
-
     def log_prob(self, store : Store) -> Tensor:
         """Compute the log-probability of the explanation.
 
@@ -159,26 +154,29 @@ class Explanation:
         Tensor
         """
         # get all enumerated variables
-        enums = dict(self.objective(semantics.enumeration.factory(), store))
+        possibilities = self.objective(semantics.enumeration.factory(), store)
 
         # construct the forcings from the observation and the enumerated variables
         forcings = []
         
         # construct cartesian product encoded by enums
-        keys, possibilities = zip(*enums.items())
-        for possibility in product(*possibilities):
-            forcing = dict(zip(keys, possibility))
+        for arg_list in semantics.enumeration.arg_lists(possibilities):
+            # and add the observed variables over - any forcings from obs are therefore guaranteed
             for id in self.observation.identifiers:
-                forcing[id] = self.observation[id]
+                arg_list[id] = self.observation[id]
             
-        forcings.append(forcing)
+            forcings.append(arg_list)
         
+        logger.info(f"{self} computing log-prob in {store}: {len(forcings)} possibilities found")
+
         # get the miser surrogates
         target = semantics.target.EqualityIndicator()
         surrogates = [self._miser(target, store, forcing) for forcing in forcings]
 
         # and combine
-        return stack(surrogates).sum(dim=-1).log()
+        result = stack(surrogates).sum(dim=-1).log()
+        logger.info(f"{self} log-prob in {store}: {result}")
+        return result
 
     def relaxed_log_prob(self, store : Store, temperature : float = 1.0) -> Tensor:
         """Compute the relaxed log-probability of the explanation.
