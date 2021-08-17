@@ -1,5 +1,5 @@
 import dataclasses
-from .monad import Monad
+from .applicative import Applicative
 from .namespace import Namespace
 from .value import Value, Identifier, Literal
 from .program import Program
@@ -15,7 +15,7 @@ T = TypeVar('T')
 class Semantics(Generic[T]):
     """Semantics package monads and namespaces to provide a complete evaluation environemnt."""
 
-    monad : Monad[T]
+    applicative : Applicative[T]
     namespace : Namespace[T]
 
     def _evaluate_value(self, value : Value, context : Mapping[str, T]) -> T:
@@ -25,7 +25,7 @@ class Semantics(Generic[T]):
             return context[value.value]
 
         if isinstance(value, Literal):
-            return self.monad.unit(value.value)
+            return self.applicative.pure(value.value)
         
         raise TypeError(f"{value} is not an evaluatable value object.")
 
@@ -35,7 +35,7 @@ class Semantics(Generic[T]):
         callable = self.namespace.lookup(statement)
         arguments = [self._evaluate_value(arg, context) for arg in statement.arguments]
 
-        return self.monad.bind(arguments, callable)
+        return self.applicative.lift(callable, arguments)
 
     def _evaluate_program(self, program : Program, context : Mapping[str, T]) -> Mapping[str, T]:
         """Apply the semantics to a program."""

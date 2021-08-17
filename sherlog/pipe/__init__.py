@@ -1,4 +1,4 @@
-from .monad import Monad
+from .monad import Monad, TransparentMonad
 from .program import Program
 from .value import Value, Identifier, Literal
 from .statement import Statement
