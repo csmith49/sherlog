@@ -19,22 +19,6 @@ class Record:
         self.features = features
         self.context = context
 
-    @classmethod
-    def of_json(cls, json) -> 'Record':
-        """Construct a record from a JSON-like record.
-        
-        Parameters
-        ----------
-        json : JSON-like object
-        
-        Returns
-        -------
-        Record
-        """
-        features = torch.tensor(json["features"])
-        context = [torch.tensor(c) for c in json["context"]]
-        return cls(features, context)
-
     def score(self, parameterization : Tensor) -> Tensor:
         """Score the record by combining the features.
 
@@ -85,6 +69,28 @@ class Record:
     def __repr__(self) -> str:
         return str(self)
 
+    # SERIALIZATION
+
+    @classmethod
+    def load(cls, json) -> 'Record':
+        """Construct a record from a JSON-like record."""
+
+        if json["type"] != "record":
+            raise TypeError(f"{json} does not represent a record.")
+        
+        features = torch.tensor(json["features"])
+        context = [torch.tensor(c) for c in json["context"]]
+        return cls(features, context)
+
+    def dump(self):
+        """Construct a JSON-like encoding of a record."""
+
+        return {
+            "type" : "record",
+            "features" : self.features,
+            "context" : self.context
+        }
+
 class History:
     """Histories are sequences of records explaining the derivation of an explanation."""
     
@@ -97,21 +103,6 @@ class History:
 
         """
         self.records = list(records)
-    
-    @classmethod
-    def of_json(cls, json) -> 'History':
-        """Construct a history from a JSON-like object.
-        
-        Parameters
-        ----------
-        json : JSON-like object
-        
-        Returns
-        -------
-        History
-        """
-        records = [Record.of_json(r) for r in json["records"]]
-        return cls(records)
 
     def log_prob(self, parameterization : Tensor) -> Tensor:
         """Log-likelihood of the history being derived.
@@ -154,3 +145,22 @@ class History:
     
     def __repr__(self):
         return str(self)
+
+    # SERIALIZATION
+
+    @classmethod
+    def load(cls, json) -> 'History':
+        """Construct a history from a JSON-like object."""
+
+        if json["type"] != "history":
+            raise TypeError(f"{json} does not represent a history.")
+
+        records = [Record.load(r) for r in json["records"]]
+        return cls(records)
+
+    def dump(self):
+        """Construct a JSON-like encoding of a history."""
+        return {
+            "type" : "history",
+            "records" : [record.dump() for record in self.records]
+        }

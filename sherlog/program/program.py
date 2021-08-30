@@ -1,7 +1,56 @@
+from _build.default.sherlog.explanation.explanation import Explanation
+from ..logs import get
+
+logger = get("program")
+
+from .evidence import Evidence
+from ..explanation import Explanation
+
+from ..interface import query
+
+from typing import Optional, Iterable
+from itertools import islice
+
+class Program:
+    """Programs coordinate the generation of explanations."""
+
+    def __init__(self, source, parameters, locals):
+        self._source = source
+        self._parameters = list(parameters)
+        self._locals = locals
+
+        self.posterior = LinearPosterior()
+
+    def explanations(self, evidence : Evidence, quantity : int = 1, attempts : int = 100, width : Optional[int] = None) -> Iterable[Explanation]:
+        """Sample explanations for the provided evidence."""
+
+        logger.info(f"Sampling explanations for evidence {evidence}...")
+
+        # build kwargs for queries
+        kwargs = {}
+        kwargs["width"] = width
+        kwargs["contexts"] = []
+        kwargs["parameterization"] = self.posterior.parameterization()
+
+        # build generator
+        def gen():
+            for attempt in range(attempts):
+                logger.info(f"Starting explanation generation attempt {attempt}...")
+
+                try:
+                    for json in query(self._source, evidence.json, **kwargs):
+                        yield Explanation.load(json)
+                except TimeoutError:
+                    logger.warning(f"Explanation generation attempt {attempt} timed out. Restarting...")
+
+        # get at most quantity explanations
+        yield from islice(gen(), quantity)
+
+    def log_prob(self, evidence : Evidence, )
+
 from .parameter import Parameter
 from .evidence import Evidence
 from .posterior import LinearPosterior
-from ..engine import Store
 
 from ..explanation import Explanation
 from ..interface import query
@@ -102,7 +151,7 @@ class Program:
         # get at most quantity explanations
         yield from islice(gen(), quantity)
 
-    def store(self, **locals) -> Store:
+    def store(self, **locals) -> Mapping[str, Tensor]:
         """Construct a store for evaluating explanations of the program.
         
         Parameters

@@ -5,11 +5,11 @@ from itertools import unique
 from networkx import DiGraph
 from networkx.algorithms.dag import topological_order
 
-class Program:
-    """Pipe programs are collections of statements."""
+class Pipeline:
+    """Pipelines are programs that represent sequences of statement evaluations in dependnecy order."""
 
     def __init__(self, statements : List[Statement]):
-        """Construct a program."""
+        """Construct a pipeline."""
 
         self.statements = statements
 
@@ -60,8 +60,8 @@ class Program:
     # IO
 
     @classmethod
-    def load(cls, json) -> "Program":
-        """Construct a program form a JSON-like object."""
+    def load(cls, json) -> "Pipeline":
+        """Construct a pipeline form a JSON-like object."""
 
         if json["type"] != "program":
             raise TypeError(f"{json} does not represent a program.")

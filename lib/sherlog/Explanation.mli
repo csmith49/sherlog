@@ -1,46 +1,27 @@
-module Introduction : sig
-	type t
+module Term : sig
+    type t
 
-    val target : t -> Watson.Term.t
-    val mechanism : t -> string
-    val context : t -> Watson.Term.t list
-    val parameters : t -> Watson.Term.t list
+    val of_watson_term : Watson.Term.t -> t option
 
-    val equal : t -> t -> bool
-    val make : string -> Watson.Term.t list -> Watson.Term.t list -> Watson.Term.t -> t
-
-    val tag : t -> Watson.Term.t list
-
-    val is_constrained : t -> bool
-
-    val to_atom : t -> Watson.Atom.t
-    val of_atom : Watson.Atom.t -> t option
-
-    val to_string : t -> string
-
-    val pp : t Fmt.t
-
-    module Key : sig
-        val mechanism : string
-        val parameters : string
-        val context : string
-        val target : string
-        val introduction : string
-    end
+    val to_json : t -> JSON.t
 end
 
-type t
+module Observation : sig
+    type 'a t = (string * 'a Pipeline.Value.t) list
 
-val introductions : t -> Introduction.t list
+    val to_json : ('a -> JSON.t) -> 'a t -> JSON.t
+end
 
-val empty : t
-val of_proof : Watson.Proof.t -> t
+type 'a t = {
+    pipeline : 'a Pipeline.t;
+    observation : 'a Observation.t;
+    history : Search.History.t;
+}
 
-val join : t -> t -> t
+val pipeline : 'a t -> 'a Pipeline.t
+val observation : 'a t -> 'a Observation.t
+val history : 'a t -> Search.History.t
 
-val is_extension : t -> t -> bool
-val extension_witness : t -> t -> t option
+val to_json : ('a -> JSON.t) -> 'a t -> JSON.t
 
-val to_string : t -> string
-
-val pp : t Fmt.t
+val of_proof : Watson.Proof.t -> Search.History.t -> Term.t t

@@ -62,13 +62,13 @@ let operate filename =
         else () in
 
     (* processing a proof *)
-    let process_model index model =
-        let _ = Fmt.pr "%a Examining model %a...\n"
+    let process_explanation index _ =
+        let _ = Fmt.pr "%a Examining explanation %a...\n"
             marker ()
             (Fmt.styled (`Fg `Blue) Fmt.int) index in
-        let _ = Fmt.pr "%a Model: %a\n"
+        let _ = Fmt.pr "%a Explanation: <todo>\n"
             marker ()
-            Sherlog.Model.pp model in
+            in
         () in
     
     (* processing a fact *)
@@ -78,11 +78,11 @@ let operate filename =
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
         (* compute proofs and process *)
-        let models = Sherlog.Program.models ~width:!search_width program posterior fact in
-        let _ = Fmt.pr "%a Found %a models.\n"
+        let explanations = Sherlog.Program.explanations ~width:!search_width program posterior fact in
+        let _ = Fmt.pr "%a Found %a explanations.\n"
             marker ()
-            (Fmt.styled (`Fg `Blue) Fmt.int) (models |> CCList.length) in
-        let _ = CCList.iteri process_model models in
+            (Fmt.styled (`Fg `Blue) Fmt.int) (explanations |> CCList.length) in
+        let _ = CCList.iteri process_explanation explanations in
         () in
 
     CCList.iter process_fact facts

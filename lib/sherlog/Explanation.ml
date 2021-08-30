@@ -1,113 +1,148 @@
-module Introduction = struct
-	type t = {
-		target : Watson.Term.t;
-		mechanism : string;
-		context : Watson.Term.t list;
-		parameters : Watson.Term.t list;
-	}
+module Term = struct
+    type t =
+        | Integer of int
+        | Float of float
+        | Boolean of bool
+        | Function of string * t list
+        | Unit
 
-	let target intro = intro.target
-	let mechanism intro = intro.mechanism
-	let context intro = intro.context
-	let parameters intro = intro.parameters
+    let rec of_watson_term = function
+        | Watson.Term.Integer i -> Some (Integer i)
+        | Watson.Term.Float f -> Some (Float f)
+        | Watson.Term.Boolean b -> Some (Boolean b)
+        | Watson.Term.Unit -> Some Unit
+        | Watson.Term.Function (f, args) -> args
+                |> CCList.map of_watson_term
+                |> CCList.all_some
+                |> CCOpt.map (fun args -> Function (f, args))
+        | _ -> None
 
-	let make mechanism parameters context target = {
-		target = target;
-		mechanism = mechanism;
-		context = context;
-		parameters = parameters;
-	}
-
-	let equal left right = 
-		CCString.equal left.mechanism right.mechanism &&
-		(CCList.equal Watson.Term.equal) left.context right.context &&
-		(CCList.equal Watson.Term.equal) left.parameters right.parameters
-
-	module Key = struct
-		let mechanism = "sl:mech"
-		let parameters = "sl:args"
-		let context = "sl:ctx"
-		let target = "sl:t"
-		let introduction = "sl:intro"
-	end
-
-	let to_atom intro = let open Watson.Term in
-		let m = Function (Key.mechanism, [Symbol intro.mechanism]) in
-		let p = Function (Key.parameters, intro.parameters) in
-		let c = Function (Key.context, intro.context) in
-		let y = Function (Key.target, [intro.target]) in
-			Watson.Atom.make Key.introduction [m ; p; c; y]
-
-	let of_atom atom = let open Watson.Term in
-		(* check the relation *)
-		if not (CCString.equal (Watson.Atom.relation atom) Key.introduction) then None else
-		(* unpack the arguments *)
-		match Watson.Atom.terms atom with
-			| [m; p; c; y] -> let open CCOpt in
-				let* mechanism = match m with
-					| Function (key, [Symbol m]) when CCString.equal Key.mechanism key -> Some m
-					| _ -> None in
-				let* parameters = match p with
-					| Function (key, p) when CCString.equal Key.parameters key -> Some p
-					| _ -> None in
-				let* context = match c with
-					| Function (key, c) when CCString.equal Key.context key -> Some c
-					| _ -> None in
-				let* target = match y with
-					| Function (key, [y]) when CCString.equal Key.target key -> Some y
-					| _ -> None in
-				(* no such thing as CCOpt.map4... *)
-				return (make mechanism parameters context target)
-			| _ -> None
-
-	let tag intro =
-		let mech = Watson.Term.Symbol intro.mechanism in
-		mech :: (intro.parameters @ intro.context)
-
-	let is_constrained intro = match intro.target with
-		| Watson.Term.Variable _ -> false
-		| _ -> true
-
-	let to_string intro =
-		let t = intro |> target |> Watson.Term.to_string in
-		let f = intro |> mechanism in
-		let p = intro |> parameters |> CCList.map Watson.Term.to_string |> CCString.concat ", " in
-		let c = intro |> context |> CCList.map Watson.Term.to_string |> CCString.concat ", " in
-			t ^ " <- " ^ f ^ "(" ^ p ^ " | " ^ c ^ ")"
-
-	let pp ppf intro = let open Fmt in
-		pf ppf "%a <- %s@[<1>(%a | %a)@]"
-			Watson.Term.pp 						intro.target
-												intro.mechanism
-			(list ~sep:comma Watson.Term.pp) 	intro.parameters
-			(list ~sep:comma Watson.Term.pp) 	intro.context
+    let rec to_json = function
+        | Integer i -> `Int i
+        | Float f -> `Float f
+        | Boolean b -> `Bool b
+        | Unit -> `Null
+        | Function (f, args) -> `Assoc [
+            ("type", `String "function");
+            ("function_id", `String f);
+            ("arguments", `List (args |> CCList.map to_json));
+        ]
 end
 
-type t = Introduction.t list
+module Observation = struct
+    type 'a t = (string * 'a Pipeline.Value.t) list
 
-let introductions ex = ex
+    let to_json value_to_json obs = obs
+        |> CCList.map (CCPair.map_snd (Pipeline.Value.to_json value_to_json))
+        |> JSON.Make.assoc
+end
 
-let empty = []
+type 'a t = {
+    pipeline : 'a Pipeline.t;
+    observation : 'a Observation.t;
+    history : Search.History.t;
+}
 
-let join = CCList.append
+let pipeline ex = ex.pipeline
+let observation ex = ex.observation
+let history ex = ex.history
 
-let to_string ex = ex
-	|> introductions
-	|> CCList.map Introduction.to_string
-	|> CCString.concat ", "
+let to_json value_to_json ex = 
+    let pipeline = ex
+        |> pipeline
+        |> Pipeline.to_json value_to_json in
+    let observation = ex
+        |> observation
+        |> Observation.to_json value_to_json in
+    let history = ex
+        |> history
+        |> Search.History.JSON.encode in
+    
+    `Assoc [
+        ("type", `String "explanation");
+        ("pipeline", pipeline);
+        ("observation", observation);
+        ("history", history);
+    ]
 
-let is_extension base ex =
-	let contained intro = CCList.mem ~eq:Introduction.equal intro ex in
-	base |> CCList.for_all contained
+module Compile = struct
+    type 'a tag = ('a * Introduction.t)
+    
+    type 'a t = 'a tag list
 
-let extension_witness base ex =
-	if is_extension base ex then
-		let not_contained intro = not (CCList.mem ~eq:Introduction.equal intro base) in
-		ex |> CCList.filter not_contained |> CCOpt.return
-	else None
+    (* lift watson terms to pipeline values *)
+    let lift : Watson.Term.t -> Term.t Pipeline.Value.t option = function 
+        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipeline.Value.Identifier id)
+        | (_ as term) -> term
+            |> Term.of_watson_term
+            |> CCOpt.map (fun term -> Pipeline.Value.Literal term)
 
-let pp = Fmt.list ~sep:Fmt.comma Introduction.pp
+    module Target = struct
+        type target = (string * Term.t Pipeline.Statement.t)
 
-let of_proof proof = proof
-		|> Watson.Proof.to_atoms
-		|> CCList.filter_map Introduction.of_atom
+        let pipeline (intros : target t) : Term.t Pipeline.t = intros
+            |> CCList.map (fun ((_, statement), _) -> statement)
+
+        let observation (intros : target t) : Term.t Observation.t = 
+            let f ((_, statement), intro) = 
+                (* check if we've seen a value we must constrain *)
+                (* note the difference in treatment between variables and symbols *)
+                (* that's due to a semantic shift between Watson variables and Pipeline identifiers *)
+                (* TODO: convert to Introduction.is_constrained *)
+                let seen = match Introduction.target intro with
+                    | Watson.Term.Variable _ -> None
+                    | (_ as term) -> lift term in
+                (* take `seen` to `(target, seen)` *)
+                seen |> CCOpt.map (CCPair.make statement.Pipeline.Statement.target) in
+            CCList.filter_map f intros
+    end
+
+    let of_proof (proof : Watson.Proof.t) : unit t = proof
+        |> Watson.Proof.to_atoms
+        |> CCList.filter_map Introduction.of_atom
+        |> CCList.map (CCPair.make ())
+
+    let associate_names (intros : unit t) : string t = intros
+        |> CCList.map (function (_, intro) -> (Introduction.targetless_identifier intro, intro))
+
+    let target_renaming (intros : string t) : Watson.Substitution.t =
+        (* maps the target to the pre-computed name of the intro *)
+        let f (name, intro) = match Introduction.target intro with
+            | Watson.Term.Variable x ->
+                let target = Watson.Term.Variable name in
+                (Some (x, target), intro)
+            | _ -> (None, intro) in
+        (* collect the non-None tags and combine into sub *)
+        CCList.map f intros
+            |> CCList.map fst
+            |> CCList.keep_some
+            |> Watson.Substitution.of_list
+
+    let associate_statements (intros : string t) : Target.target t=
+        (* get the target renamings *)
+        let substitution = target_renaming intros in
+        (* and build statements by remapping arguments *)
+        let f (name, intro) = 
+            let pipeline = {
+                Pipeline.Statement.target = name;
+                function_id = Introduction.function_id intro;
+                arguments = Introduction.arguments intro
+                    |> CCList.map (Watson.Substitution.apply substitution)
+                    |> CCList.map lift
+                    |> CCList.all_some
+                    |> CCOpt.get_exn_or "Invalid Watson terms in introduction.";
+            } in ((name, pipeline), intro) 
+        in
+        CCList.map f intros
+end
+
+let of_proof proof history =
+    let compilation = proof
+        |> Compile.of_proof
+        |> Compile.associate_names
+        |> Compile.associate_statements in
+    {
+        pipeline = compilation |> Compile.Target.pipeline;
+        observation = compilation |> Compile.Target.observation;
+        history = history
+    }

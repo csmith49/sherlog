@@ -6,15 +6,15 @@ module Operator = struct
 
 		(* pre-builts *)
 		let intros proof = proof
-			|> Explanation.of_proof
-			|> Explanation.introductions
+			|> Watson.Proof.to_atoms
+			|> CCList.filter_map Introduction.of_atom
 			|> CCList.length
 			|> CCFloat.of_int
 
 		let constrained_intros proof = proof
-			|> Explanation.of_proof
-			|> Explanation.introductions
-			|> CCList.filter Explanation.Introduction.is_constrained
+			|> Watson.Proof.to_atoms
+			|> CCList.filter_map Introduction.of_atom
+			|> CCList.filter Introduction.is_constrained
 			|> CCList.length
 			|> CCFloat.of_int
 
@@ -24,9 +24,9 @@ module Operator = struct
 			|> CCFloat.of_int
 
 		let context str proof = proof
-			|> Explanation.of_proof
-			|> Explanation.introductions
-			|> CCList.flat_map Explanation.Introduction.context
+			|> Watson.Proof.to_atoms
+			|> CCList.filter_map Introduction.of_atom
+			|> CCList.flat_map Introduction.context
 			|> CCList.filter (fun t -> Watson.Term.equal t (Watson.Term.Symbol str))
 			|> CCList.length
 			|> CCFloat.of_int

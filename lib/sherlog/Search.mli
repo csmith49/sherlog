@@ -1,4 +1,7 @@
 val prop_to : 'a list -> ('a -> float) -> 'a CCRandom.t
+(* sample a value proportional to the produced weight *)
+
+(* Search Domain *)
 
 module type Domain = sig
     type t
@@ -10,9 +13,15 @@ module type Domain = sig
     val successors : t -> t list
 end
 
+(* Search History *)
+
 module History : sig
+
+    (* Search Records *)
+
     module Record : sig
         type t
+        (* Records maintain the selected features and the context in which they were chosen *)
 
         val make : float list -> float list list -> t
         val features : t -> float list

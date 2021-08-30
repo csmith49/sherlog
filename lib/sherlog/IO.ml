@@ -1,21 +1,16 @@
 let program_of_lines lines =
     (* storage *)
     let rules = ref [] in
-    let dependencies = ref [] in
-    let constraints = ref [] in
     let parameters = ref [] in
     let evidence = ref [] in
     (* handle lines one by one *)
     let process line = match line with
         | `Rule       r ->        rules := r :: !rules
-        | `Dependency d -> dependencies := d :: !dependencies
-        | `Constraint c ->  constraints := c :: !constraints
         | `Parameter  p ->   parameters := p :: !parameters
         | `Evidence   e ->     evidence := e :: !evidence in
     let _ = CCList.iter process lines in
     (* then build *)
-    let ontology = Ontology.make !dependencies !constraints in
-    Program.make !rules !parameters !evidence ontology
+    Program.make !rules !parameters !evidence 
 
 let position_to_string lexbuf =
     let pos = lexbuf.Lexing.lex_curr_p in
@@ -35,4 +30,3 @@ let parse st =
             let message = Fmt.str "Cannot lex @ %s: %s" (position_to_string lexbuf) m in
                 raise (Sherlog_IO message)
     in program_of_lines lines
-    

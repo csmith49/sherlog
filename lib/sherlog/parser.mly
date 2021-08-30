@@ -35,14 +35,9 @@
 %token PARAMETER
 %token EVIDENCE
 
-// ontologies explicitly labeled too
-%token DEPENDENCY
-%token CONSTRAINT
-
 // and colons for separating arguments and the like
 %token COLON
 %token DOUBLECOLON
-%token OR
 %token BLANK
 
 
@@ -87,24 +82,24 @@ clause :
 // generative logic programming
 intro_term : f = SYMBOL; LBRACKET; params = terms; RBRACKET { (f, params) } ;
 intro_atom : 
-    | rel = SYMBOL; LPARENS; args = terms; SEMICOLON; it = intro_term; RPARENS {
+    | rel = SYMBOL; LPARENS; terms = terms; SEMICOLON; it = intro_term; RPARENS {
         let rel_term = (Term.Symbol rel) in
-        let f, params = it in let context = rel_term :: (args @ params) in
-        (rel, args, f, params, context)
+        let function_id, args = it in let context = rel_term :: (terms @ args) in
+        (rel, terms, function_id, args, context)
     }
-    | rel = SYMBOL; LPARENS; args = terms; SEMICOLON; it = intro_term; AT; context = terms; RPARENS {
-        let f, params = it in (rel, args, f, params, context)
+    | rel = SYMBOL; LPARENS; terms = terms; SEMICOLON; it = intro_term; AT; context = terms; RPARENS {
+        let function_id, args = it in (rel, terms, function_id, args, context)
     }
     ;
 
 intro_clause : 
     | ia = intro_atom; ARROW; body = atoms; PERIOD {
-        let rel, args, f, params, context = ia in Line.encode_intro
-            ~relation:rel ~arguments:args ~guard:f ~parameters:params ~context:context ~body:body
+        let rel, terms, function_id, args, context = ia in Line.encode_intro
+            ~relation:rel ~terms:terms ~function_id:function_id ~arguments:args ~context:context ~body:body
     } 
     | ia = intro_atom; PERIOD {
-        let rel, args, f, params, context = ia in Line.encode_intro
-            ~relation:rel ~arguments:args ~guard:f ~parameters:params ~context:context ~body:[]
+        let rel, terms, function_id, args, context = ia in Line.encode_intro
+            ~relation:rel ~terms:terms ~function_id:function_id ~arguments:args ~context:context ~body:[]
     }
     ;
 
@@ -132,16 +127,6 @@ evidence :
     | EVIDENCE; atoms = atoms; PERIOD { Evidence.make atoms }
     ;
 
-ontology_dependency :
-    | DEPENDENCY; head = separated_list(OR, atom); ARROW; body = atoms; PERIOD { 
-        head |> CCList.map (fun hd -> `Dependency (Rule.make hd body))
-    }
-    ;
-
-ontology_constraint :
-    | CONSTRAINT; atoms = atoms; PERIOD { atoms }
-    ;
-
 // generating lines to build program from
 line :
     // core logic programming
@@ -153,8 +138,6 @@ line :
     // inference
     | parameter = parameter;        { [`Parameter parameter] }
     | evidence = evidence;          { [`Evidence evidence] }
-    | d = ontology_dependency;      { d }
-    | c = ontology_constraint;      { [`Constraint c] }
     ;
 
 // entrypoint - collects lists of lines
