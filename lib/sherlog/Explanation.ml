@@ -32,9 +32,12 @@ end
 module Observation = struct
     type 'a t = (string * 'a Pipeline.Value.t) list
 
-    let to_json value_to_json obs = obs
-        |> CCList.map (CCPair.map_snd (Pipeline.Value.to_json value_to_json))
-        |> JSON.Make.assoc
+    let to_json value_to_json obs = `Assoc [
+        ("type", `String "observation");
+        ("items", obs 
+            |> CCList.map (CCPair.map_snd (Pipeline.Value.to_json value_to_json))
+            |> JSON.Make.assoc);
+    ]
 end
 
 type 'a t = {

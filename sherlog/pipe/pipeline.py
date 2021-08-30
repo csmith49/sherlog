@@ -71,25 +71,25 @@ class Pipeline:
     def evaluation_order(self) -> Iterable[Statement]:
         """Iterate over all statements in the program in an order suitable for evaluation."""
 
-        for target in topological_sort(self._dependency_graph).reverse():
+        for target in reversed(list(topological_sort(self._dependency_graph))):
             yield self.source(target)
 
     # IO
 
     @classmethod
-    def load(cls, json) -> "Pipeline":
+    def of_json(cls, json) -> "Pipeline":
         """Construct a pipeline form a JSON-like object."""
 
-        if json["type"] != "program":
-            raise TypeError(f"{json} does not represent a program.")
+        if json["type"] != "pipeline":
+            raise TypeError(f"{json} does not represent a pipeline.")
         
-        statements = [Statement.load(stmt) for stmt in json["statements"]]
+        statements = [Statement.of_json(stmt) for stmt in json["statements"]]
 
         return cls(statements)
 
-    def dump(self):
-        """Construct a JSON-like object representing the program."""
+    def to_json(self):
+        """Construct a JSON-like object representing the pipeline."""
         return {
-            "type" : "program",
-            "statements" : [stmt.dump() for stmt in self.statements]
+            "type" : "pipeline",
+            "statements" : [stmt.to_json() for stmt in self.statements]
         }

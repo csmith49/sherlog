@@ -1,11 +1,11 @@
 from torch.distributions import Distribution
 from sherlog.explanation.semantics.core.distribution import supported_distributions
-from typing import Callable, List, Mapping, Iterable, Optional
+from typing import Callable, List, Mapping, Iterable, Optional, Any
 from torch import Tensor, tensor, stack
 from functools import partial
 from itertools import filterfalse, chain
 
-from ...pipe import DynamicNamespace, Semantics, Pipe, Statement
+from ...pipe import DynamicNamespace, Semantics, Pipe, Statement, Value, Literal
 
 from .core.target import Target
 from . import core
@@ -88,16 +88,26 @@ class Clue:
 
         return self.value * magic_box * forcing_likelihood
 
-def unit(value : Tensor) -> Clue:
+def to_tensor(value : Any) -> Tensor:
+    if isinstance(value, Tensor):
+        return value
+    elif isinstance(value, (int, float)):
+        return tensor(value)
+    elif isinstance(value, bool):
+        return tensor(1.0) if value else tensor(0.0)
+    else:
+        raise TypeError(f"Cannot convert {value} to a tensor.")
+
+def unit(value : Any) -> Clue:
     """Wrap a value in a clue constructor."""
 
-    return Clue(value)
+    return Clue(to_tensor(value))
 
 def bind(callable : Callable[..., Clue], arguments : List[Clue]) -> Clue:
     """Evaluate a monadic callable on a list of monadic arguments."""
 
     result = callable(*(argument.value for argument in arguments))
-    result.dependencies = arguments # never set by callable
+    result._dependencies = arguments # never set by callable
     return result
 
 # NAMESPACE CONSTRUCTION
@@ -116,7 +126,7 @@ def lift_distribution(name : str) -> Callable[..., Clue]:
 
     def wrapped(*args):
         distribution = core.distribution.lookup_constructor(name)(*args)
-        value = distribution.rsample() if distribution.has_rsample() else distribution.sample()
+        value = distribution.rsample() if distribution.has_rsample else distribution.sample()
         return Clue(value=value, distribution=distribution)
     
     return wrapped
@@ -131,7 +141,7 @@ def lift_forcing(name : str, forced_value : Tensor) -> Callable[..., Clue]:
     
     return wrapped
 
-def forcing_lookup(statement : Statement, forcing : Mapping[str, Tensor], target : Target):
+def forcing_lookup(statement : Statement, forcing : Mapping[str, Tensor], target : Target, locals : Mapping[str, Callable[..., Tensor]]):
     """Given a forcing, look up the appropriate callable for a statement."""
 
     # case 0: the target!
@@ -153,14 +163,20 @@ def forcing_lookup(statement : Statement, forcing : Mapping[str, Tensor], target
     elif statement.function in core.builtin.supported_builtins():
         return lift(core.builtin.lookup(statement.function))
 
-    # case 3: function can't be found
+    # case 3: check the local functions
+    elif statement.function in locals.keys():
+        return lift(locals[statement.function])
+
+    # case 4: function can't be found
     else:
         raise KeyError(f"{statement.function} is not a recognized function.")
 
 # SEMANTICS
 
-def semantics_factory(forcing : Mapping[str, Tensor], target : Target) -> Semantics[Clue]:
+def semantics_factory(forcing : Mapping[str, Value], target : Target, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None) -> Semantics[Clue]:
     """Dynamically construct Spyglass semantics from a forcing."""
 
-    lookup = partial(forcing_lookup, forcing=forcing, target=target)
+    forced_tensors = {k : to_tensor(v.value) for k, v in forcing.items() if isinstance(v, Literal)}
+
+    lookup = partial(forcing_lookup, forcing=forced_tensors, target=target, locals=locals if locals else {})
     return Semantics(Pipe(unit, bind), DynamicNamespace(lookup))

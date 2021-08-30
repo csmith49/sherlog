@@ -42,27 +42,27 @@ class Observation:
             return [
                 Statement("sherlog:keys", "tensorize", self.domain),
                 Statement("sherlog:vals", "tensorize", self.codomain),
-                Statement("sherlog:goal", "target", [Identifier("sherlog:keys"), Identifier("sherlog:vals")])
+                Statement("sherlog:target", "target", [Identifier("sherlog:keys"), Identifier("sherlog:vals")])
             ]
 
     # SERIALIZATION
     
     @classmethod
-    def load(cls, json) -> 'Observation':
+    def of_json(cls, json) -> 'Observation':
         """Construct an observation from a JSON-like object."""
 
-        if json["type"] == "observation":
+        if json["type"] != "observation":
             raise TypeError(f"{json} does not represent an observation.")
         
-        mapping = {key : Value.load(value) for key, value in json["items"].items()}
+        mapping = {key : Value.of_json(value) for key, value in json["items"].items()}
         return cls(mapping)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like encoding of the observation."""
 
         return {
             "type" : "observation",
             "items" : {
-                key : value.dump() for key, value in self.mapping.items()
+                key : value.to_json() for key, value in self.mapping.items()
             }
         }

@@ -44,8 +44,8 @@ let handler json = let open CCOpt in match JSON.Parse.(find string "type" json) 
     | Some "query-request" ->
         (* core programmatic info *)
         let* program = JSON.Parse.(find Sherlog.Program.of_json "program" json) in
-        let* query = JSON.Parse.(find Sherlog.Evidence.of_json "query" json) in
         let* posterior = JSON.Parse.(find Sherlog.Posterior.of_json "posterior" json) in
+        let* query = JSON.Parse.(find Sherlog.Evidence.of_json "evidence" json) in
         (* parameters for the search *)
         let search_width = JSON.Parse.(find int "search-width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in

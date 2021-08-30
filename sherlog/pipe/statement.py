@@ -21,7 +21,7 @@ class Statement:
     # IO
 
     @classmethod
-    def load(cls, json) -> "Statement":
+    def of_json(cls, json) -> "Statement":
         """Construct a statement from a JSON-like object."""
 
         if not json["type"] == "statement":
@@ -29,16 +29,16 @@ class Statement:
 
         target = json["target"]
         function = json["function"]
-        arguments = [Value.load(arg) for arg in json["arguments"]]
+        arguments = [Value.of_json(arg) for arg in json["arguments"]]
 
         return cls(target, function, arguments)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like representation of the statement."""
 
         return {
             "type" : "statement",
             "target" : self.target,
             "function" : self.function,
-            "arguments" : [arg.dump() for arg in self.arguments]
+            "arguments" : [arg.to_json() for arg in self.arguments]
         }

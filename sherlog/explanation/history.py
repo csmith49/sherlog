@@ -72,7 +72,7 @@ class Record:
     # SERIALIZATION
 
     @classmethod
-    def load(cls, json) -> 'Record':
+    def of_json(cls, json) -> 'Record':
         """Construct a record from a JSON-like record."""
 
         if json["type"] != "record":
@@ -82,7 +82,7 @@ class Record:
         context = [torch.tensor(c) for c in json["context"]]
         return cls(features, context)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like encoding of a record."""
 
         return {
@@ -149,18 +149,18 @@ class History:
     # SERIALIZATION
 
     @classmethod
-    def load(cls, json) -> 'History':
+    def of_json(cls, json) -> 'History':
         """Construct a history from a JSON-like object."""
 
         if json["type"] != "history":
             raise TypeError(f"{json} does not represent a history.")
 
-        records = [Record.load(r) for r in json["records"]]
+        records = [Record.of_json(r) for r in json["records"]]
         return cls(records)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like encoding of a history."""
         return {
             "type" : "history",
-            "records" : [record.dump() for record in self.records]
+            "records" : [record.to_json() for record in self.records]
         }

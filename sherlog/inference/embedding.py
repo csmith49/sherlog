@@ -82,3 +82,15 @@ class UniformEmbedding(Embedding):
     
     def to_namespace(self, value):
         return self._namespace(value)
+
+class DirectEmbedding(Embedding):
+    """Embeds values directly."""
+
+    def __init__(self):
+        pass
+
+    def to_evidence(self, value):
+        return value
+    
+    def to_namespace(self, _):
+        return {}

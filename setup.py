@@ -14,10 +14,15 @@ setup(name='sherlog',
         "torch",
         "torchvision",
         "rich",
-        "click",
+        "Click",
         "hashids",
         "pandas",
         "altair",
         "altair_viewer"
     ],
-    zip_safe=False)
+    zip_safe=False,
+    entry_points = {
+        "console_scripts" : [
+            "sherlog = sherlog.scripts.cli:cli"
+        ]
+    })

@@ -9,13 +9,13 @@ class Value(ABC):
     # IO
 
     @abstractclassmethod
-    def load(cls, json):
+    def of_json(cls, json):
         """Construct a value from a JSON-like object."""
 
         raise NotImplementedError(f"Cannot load {json}.")
 
     @abstractmethod
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like object from a value."""
 
         raise NotImplementedError(f"Cannot dump {self}.")
@@ -33,7 +33,7 @@ class Identifier(Value):
     # IO
 
     @classmethod
-    def load(cls, json) -> "Identifier":
+    def of_json(cls, json) -> "Identifier":
         """Construct an identifier from a JSON-like object."""
 
         if json["type"] != "identifier":
@@ -43,7 +43,7 @@ class Identifier(Value):
 
         return cls(value)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like object from an identifier."""
 
         return {
@@ -62,7 +62,7 @@ class Literal(Value):
     # IO
 
     @classmethod
-    def load(cls, json) -> "Literal":
+    def of_json(cls, json) -> "Literal":
         """Construct a literal from a JSON-like object."""
 
         if json["type"] != "literal":
@@ -72,7 +72,7 @@ class Literal(Value):
         
         return cls(value)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like object from a literal."""
 
         return {
@@ -83,16 +83,18 @@ class Literal(Value):
 # MONKEY PATCH FOR IO ON VALUE ABC
 
 @classmethod
-def load(cls, json):
+def of_json(cls, json):
     """Construct a value from a JSON-like object."""
 
     # check if it's an identifier
-    try: return Identifier.load(json)
+    try: return Identifier.of_json(json)
     except TypeError: pass
 
     # then check for literal
-    try: return Literal.load(json)
+    try: return Literal.of_json(json)
     except TypeError: pass
 
     # otherwise raise a type error
     raise TypeError(f"{json} does not represent a value.")
+
+Value.of_json = of_json

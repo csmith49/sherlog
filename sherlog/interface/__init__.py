@@ -26,7 +26,12 @@ def initialize(port=PORT):
 
 console = Console(markup=False)
 
-class CommunicationError(Exception): pass
+class CommunicationError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return self.message
 
 def parse_source(source : str):
     """Parse a Sherlog source file."""
@@ -37,10 +42,13 @@ def parse_source(source : str):
     }
 
     response = _SOCKET.communicate(message)
-    if response == "failure" or response["type"] != "parse-source-response":
-        raise CommunicationError()
-
-    return response["program"], response["evidence"]
+    
+    if response["type"] == "failure":
+        raise CommunicationError(response["message"])
+    elif response["type"] != "parse-source-response":
+        raise CommunicationError(f"Found invalid response type {response['type']}.")
+    else:
+        return response["program"], response["evidence"]
 
 def query(rules, evidence, posterior, width = None):
     """Query a Sherlog program to explain the provided evidence."""
@@ -62,7 +70,10 @@ def query(rules, evidence, posterior, width = None):
 
     # send and rec
     response = _SOCKET.communicate(message)
-    if response == "failure" or response["type"] != "query-respones":
-        raise CommunicationError()
-
-    return response["explanations"]
+    
+    if response["type"] == "failure":
+        raise CommunicationError(response["message"])
+    elif response["type"] != "query-response":
+        raise CommunicationError(f"Found invalid response type {response['type']}.")
+    else:
+        return response["explanations"]
