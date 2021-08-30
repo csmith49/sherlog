@@ -3,12 +3,29 @@ from sherlog.explanation.semantics.core.distribution import supported_distributi
 from typing import Callable, List, Mapping, Iterable, Optional
 from torch import Tensor, tensor, stack
 from functools import partial
-from itertools import unique, chain
+from itertools import filterfalse, chain
 
-from ...pipe import DynamicNamespace, Semantics, Monad, Statement
+from ...pipe import DynamicNamespace, Semantics, Pipe, Statement
 
 from .core.target import Target
 from . import core
+
+# utility for ensuring uniqueness in enumeration
+def unique(iterable, key=None):
+    """List unique elements by `key`, if provided."""
+
+    seen = set()
+    seen_add = seen.add
+    if key is None:
+        for element in filterfalse(seen.__contains__, iterable):
+            seen_add(element)
+            yield element
+    else:
+        for element in iterable:
+            k = key(element)
+            if k not in seen:
+                seen_add(k)
+                yield element
 
 # MONADIC SEMANTICS
 
@@ -146,4 +163,4 @@ def semantics_factory(forcing : Mapping[str, Tensor], target : Target) -> Semant
     """Dynamically construct Spyglass semantics from a forcing."""
 
     lookup = partial(forcing_lookup, forcing=forcing, target=target)
-    return Semantics(Monad(unit, bind), DynamicNamespace(lookup))
+    return Semantics(Pipe(unit, bind), DynamicNamespace(lookup))

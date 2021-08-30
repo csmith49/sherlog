@@ -1,9 +1,26 @@
 from typing import List, Iterable
 from .statement import Statement
 
-from itertools import unique
+from itertools import filterfalse
 from networkx import DiGraph
-from networkx.algorithms.dag import topological_order
+from networkx.algorithms.dag import topological_sort
+
+# utility for ensuring uniqueness in enumeration
+def unique(iterable, key=None):
+    """List unique elements by `key`, if provided."""
+
+    seen = set()
+    seen_add = seen.add
+    if key is None:
+        for element in filterfalse(seen.__contains__, iterable):
+            seen_add(element)
+            yield element
+    else:
+        for element in iterable:
+            k = key(element)
+            if k not in seen:
+                seen_add(k)
+                yield element
 
 class Pipeline:
     """Pipelines are programs that represent sequences of statement evaluations in dependnecy order."""
@@ -54,7 +71,7 @@ class Pipeline:
     def evaluation_order(self) -> Iterable[Statement]:
         """Iterate over all statements in the program in an order suitable for evaluation."""
 
-        for target in topological_order(self._dependency_graph).reverse():
+        for target in topological_sort(self._dependency_graph).reverse():
             yield self.source(target)
 
     # IO

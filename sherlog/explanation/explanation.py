@@ -4,7 +4,7 @@ from ..logs import get
 
 logger = get("explanation")
 
-from ..pipe import Program, Semantics, Statement, Literal, Identifier
+from ..pipe import Pipeline, Semantics, Statement, Literal, Identifier
 from .semantics.core.target import Target, EqualityIndicator
 from .semantics import spyglass
 from .observation import Observation
@@ -19,11 +19,11 @@ T = TypeVar('T')
 class Explanation:
     """Explanations model observations over a generative process."""
 
-    def __init__(self, program : Program, observation : Observation, history : History):
+    def __init__(self, pipeline : Pipeline, observation : Observation, history : History):
         """Construct an explanation."""
 
         logger.info(f"Explanation {self} built.")
-        self.program, self.obervation, self.history = program, observation, history
+        self.pipeline, self.obervation, self.history = pipeline, observation, history
 
     def evaluate_observation(self, store : Mapping[str, T], semantics : Semantics[T], target : Target) -> T:
         """Evaluate the observation using the provided target."""
@@ -31,7 +31,7 @@ class Explanation:
     def evaluate(self, parameters : Mapping[str, Tensor], semantics : Semantics[T], default=0.0) -> Mapping[str, T]:
         """Evaluate the explanation in a context defined by a given set of parameters and semantics."""
 
-        store = semantics(self.program, parameters)
+        store = semantics(self.pipeline, parameters)
 
         return semantics.evaluate(self.observation.stub, store)
 
