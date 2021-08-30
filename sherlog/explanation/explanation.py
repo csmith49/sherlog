@@ -10,7 +10,7 @@ from .semantics import spyglass
 from .observation import Observation
 from .history import History
 
-from torch import tensor, Tensor
+from torch import tensor, Tensor, stack
 
 from typing import TypeVar, Mapping, Optional, Any, Callable
 
@@ -38,12 +38,12 @@ class Explanation:
         """Compute the log-probability of the explanation generating the observations."""
 
         sem = spyglass.semantics_factory(
-            forcing=self.observation.mapping,
+            observation=self.observation,
             target=EqualityIndicator(),
             locals=self.locals
         )
         store = self.evaluate(parameters, sem)
-        result = store["sherlog:target"].surrogate.log()
+        result = stack([clue.surrogate for clue in store["sherlog:target"]]).mean().log()
 
         return result
 

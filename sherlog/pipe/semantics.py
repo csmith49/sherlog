@@ -90,8 +90,9 @@ class NDSemantics(Semantics[List[T]]):
             # generator loops over all arguments in the cart-prod and uses pipe.bind to stitch context together
             def gen():
                 for args in zip(*arguments):
-                    for result in callable(*args):
-                        yield pipe.bind(lambda *_: result, args)
+                    for result in pipe.bind(callable, args):
+                        yield result
+                        # yield pipe.bind(lambda *_: result, args)
 
             return list(gen())
 
