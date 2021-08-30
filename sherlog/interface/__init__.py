@@ -28,63 +28,41 @@ console = Console(markup=False)
 
 class CommunicationError(Exception): pass
 
-def parse(source: str):
-    """Run a string through Sherlog's parser.
+def parse_source(source : str):
+    """Parse a Sherlog source file."""
 
-    Parameters
-    ----------
-    source : string
-        Raw source text to be parsed
-
-    Returns
-    -------
-    JSON representation of the encoded program
-
-    Raises
-    ------
-    CommunicationError
-    """
     message = {
-        "command" : "parse",
-        "program" : source
+        "type" : "parse-source-request",
+        "source" : source
     }
+
     response = _SOCKET.communicate(message)
-    if response == "failure": raise CommunicationError()
-    return response
+    if response == "failure" or response["type"] != "parse-source-response":
+        raise CommunicationError()
 
-def query(program, query, **kwargs):
-    """Run a Sherlog program on a query.
+    return response["program"], response["evidence"]
 
-    Parameters
-    ----------
-    program : JSON representation
-    query : JSON representation
+def query(rules, evidence, posterior, width = None):
+    """Query a Sherlog program to explain the provided evidence."""
 
-    width : Optional[int]
-    posterior_context : Optional[List[str]]
-    parameterization : Optional[List[float]]
-
-    Returns
-    -------
-    JSON representation of the entailed model
-
-    Raises
-    ------
-    CommunicationError
-    """
     message = {
-        "command" : "query",
-        "program" : program,
-        "query"   : query,
+        "type" : "query-request",
+        "program" : {
+            "type" : "program",
+            "rules" : rules,
+            "parameters" : []
+        },
+        "evidence" : evidence,
+        "posterior" : posterior
     }
 
-    # build the extra config tags
-    for key, value in kwargs.items():
-        message[key] = value
+    # add additional config stuff
+    if width:
+        message["search-width"] = width
 
     # send and rec
     response = _SOCKET.communicate(message)
-    if response == "failure":
+    if response == "failure" or response["type"] != "query-respones":
         raise CommunicationError()
-    else:
-        return response
+
+    return response["explanations"]

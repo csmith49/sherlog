@@ -5,7 +5,6 @@ open Watson
 type t = {
 	rules : Rule.t list;
 	parameters : Parameter.t list;
-	evidence : Evidence.t list;
 }
 
 let is_intro_rule rule = rule
@@ -22,12 +21,10 @@ let non_introduction_rules program = program
 	|> CCList.filter (fun r -> not (is_intro_rule r))
 
 let parameters program = program.parameters
-let evidence program = program.evidence
 
-let make rules parameters evidence = {
+let make rules parameters = {
 	rules = rules;
 	parameters = parameters;
-	evidence = evidence;
 }
 
 (* SEMANTICS *)
@@ -131,7 +128,7 @@ let linear_domain : t -> (t -> Watson.Proof.t -> Watson.Proof.t list) -> Posteri
 		type t = Watson.Proof.t
 
 		let features = Posterior.Operator.apply (Posterior.operator posterior)
-		let score = Posterior.Parameterization.linear_combination (Posterior.parameterization posterior)
+		let score = Posterior.Ensemble.apply (Posterior.ensemble posterior)
 		let accept = Watson.Proof.is_resolved
 		let reject = fun _ -> false
 		let successors = successor program
@@ -168,15 +165,12 @@ let to_json program = `Assoc [
 	("type", `String "program");
 	("rules", `List (program |> rules |> CCList.map Watson.Rule.JSON.encode));
 	("parameters", `List (program |> parameters |> CCList.map Parameter.JSON.encode));
-	("evidence", `List (program |> evidence |> CCList.map Evidence.JSON.encode));
 ]
 
 let of_json json = let open CCOpt in
 	let* rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
 	let* parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
-	let* evidence = JSON.Parse.(find (list Evidence.JSON.decode) "evidence" json) in
 		return {
 			rules = rules;
 			parameters = parameters;
-			evidence = evidence;
 		}

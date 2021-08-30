@@ -2,5 +2,4 @@
     (name sherlog)
     (libraries watson pipeline data JSON containers fmt)
 )
-(ocamllex lexer)
-(menhir (modules parser))
+(include_subdirs unqualified)

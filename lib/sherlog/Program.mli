@@ -15,12 +15,9 @@ val non_introduction_rules : t -> Watson.Rule.t list
 val parameters : t -> Parameter.t list
 (** [parameters program] returns a list of all learnable parameters defined by [program] *)
 
-val evidence : t -> Evidence.t list
-(** [evidence program] returns a list of all defined evidence in [program] *)
-
 (** {1 Construction, Serialization, and Printing} *)
 
-val make : Watson.Rule.t list -> Parameter.t list -> Evidence.t list -> t
+val make : Watson.Rule.t list -> Parameter.t list -> t
 (** [make] packages all the arguments into a program object *)
 
 (** Serialization done via the included [JSON] library *)

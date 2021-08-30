@@ -1,0 +1,41 @@
+{
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "$id" : "https://github.com/csmith49/sherlog/schemas/sherlog/parse-source.schema.json",
+    
+    "title" : "Source Parsing Message Format",
+
+    "description" : "Query and response format for Sherlog file parse requests.",
+
+    "oneOf" : [
+        { "$ref" : "#/$defs/request" },
+        { "$ref" : "#/$defs/response" }
+    ],
+
+    "$defs" : {
+        "request" : {
+            "description" : "Message requesting a source file be parsed",
+
+            "type" : "object",
+            "properties" : {
+                "type" : { "const" : "parse-source-request" },
+                "source" : { "type" : "string" }
+            },
+            "required" : ["type", "source"]
+        },
+
+        "response" : {
+            "description" : "Message containing a parsed program",
+
+            "type" : "object",
+            "properties" : {
+                "type" : { "const" : "parse-source-response" },
+                "program" : { "$ref" : "https://github.com/csmith49/sherlog/schemas/sherlog/sherlog.schema.json/$defs/program" },
+                "evidence" : {
+                    "type" : "array",
+                    "items" : { "type" : { "$ref" : "https://github.com/csmith49/sherlog/schemas/sherlog/sherlog.schema.json/$defs/evidence" } }
+                }
+            },
+            "required" : ["type"]
+        }
+    }
+}

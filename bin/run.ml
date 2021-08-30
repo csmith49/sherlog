@@ -28,9 +28,7 @@ let _ = Fmt.pr "%a Search width/depth: %a/%a\n"
 
 (* utility functions *)
 
-let operator = Sherlog.Posterior.Operator.of_contexts []
-let parameterization = CCList.replicate (CCList.length operator) 1.0
-let posterior = Sherlog.Posterior.make operator parameterization
+let posterior = Sherlog.Posterior.uniform
 
 (* operation to be done per-file *)
 let operate filename =
@@ -44,17 +42,20 @@ let operate filename =
         let length = in_channel_length channel in
         really_input_string channel length in
     
-    (* convert to program *)
-    let program = Sherlog.IO.parse contents in
+    (* convert *)
+    let lines = Sherlog.IO.parse contents in
     
-    (* pop out the relevant semantics *)
-    let facts = program
-        |> Sherlog.Program.evidence
+    let program = lines
+        |> Sherlog.IO.program_of_lines in
+
+    let facts = lines
+        |> Sherlog.IO.evidence_of_lines
         |> CCList.map Sherlog.Evidence.to_atoms in
+
     let _ = Fmt.pr "%a Found %a fact(s).\n" 
         marker ()
         (Fmt.styled (`Fg `Blue) Fmt.int) (facts |> CCList.length) in
-    
+
     (* print the program if echo is on *)
     (* TODO - Program.pp needs cleanup *)
     let _ = if !echo

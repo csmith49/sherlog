@@ -94,21 +94,21 @@ intro_atom :
 
 intro_clause : 
     | ia = intro_atom; ARROW; body = atoms; PERIOD {
-        let rel, terms, function_id, args, context = ia in Line.encode_intro
+        let rel, terms, function_id, args, context = ia in Line.Encode.introduction_rule
             ~relation:rel ~terms:terms ~function_id:function_id ~arguments:args ~context:context ~body:body
     } 
     | ia = intro_atom; PERIOD {
-        let rel, terms, function_id, args, context = ia in Line.encode_intro
+        let rel, terms, function_id, args, context = ia in Line.Encode.introduction_rule
             ~relation:rel ~terms:terms ~function_id:function_id ~arguments:args ~context:context ~body:[]
     }
     ;
 
 fuzzy_clause :
     | w = value; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
-        Line.encode_fuzzy ~head:head ~body:body ~weight:w
+        Line.Encode.fuzzy_rule ~head:head ~body:body ~weight:w
     }
     | w = value; DOUBLECOLON; head = atom; PERIOD {
-        Line.encode_fuzzy ~head:head ~body:[] ~weight:w
+        Line.Encode.fuzzy_rule ~head:head ~body:[] ~weight:w
     }
     ;
 

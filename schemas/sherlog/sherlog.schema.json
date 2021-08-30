@@ -1,0 +1,120 @@
+{
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "$id" : "https://github.com/csmith49/sherlog/schemas/sherlog/sherlog.schema.json",
+    
+    "title" : "Sherlog",
+
+    "description" : "Definitions supporting Sherlog serialization protocols",
+
+    "$defs" : {
+        "program" : {
+            "properties" : {
+                "type" : { "const" : "program" },
+                "rules" : {},
+                "parameters" : {},
+                "evidence" : {}
+            },
+            "required" : ["type", "rules", "parameters", "evidence"]
+        },
+
+        "rule" : {
+            "properties" : {
+                "type" : { "const" : "rule" },
+                "head" : {},
+                "body" : {}
+            },
+            "required" : ["type", "head", "body"]
+        },
+
+        "atom" : {
+            "properties" : {
+                "type" : { "const" : "atom" },
+                "relation" : {
+                    "type" : "string"
+                },
+                "terms" : {}
+            }           
+        },
+
+        "term" : {
+            "oneOf" : [
+                {
+                    "properties" : {
+                        "type" : { "const" : "variable" },
+                        "value" : { "type" : "string" }
+                    },
+                    "required" : ["type", "value"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "symbol" },
+                        "value" : { "type" : "string" }
+                    },
+                    "required" : ["type", "value"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "integer" },
+                        "value" : { "type" : "integer" }
+                    },
+                    "required" : ["type", "value"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "float" },
+                        "value" : { "type" : "number" }
+                    },
+                    "required" : ["type", "value"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "boolean" },
+                        "value" : { "type" : "boolean"}
+                    },
+                    "required" : ["type", "value"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "unit" }
+                    },
+                    "required" : ["type", "value"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "wildcard" }
+                    },
+                    "required" : ["type"]
+                },
+                {
+                    "properties" : {
+                        "type" : { "const" : "function" },
+                        "value" : { "type" : "string" },
+                        "arguments" : {
+                            "type" : "array",
+                            "items" : { "type" : { "$ref" : "#/$defs/term" } }
+                        }
+                    },
+                    "required" : ["type", "value", "arguments"]
+                }
+            ]
+        },
+
+        "parameter" : {
+            "properties" : {
+                "type" : { "const" : "parameter" },
+                "name" : { "type" : "string" },
+                "domain" : { "enum" : ["unit", "positive", "real"] }
+            }
+        },
+
+        "evidence" : {
+            "properties" : {
+                "type" : { "const" : "evidence" },
+                "value" : {
+                    "type" : "array",
+                    "items" : { "type" : { "$ref" : "#/$defs/atom" } }
+                }
+            }
+        }
+    }
+}

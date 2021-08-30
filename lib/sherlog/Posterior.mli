@@ -1,55 +1,82 @@
-module Operator : sig
-    module Feature : sig
-        type t = Watson.Proof.t -> float
-        (* features convert proofs to numerical indicators *)
+module Feature : sig
+    type t = Watson.Proof.t -> float
+    (* features score proofs *)
 
-        val intros : t
-        (** [intros proof] counts the number of intros in [proof] *)
-        
-        val constrained_intros : t
-        (** [constrained_intros proof] counts the number of constrained introductions in [proof] *)
-        
-        val length : t
-        (** [length proof] is the number of resolution steps in [proof] *)
+    val intros : t
+    (* counts the number of intros in the proof *)
 
-        val context : string -> t
-        (** [context str proof] counts the number of instances of str in a context in [proof] *)
+    val constrained_intros : t
+    (* counts the number of constrained intros in the proof *)
+    
+    val length : t
+    (* counts the number of resolution steps in the proof *)
 
-        val apply : Watson.Proof.t -> t -> float
-        (** [apply proof f] applies [f] to [proof] - inverse application *)
-    end
+    val context : string -> t
+    (* counts the number of instances of the given string in contexts in the proof *)
 
-    type t = Feature.t list
-    (* operators map proofs to a feature embedding *)
-
-    val of_contexts : string list -> t
-    (* constructs operator from context clues - contains default operators too *)
-
-    val apply : t -> Watson.Proof.t -> float list
-    (* apply an operator to a proof to derive a feature embedding *)
+    val apply : Watson.Proof.t -> t -> float
+    (* inverse application *)
 end
 
-module Parameterization : sig
+module Embedding : sig
     type t = float list
-    (* parameterizations weight individual features *)
+    (* embeddings of proofs into R^n *)
 
-    val linear_combination : t -> float list -> float
-    (* dot product with list of evaluated features *)
+    val to_json : t -> JSON.t
+    val of_json : JSON.t -> t option
+end
 
-    module JSON : sig
-        val encode : t -> Yojson.Basic.t
-        val decode : Yojson.Basic.t -> t option
-    end
+module Operator : sig
+    type t
+    (* operators embed proofs *)
+
+    val apply : t -> Watson.Proof.t -> Embedding.t
+    (* embed the proof using the operator *)
+
+    val default : t
+    (* default operator relying on bog-standard features *)
+
+    val of_context_clues : string list -> t
+    (* construct operator from a finite set of features *)
+
+    val join : t -> t -> t
+    (* combine two operators *)
+
+    val to_json : t -> JSON.t
+    val of_json : JSON.t -> t option
+end
+
+module Ensemble : sig
+    type t
+    (* ensembles combine evaluated features *)
+
+    val apply : t -> Embedding.t -> float
+    (* project an embedding to a real-valued score *)
+
+    val to_json : t -> JSON.t
+    val of_json : JSON.t -> t option
 end
 
 type t
-(* posteriors combine operators and parameterizations *)
+(* posteriors score proofs *)
 
-val make : Operator.t -> Parameterization.t -> t
-(* make posterior from operator and parameterization *)
+(* application *)
+
+val embed_and_score : t -> Watson.Proof.t -> (Embedding.t * float)
+val apply : t -> Watson.Proof.t -> float
+
+(* construction *)
+
+val make : Operator.t -> Ensemble.t -> t
+val uniform : t
+val default : t
+
+(* accessors *)
 
 val operator : t -> Operator.t
-(* deconstruct posterior to access operator *)
+val ensemble : t -> Ensemble.t
 
-val parameterization : t -> Parameterization.t
-(* deconstruct posterior to access parameterization *)
+(* serialization *)
+
+val to_json : t -> JSON.t
+val of_json : JSON.t -> t option
