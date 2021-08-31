@@ -5,14 +5,12 @@ open Watson
 type t = {
 	rules : Rule.t list;
 	parameters : Parameter.t list;
-	evidence : Evidence.t list;
-	ontology : Ontology.t;
 }
 
 let is_intro_rule rule = rule
 	|> Rule.head
 	|> Atom.relation
-	|> CCString.equal Explanation.Introduction.Key.introduction
+	|> CCString.equal Introduction.relation
 
 let rules program = program.rules
 let introduction_rules program = program
@@ -23,14 +21,10 @@ let non_introduction_rules program = program
 	|> CCList.filter (fun r -> not (is_intro_rule r))
 
 let parameters program = program.parameters
-let evidence program = program.evidence
-let ontology program = program.ontology
 
-let make rules parameters evidence ontology = {
+let make rules parameters = {
 	rules = rules;
 	parameters = parameters;
-	evidence = evidence;
-	ontology = ontology;
 }
 
 (* SEMANTICS *)
@@ -89,18 +83,11 @@ module Filter = struct
 
 	let negate filter = fun x -> not (filter x)
 
-	let constraint_avoiding ontology proof =
-		let constraints = ontology |> Ontology.constraints in
-		let atoms = proof |> Watson.Proof.to_atoms in
-		constraints
-			|> CCList.map (fun c -> Watson.Atom.embed_all c atoms)
-			|> CCList.for_all CCList.is_empty
-
 	let intro_consistent proof =
 		let intro_tags = proof
-			|> Explanation.of_proof
-			|> Explanation.introductions
-			|> CCList.map Explanation.Introduction.tag in
+			|> Watson.Proof.to_atoms
+			|> CCList.filter_map Introduction.of_atom
+			|> CCList.map Introduction.introduction_consistency_tag in
 		let num_intros = CCList.length intro_tags in
 		let num_unique_intros = intro_tags
 			|> CCList.sort_uniq ~cmp:(CCList.compare Watson.Term.compare)
@@ -134,25 +121,6 @@ let apply program =
 		fp >> introduction >> fp
 	)
 
-let apply_with_dependencies program =
-	let classical = program
-		|> non_introduction_rules
-		|> CCList.map Semantics.of_rule
-		|> Semantics.Combinator.union in
-	let introduction = program
-		|> introduction_rules
-		|> CCList.map Semantics.of_rule
-		|> Semantics.Combinator.union in
-	let ontological = program
-		|> ontology
-		|> Ontology.dependencies
-		|> CCList.map Semantics.of_rule
-		|> Semantics.Combinator.union in
-	Semantics.Combinator.(
-		let fp = fixpoint classical in
-		fp >> (introduction <|> ontological) >> fp
-	)
-
 (* SEARCH *)
 
 let linear_domain : t -> (t -> Watson.Proof.t -> Watson.Proof.t list) -> Posterior.t -> (module Search.Domain with type t = Watson.Proof.t) = fun program successor posterior ->
@@ -160,7 +128,7 @@ let linear_domain : t -> (t -> Watson.Proof.t -> Watson.Proof.t list) -> Posteri
 		type t = Watson.Proof.t
 
 		let features = Posterior.Operator.apply (Posterior.operator posterior)
-		let score = Posterior.Parameterization.linear_combination (Posterior.parameterization posterior)
+		let score = Posterior.Ensemble.apply (Posterior.ensemble posterior)
 		let accept = Watson.Proof.is_resolved
 		let reject = fun _ -> false
 		let successors = successor program
@@ -174,59 +142,35 @@ let initial_worklist goal cache =
 (* MODEL BUILDING *)
 let prove ?width:(width=CCInt.max_int) program posterior goal =
 	(* get search domain *)
-	let (module D) = linear_domain program apply_with_dependencies posterior in
+	let (module D) = linear_domain program apply posterior in
 	(* initialize worklist *)
 	let wl = initial_worklist goal [] in
 	(* search *)
-	let results = Search.stochastic_beam_search (module D) width wl [] in
-	(* and remove anything with a contradiction *)
-	let constraint_avoiding = program
-		|> ontology
-		|> Filter.constraint_avoiding in
-	results |> CCList.filter (Search.State.check constraint_avoiding)
-
-(* let contradict ?width:(width=CCInt.max_int) program posterior proof =
-	(* get search domain *)
-	let (module D) = linear_domain program apply posterior in
-	(* initialize worklist *)
-	let proven_atoms = proof |> Watson.Proof.to_atoms in
-	let constraints = program |> ontology |> Ontology.constraints in
-	let wl = constraints |> CCList.flat_map (fun c -> initial_worklist c proven_atoms) in
-	(* search *)
-	let results = Search.stochastic_beam_search (module D) width wl [] in
-		results *)
-
-let models ?width:(width=CCInt.max_int) program posterior goal = goal
+	Search.stochastic_beam_search (module D) width wl []
+	
+let explanations ?width:(width=CCInt.max_int) program posterior goal = goal
 	|> prove ~width:width program posterior
 	|> CCList.map Search.State.to_tuple
-	|> CCList.map (CCPair.fold Model.of_proof)
+	|> CCList.map (CCPair.fold Explanation.of_proof)
 
 (* INPUT / OUTPUT *)
 
 let pp ppf program = let open Fmt in
-	pf ppf "Parameters: %a@, Rules: %a@,%a"
+	pf ppf "Parameters: %a@, Rules: %a"
 		(list ~sep:comma Parameter.pp) program.parameters
 		(list ~sep:comma Watson.Rule.pp) program.rules
-		Ontology.pp program.ontology
 
-module JSON = struct
-	let encode program = `Assoc [
-		("type", `String "program");
-		("rules", `List (program |> rules |> CCList.map Watson.Rule.JSON.encode));
-		("parameters", `List (program |> parameters |> CCList.map Parameter.JSON.encode));
-		("evidence", `List (program |> evidence |> CCList.map Evidence.JSON.encode));
-		("ontology", program |> ontology |> Ontology.JSON.encode);
-	]
 
-	let decode json = let open CCOpt in
-		let* rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
-		let* parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
-		let* evidence = JSON.Parse.(find (list Evidence.JSON.decode) "evidence" json) in
-		let* ontology = JSON.Parse.(find Ontology.JSON.decode "ontology" json) in
-			return {
-				rules = rules;
-				parameters = parameters;
-				evidence = evidence;
-				ontology = ontology;
-			}
-end
+let to_json program = `Assoc [
+	("type", `String "program");
+	("rules", `List (program |> rules |> CCList.map Watson.Rule.JSON.encode));
+	("parameters", `List (program |> parameters |> CCList.map Parameter.JSON.encode));
+]
+
+let of_json json = let open CCOpt in
+	let* rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
+	let* parameters = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
+		return {
+			rules = rules;
+			parameters = parameters;
+		}

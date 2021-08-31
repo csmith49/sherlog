@@ -2,27 +2,24 @@ class Evidence:
     """Evidence is a goal conjunct."""
 
     def __init__(self, json):
-        """Construct evidence from a JSON-like representation.
-        
-        Parameters
-        ----------
-        json : JSON-like object
-        """
+        """Construct evidence."""
         self.json = json
 
     @classmethod
     def of_json(cls, json) -> 'Evidence':
-        """Construct evidence from a JSON-like representation.
-        
-        Parameters
-        ----------
-        json : JSON-like object
-
-        Returns
-        -------
-        Evidence
-        """
+        """Construct evidence from a JSON-like representation."""
         return cls(json)
+
+    def to_json(self):
+        """Construct a JSON-like encoding of the evidence."""
+        return self.json
+
+    def join(self, other):
+        json = {
+            "type" : "evidence",
+            "value" : self.to_json["value"] + other.to_json["value"]
+        }
+        return Evidence.of_json(json)
 
     # MAGIC METHODS
 

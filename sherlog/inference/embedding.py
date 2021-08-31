@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, Dict, Any, Tuple, Callable
-from ..program import Evidence
+from ..program import Evidence, Program
+from torch import Tensor
 
 T = TypeVar('T')
 
@@ -82,3 +83,15 @@ class UniformEmbedding(Embedding):
     
     def to_namespace(self, value):
         return self._namespace(value)
+
+class DirectEmbedding(Embedding):
+    """Embeds values directly."""
+
+    def __init__(self):
+        pass
+
+    def to_evidence(self, value):
+        return value
+    
+    def to_namespace(self, _):
+        return {}

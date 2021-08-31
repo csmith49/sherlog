@@ -1,0 +1,67 @@
+{
+    "$schema" : "https://json-schema.org/draft/2020-12/schema",
+    "$id" : "https://github.com/csmith49/sherlog/schemas/pipeline.schema.json",
+    
+    "title" : "Pipeline",
+
+    "description" : "Sequence of statements to be executed",
+
+    "type" : "object",
+    "properties" : {
+        "type" : { "const" : "pipeline" },
+        "statements" : {
+            "type" : "array",
+            "items" : { "$ref" : "#/$defs/statement"}
+        }
+    },
+    "required" : ["type", "statements"],
+
+    "$defs" : {
+        "identifier" : {
+            "description" : "Symbol with an extrinsic interpretation",
+
+            "type" : "object",
+            "properties" : {
+                "type" : { "const" : "identifier" },
+                "value" : { "type" : "string" }
+            },
+            "required" : ["type", "value"]
+        },
+
+        "literal" : {
+            "description" : "Symbol with an intrinsic interpretration",
+
+            "type" : "object",
+            "properties" : {
+                "type" : { "const" : "literal" },
+                "value" : {}
+            },
+            "required" : ["type", "value"]
+        },
+
+        "value" : {
+            "description" : "Symbol representing an atomic pipeline value",
+
+            "oneOf" : [
+                { "$ref" : "#/$defs/identifier" },
+                { "$ref" : "#/$defs/literal" }
+            ]
+        },
+
+        "statement" : {
+            "description" : "Statement of the form 'target <- function(*arguments)'",
+
+            "type" : "object",
+            "properties" : {
+                "type" : {"const" : "statement"},
+                "target" : {"type" : "string"},
+                "function" : {"type" : "string"},
+                "arguments" : {
+                    "type" : "array",
+                    "items" : { "$ref" : "#/$defs/value" }
+                }
+            },
+            "required" : ["type", "target", "function", "arguments"]
+        }
+    }
+}

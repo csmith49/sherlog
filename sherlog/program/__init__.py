@@ -1,39 +1,20 @@
 from .program import Program
 from .evidence import Evidence
-from ..interface import parse
-from typing import Tuple, Iterable
 
-def load(filepath: str, namespace=None) -> Tuple[Program, Iterable[Evidence]]:
-    """Load a problem from a filepath.
+from ..interface import parse_source
 
-    Parameters
-    ----------
-    filepath : str
+from typing import Tuple, List
 
-    Returns
-    -------
-    Tuple[Program, Iterable[Evidence]]
-    """
-    with open(filepath, "r") as f:
+def loads(source : str) -> Tuple[Program, List[Evidence]]:
+    """Load a program/evidence pair from a string."""
+
+    program, evidence = parse_source(source)
+    return Program.of_json(program), [Evidence.of_json(evidence) for evidence in evidence]
+
+def load(filename : str) -> Tuple[Program, List[Evidence]]:
+    """Load a program/evidence pair from file."""
+
+    with open(filename, 'r') as f:
         contents = f.read()
-    return loads(contents, namespace=namespace)
-
-def loads(contents: str, namespace=None) -> Tuple[Program, Iterable[Evidence]]:
-    """Load a problem from a string.
-
-    Parameters
-    ----------
-    contents : str
-
-    Returns
-    -------
-    Tuple[Program, Iterable[Evidence]]
-    """
-    json = parse(contents)
-    evidence = [Evidence.of_json(ev) for ev in json["evidence"]]
-    problem = Program.of_json(json, namespace)
-    return (problem, evidence)
-
-def load_evidence(evidence : str) -> Evidence:
-    _, evidences = loads(evidence)
-    return evidences[0]
+    
+    return loads(contents)

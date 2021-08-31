@@ -108,5 +108,5 @@ class Optimizer:
             self.optimizer.step()
             self.program.clamp()
 
-        for p, v in self.program._parameters.items():
-            logger.info(f"Gradient for {p}: {v.value.grad}.")
+        for parameter in self.program._parameters:
+            logger.info(f"Gradient for {parameter.name}: {parameter.value.grad}")

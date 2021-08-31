@@ -68,7 +68,11 @@ let write connection json =
     let oc = Lwt_io.of_fd ~mode:Lwt_io.Output fd in
     let message = match json with
         | Some json -> Yojson.Basic.to_string json
-        | None -> "failure" in
+        | None -> let msg = `Assoc [
+            ("type", `String "failure");
+            ("message", `String "Handler failed to produce response.");
+        ] in
+        Yojson.Basic.to_string msg in
     Lwt_io.write_line oc message
 (* 
 let handle_with_timeout (timeout : float) (handler : Yojson.Basic.t -> Yojson.Basic.t option) (message : Yojson.Basic.t option) : Yojson.Basic.t option t= match message with

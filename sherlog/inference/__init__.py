@@ -1,3 +1,4 @@
 from .objective import Objective, BatchObjective, BatchEmbeddingObjective
 from .optimizer import Optimizer, Intent
-from .embedding import Embedding, FunctionalEmbedding, UniformEmbedding
+from .embedding import Embedding, FunctionalEmbedding, UniformEmbedding, DirectEmbedding
+from .batch import Batch, minibatch

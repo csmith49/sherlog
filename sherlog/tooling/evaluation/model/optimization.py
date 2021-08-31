@@ -2,7 +2,7 @@
 constants is denoted "the target". Each datum represents an instantiation of
 each symbolic constant, including the target."""
 
-from .model import Model
+from .model import Model, Task
 from typing import Dict, Any, Generic, TypeVar, Callable, List
 from ....program import loads, Evidence
 from ....inference import Optimizer, Objective
@@ -11,16 +11,6 @@ from ..utility import minibatch
 from torch import stack, Tensor
 
 T = TypeVar('T')
-
-class Task(Generic[T]):
-    """An optimization task."""
-
-    def __init__(self, evidence : Evidence, injection : Callable[[T], Dict[str, Any]]):
-        self.evidence = evidence
-        self.injection = injection
-
-    def inject(self, datum : T) -> Dict[str, Any]:
-        return self.injection(datum)
 
 class OptimizationModel(Model[T]):
     """Optimization-based model with uniform evidence and MSE loss."""

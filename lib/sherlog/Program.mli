@@ -15,26 +15,18 @@ val non_introduction_rules : t -> Watson.Rule.t list
 val parameters : t -> Parameter.t list
 (** [parameters program] returns a list of all learnable parameters defined by [program] *)
 
-val evidence : t -> Evidence.t list
-(** [evidence program] returns a list of all defined evidence in [program] *)
-
-val ontology : t -> Ontology.t
-(** [ontology program] returns the ontology defined in [program] *)
-
 (** {1 Construction, Serialization, and Printing} *)
 
-val make : Watson.Rule.t list -> Parameter.t list -> Evidence.t list -> Ontology.t -> t
+val make : Watson.Rule.t list -> Parameter.t list -> t
 (** [make] packages all the arguments into a program object *)
 
-module JSON : sig
-    (** Serialization done via the included [JSON] library *)
+(** Serialization done via the included [JSON] library *)
     
-    val encode : t -> JSON.t
-    (** [encode program] converts [program] to a JSON object *)
+val to_json : t -> JSON.t
+(** [to_json program] converts [program] to a JSON object *)
 
-    val decode : JSON.t -> t option
-    (** [decode json] attempts to extract a program from [json] *)
-end
+val of_json : JSON.t -> t option
+(** [of_json json] attempts to extract a program from [json] *)
 
 val pp : t Fmt.t
 (** a pretty printer for program objects (TODO - needs breakpoint improvements) *)
@@ -42,6 +34,7 @@ val pp : t Fmt.t
 module Semantics : sig
     type t = Watson.Proof.t -> Watson.Proof.t list
 
+    (* forms a monadplus typeclass *)
     module M : sig
         val return : Watson.Proof.t -> Watson.Proof.t list
         val (>>=) : Watson.Proof.t list -> (Watson.Proof.t -> Watson.Proof.t list) -> Watson.Proof.t list
@@ -75,8 +68,6 @@ module Filter : sig
 
     val negate : t -> t
 
-    val constraint_avoiding : Ontology.t -> t
-
     val intro_consistent : t
 
     val length : int -> t
@@ -87,6 +78,5 @@ module Filter : sig
 end
 
 val apply : t -> Watson.Proof.t -> Watson.Proof.t list
-val apply_with_dependencies : t -> Watson.Proof.t -> Watson.Proof.t list
 
-val models : ?width:int -> t -> Posterior.t -> Watson.Atom.t list -> Model.t list
+val explanations : ?width:int -> t -> Posterior.t -> Watson.Atom.t list -> Explanation.Term.t Explanation.t list

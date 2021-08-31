@@ -9,7 +9,7 @@ module Parse : sig
     val list : 'a parser -> 'a list parser
     val assoc : 'a parser -> (string * 'a) list parser
     val find : 'a parser -> string -> 'a parser
-    val identity : Yojson.Basic.t parser
+    val identity : t parser
     val string : string parser
     val int : int parser
     val float : float parser

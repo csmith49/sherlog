@@ -25,32 +25,42 @@ let rec shuffle xs = match xs with
             x :: (shuffle xs')
 
 (* message handling *)
-let handler json = match JSON.Parse.(find string "command" json) with
-    | Some "parse" ->
-        JSON.Parse.(find string "program" json)
-            |> CCOpt.map Sherlog.IO.parse
-            |> CCOpt.map Sherlog.Program.JSON.encode
-    | Some "query" -> let open CCOpt in
-        (* get core program and query *)
-        let* program = JSON.Parse.(find Sherlog.Program.JSON.decode "program" json) in
-        let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "query" json) 
-            |> CCOpt.map Sherlog.Evidence.to_atoms in
-        (* get parameters for search *)
-        let search_width = JSON.Parse.(find int "width" json)
+
+let handler json = let open CCOpt in match JSON.Parse.(find string "type" json) with
+    | Some "parse-source-request" ->
+        let* source = JSON.Parse.(find string "source" json) in
+        let lines = source |> Sherlog.IO.parse in
+        let response = `Assoc [
+            ("type", `String "parse-source-response");
+            ("program", lines |> Sherlog.IO.program_of_lines |> Sherlog.Program.to_json);
+            ("evidence", lines
+                |> Sherlog.IO.evidence_of_lines
+                |> CCList.map Sherlog.Evidence.to_json
+                |> JSON.Make.list
+            );
+        ] in
+        return response
+
+    | Some "query-request" ->
+        (* core programmatic info *)
+        let* program = JSON.Parse.(find Sherlog.Program.of_json "program" json) in
+        let* posterior = JSON.Parse.(find Sherlog.Posterior.of_json "posterior" json) in
+        let* query = JSON.Parse.(find Sherlog.Evidence.of_json "evidence" json) in
+        (* parameters for the search *)
+        let search_width = JSON.Parse.(find int "search-width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in
-        let operator = JSON.Parse.(find (list string) "contexts" json)
-            |> CCOpt.get_or ~default:[]
-            |> Sherlog.Posterior.Operator.of_contexts in
-        let parameterization = JSON.Parse.(find Sherlog.Posterior.Parameterization.JSON.decode "parameterization" json)
-            |> CCOpt.get_or ~default:(CCList.replicate (CCList.length operator) 1.0) in
-        (* build score function *)
-        let posterior = Sherlog.Posterior.make operator parameterization in
-        (* build filter from parameters *)
-        let models = query
-            |> Sherlog.Program.models ~width:search_width program posterior
-            |> CCList.map Sherlog.Model.JSON.encode 
+        (* get explanations *)
+        let explanations = query
+            |> Sherlog.Evidence.to_atoms
+            |> Sherlog.Program.explanations ~width:search_width program posterior
+            |> CCList.map (Sherlog.Explanation.to_json Sherlog.Explanation.Term.to_json)
             |> shuffle in
-        return (`List models)
+        let response = `Assoc [
+            ("type", `String "query-response");
+            ("explanations", `List explanations)
+        ] in
+        return response
+
     | _ -> None
 
 (* main *)

@@ -1,6 +1,6 @@
 from .nn import MNISTNetwork, add
 
-from sherlog.tooling.evaluation.model import Task, OptimizationModel
+from sherlog.tooling.evaluation.model import Task, OptimizationModel, EnumerationModel
 from sherlog.program import load_evidence
 from sherlog import initialize
 from torch import tensor
@@ -21,7 +21,23 @@ addition(X, Y, Z) <- digit(X, X2), digit(Y, Y2), add(X2, Y2, Z).
 EVIDENCE = load_evidence("!evidence addition(left, right, total).")
 
 # build desired model
-model = OptimizationModel(
+optimization_model = OptimizationModel(
+    SOURCE,
+    Task(
+        evidence=EVIDENCE,
+        injection=lambda i: {
+            "left" : i.left.data,
+            "right" : i.right.data,
+            "total" : tensor(i.total)
+        }
+    ),
+    {
+        "add" : add,
+        "digit_nn" : MNISTNetwork(squeeze=True)
+    }
+)
+
+enumeration_model = EnumerationModel(
     SOURCE,
     Task(
         evidence=EVIDENCE,

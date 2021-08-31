@@ -4,8 +4,7 @@ import sherlog.tooling.evaluation.datasource.combinators as combinators
 
 from dataclasses import dataclass
 
-from .dpl import DPLModel
-from .sherlog import model as sherlog_model
+from .sherlog import optimization_model, enumeration_model
 
 # class to hold samples from the desired distribution
 @dataclass

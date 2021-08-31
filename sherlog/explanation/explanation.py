@@ -1,188 +1,73 @@
 """Explanations are the central explanatory element in Sherlog. They capture sufficient generative constraints to ensure a particular outcome."""
 
-from ..engine import Store, Functor, Identifier, Model
 from ..logs import get
-from .observation import Observation
-from .history import History
-from .semantics.target import Target
-from . import semantics
-
-from typing import Dict, Optional, TypeVar, Any
-from torch import Tensor
-from networkx import DiGraph
 
 logger = get("explanation")
+
+from ..pipe import Pipeline, Semantics
+from .semantics.core.target import EqualityIndicator
+from .semantics import spyglass
+from .observation import Observation
+from .history import History
+
+from torch import tensor, Tensor, stack
+
+from typing import TypeVar, Mapping, Optional, Any, Callable
 
 T = TypeVar('T')
 
 class Explanation:
-    """Explanations combine generative models with observations on identifiers."""
+    """Explanations model observations over a generative process."""
 
-    def __init__(self, model : Model, observation : Observation, history : History):
-        """Construct an explanation.
+    def __init__(self, pipeline : Pipeline, observation : Observation, history : History, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None):
+        """Construct an explanation."""
 
-        Parameters
-        ----------
-        model : Model
-
-        meet : Observation
-
-        history : History
-        """
         logger.info(f"Explanation {self} built.")
-        self.model, self.observation, self.history = model, observation, history
+        self.pipeline, self.observation, self.history = pipeline, observation, history
+        self.locals = locals if locals else {}
 
-    @classmethod
-    def of_json(cls, json) -> 'Explanation':
-        """Constructs an explanation from a JSON encoding.
+    def evaluate(self, parameters : Mapping[str, Tensor], semantics : Semantics[T], default=0.0) -> Mapping[str, T]:
+        """Evaluate the explanation."""
 
-        Parameters
-        ----------
-        json : JSON-like object
-
-        Returns
-        -------
-        Explanation
-        """
-        logger.info(f"Building explanation from serialization: {json}...")
-        # delegate to the relevant sub-component JSON parsers
-        model = Model.of_json(json["assignments"])
-        observation = Observation.of_json(json["meet"])
-        history = History.of_json(json["history"])
-        # and just pull it all together
-        return cls(model, observation, history)
-
-    def run(self, functor : Functor, store : Store, **kwargs) -> Store:
-        """Evaluate the explanation in the given functor.
-
-        Parameters
-        ----------
-        functor : Functor
-
-        store : Store
-
-        **kwargs
-            Passed to the functor on execution.
-
-        Returns
-        -------
-        Store
-        """
-        # evaluate every assignment in order
-        for assignment in self.model.assignments: # ordering handled by this iterable property
-            functor.run_assignment(assignment, store, **kwargs)
+        store = semantics(self.pipeline, parameters)
+        for statement in self.observation.stub(default=default):
+            store[statement.target] = semantics.evaluate(statement, store)
         return store
 
-    def objective(self, functor : Functor[T], store : Store, **kwargs) -> T:
-        """
-        Parameters
-        ----------
-        functor : Functor[T]
+    def log_prob(self, parameters : Mapping[str, Tensor]) -> Tensor:
+        """Compute the log-probability of the explanation generating the observations."""
 
-        store : Store
+        sem = spyglass.semantics_factory(
+            observation=self.observation,
+            target=EqualityIndicator(),
+            locals=self.locals
+        )
+        store = self.evaluate(parameters, sem)
+        result = stack([clue.surrogate for clue in store["sherlog:target"]]).mean().log()
 
-        **kwargs
-            Passed to the functor during execution.
-        
-        Returns
-        -------
-        T
-        """
-        store = self.run(functor, store)
-        obs = self.observation.target(functor, store, prefix="sherlog:observation", default=1.0)
-        objective = Identifier("sherlog:objective")
-        functor.run(objective, "set", [obs], store, **kwargs)
-        return store[objective]
+        return result
 
-    # APPLICATIONS OF OBJECTIVE BUILDING
+    # SERIALIZATION
 
-    def graph(self) -> DiGraph:
-        """Build a directed graph representation of the explanation.
-        
-        Returns
-        -------
-        DiGraph
-        """
-        objective = self.objective(semantics.graph.functor)
-        return semantics.graph.to_graph(objective)
+    @classmethod
+    def of_json(cls, json, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None) -> 'Explanation':
+        """Construct an explanation from a JSON-like object."""
 
-    def miser(self, target : Target, store : Store, **kwargs) -> Tensor:
-        """Builds a Miser surrogate objective for the satisfaction of the given observation.
+        if not json["type"] == "explanation":
+            raise TypeError(f"{json} does not represent an explanation.")
 
-        Parameters
-        ----------
-        target : Target
+        program = Pipeline.of_json(json["pipeline"])
+        observation = Observation.of_json(json["observation"])
+        history = History.of_json(json["history"])
 
-        store : Store
+        return cls(program, observation, history, locals=locals)
 
-        **kwargs:
-            Passed to the functor during execution.
+    def to_json(self):
+        """Construct a JSON-like encoding for the explanation."""
 
-        Returns
-        -------
-        Tensor
-        """
-        # force all the observed variables
-        forcing = {}
-        for identifier in self.observation.identifiers:
-            forcing[identifier] = self.observation[identifier]
-
-        # construct the objective
-        functor = semantics.miser.factory(target, forcing=forcing)
-        objective = self.objective(functor, store, **kwargs)
-        
-        # scaling and whatnot handled by .surrogate property
-        return objective.surrogate
-
-    def log_prob(self, store : Store) -> Tensor:
-        """Compute the log-probability of the explanation.
-
-        Parameters
-        ----------
-        store : Store
-
-        Returns
-        -------
-        Tensor
-        """
-        # log-prob done via expectation of indicator function
-        target = semantics.target.EqualityIndicator()
-        surrogate_log_prob = self.miser(target, store).log()
-
-        return surrogate_log_prob
-
-    def relaxed_log_prob(self, store : Store, temperature : float = 1.0) -> Tensor:
-        """Compute the relaxed log-probability of the explanation.
-
-        Converges to `self.log_prob` as temperature tends towards 0.
-
-        Parameters
-        ----------
-        store : Store
-
-        temperature : float (default=1.0)
-
-        Returns
-        -------
-        Tensor
-        """
-        target = semantics.target.RBF(sdev=temperature)
-        surrogate_log_prob = self.miser(target, store).log()
-
-        return surrogate_log_prob
-
-    def observation_loss(self, store : Store) -> Tensor:
-        """Compute the MSE between the observation and the generated values.
-
-        Parameters
-        ----------
-        store : Store
-
-        Returns
-        -------
-        Tensor
-        """
-        target = semantics.target.MSE()
-        surrogate_loss = self.miser(target, store)
-
-        return surrogate_loss
+        return {
+            "type" : "explanation",
+            "program" : self.program.dump(),
+            "observation" : self.observation.dump(),
+            "history" : self.history.dump()
+        }
