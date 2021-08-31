@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, Dict, Any, Tuple, Callable
-from ..program import Evidence
+from ..program import Evidence, Program
+from torch import Tensor
 
 T = TypeVar('T')
 

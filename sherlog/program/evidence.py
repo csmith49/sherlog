@@ -14,6 +14,13 @@ class Evidence:
         """Construct a JSON-like encoding of the evidence."""
         return self.json
 
+    def join(self, other):
+        json = {
+            "type" : "evidence",
+            "value" : self.to_json["value"] + other.to_json["value"]
+        }
+        return Evidence.of_json(json)
+
     # MAGIC METHODS
 
     def __str__(self) -> str:

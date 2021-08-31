@@ -81,6 +81,31 @@ class Program:
 
         return result
 
+    def conditional_log_prob(self,
+        evidence : Evidence, condition : Evidence,
+        explanations : int = 1,
+        attempts = 100,
+        width : Optional[int] = None,
+        parameters : Optional[Mapping[str, Tensor]] = None
+    ) -> Tensor:
+        """Compute the log-likelihood of the provided evidenced conditioned on another piece of evidence."""
+
+        numerator = self.log_prob(evidence.join(condition),
+            explanations=explanations,
+            attempts=attempts,
+            width=width,
+            parameters=parameters
+        )
+
+        denominator = self.log_prob(condition,
+            explanations=explanations,
+            attempts=attempts,
+            witdth=width,
+            parameters=parameters
+        )
+
+        return numerator - denominator
+
     def parameters(self, locals : Optional[Mapping[str, Any]] = None) -> Iterable[Tensor]:
         """Yields all tuneable parameters in the program and optional local namespace."""
 

@@ -1,21 +1,29 @@
 # Pipe
 
-A monad-based evaluation engine supporting Sherlog.
+This module is `sherlog.pipe`, an evaluation engine for sequences of assignment statements.
 
-## Data Model
+## Why bother?
 
-Uses the following structure: values, statements, programs.
+The computational artifact-of-interest in Sherlog are *stochastic computation graphs*: directed, acyclic graphs whose edges capture dependencies and whose nodes are annotated with arbitrary functions. Existing implementations of stochastic computation graphs, for various reasons, are not suited to our purpose. This module conceptualizes SCGs as sequences of assignments (their natural form when produced via Sherlog's abductive resolution), and provides utilities for their evaluation and analysis.
 
-## Evaluation Model
+## Data model
 
-Namespaces let us select functions or callables to apply to values.
+Values - variables and literals
 
-Monads tell us how to combine values and apply functions.
+Statements - always of the form `target <- function(arguments)`.
 
-Semantics combine namespaces and monads to provide a complete evaluation context.
+Pipelines - just a sequence of statements
+
+## Evaluation model
+
+Namespace - look up functions
+
+Pipe - not a monad!
+
+Semantics - combine a namespace and a pipe to produce semantics for evaluating a pipeline.
 
 ## Serialization
 
-Pipe uses a JSON-based serialization format. Values, Statements, and Programs contain `load` class methods, and instances have a `dump` method. Functions consume and produce objects generated via Python's default `json` library.
+Like the rest of Sherlog, Pipe uses a JSON-based serialization format. Each object in the data model contains `to_json : t -> json` and `of_json : json -> t option` functions which perform exactly as they suggest.
 
-Put the schema here eventually.
+The schema for this serialization is given in `#/schemas/pipeline.schema.json`, relative to the root of this repository.
