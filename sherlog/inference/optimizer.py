@@ -1,112 +1,139 @@
-import torch
-from torch.optim import SGD, Adam
-from enum import Enum
-from ..logs import get
 from .objective import Objective
+from ..program import Program
+from .. import logs
 
-logger = get("optimizer")
+from torch import Tensor, tensor, stack
+from enum import Enum, auto
+from torch.optim import SGD, Adam
 
-# objective intent
-Intent = Enum("Intent", "MAXIMIZE MINIMIZE")
+logger = logs.get("optimizer")
+
+# managing torch optimization strategies
+Strategy = Enum("Strategy", "SGD ADAM")
+
+_STRATEGY_MAP = {
+    Strategy.SGD : SGD,
+    Strategy.ADAM : Adam
+}
+
+# managing optimization intent
+class Intent(Enum):
+    MIN = 1
+    MAX = -1
+
+    @property
+    def sign(self):
+        return self.value
+
+
+# optimizer context manager
 
 class Optimizer:
-    """Context manager for registering and optimizing objectives.
+    """Doc string goes here"""
 
-    Handles PyTorch optimizers so you don't have to.
-    
-    See also: `sherlog.inference.Objective`.
-    """
+    # CONSTRUCTION
 
-    def __init__(self, program, optimizer : str = "sgd", learning_rate : float = 0.1):
-        """Constructs an optimization context manager with the indicated Torch optimizer.
-
-        Parameters
-        ----------
-        problem : Problem
-
-        optimizer : str (default='sgd')
-            One of ['sgd', 'adam']
-
-        learning_rate : float (default=0.1)
-        """
+    def __init__(self, program : Program, strategy : Strategy, learning_rate : float = 1e-4, **kwargs):
         self.program = program
+        self.strategy = strategy
 
-        self.optimizer = {
-            "sgd" : SGD,
-            "adam" : Adam
-        }[optimizer](program.parameters(), lr=learning_rate)
+        # group kwargs into strategy and program dicts
+        self.strategy_kwargs = {
+            "lr" : learning_rate
+        }
 
-        self._maximize, self._minimize = [], []
+        self.program_kwargs = {
 
-    def register(self, objective : Objective, intent : Intent = Intent.MAXIMIZE):
-        """Registers objectives.
+        }
 
-        Parameters
-        ----------
-        objective : Objective
-        intent : Intent
-        """
-        if intent == Intent.MAXIMIZE:
-            self.maximize(objective)
-        elif intent == Intent.MINIMIZE:
-            self.minimize(objective)
+        # construct the store optimizer
+        self._optimizer = _STRATEGY_MAP[strategy](**self.strategy_kwargs)
 
-    def maximize(self, *args):
-        """Registers objectives to be maximized.
+        # the optimization queue
+        self._queue = []
 
-        Parameters
-        ----------
-        *args : list[Objective]
-        """
-        for objective in args:
-            logger.info(f"Registering {objective} for maximization.")
-            if objective.is_nan():
-                logger.warning(f"{objective} is NaN.")
-            elif objective.is_infinite():
-                logger.warning(f"{objective} is infinite.")
-            else:
-                self._maximize.append(objective)
-    
-    def minimize(self, *args):
-        """Registers objectives to be minimized.
+    # HANDLING OBJECTIVES
 
-        Parameters
-        ----------
-        *args : list[Objective]
-        """
-        for objective in args:
-            logger.info(f"Registering {objective} for minimization.")
-            if objective.is_nan():
-                logger.warning(f"{objective} is NaN.")
-            elif objective.is_infinite():
-                logger.warning(f"{objective} is infinite.")
-            else:
-                self._minimize.append(objective)
+    def evaluate(self, objective : Objective) -> Tensor:
+        """doc string goes here"""
+        
+        # convert objective parameters and namespace and self.program_kwargs into the arguments for log_prob
+        kwargs = {
+            "parameters" : objective.parameters,
+            **self.program_kwargs
+        }
 
+        # if they've provided a conditional, we need two calls to self.program.log_prob
+        if objective.conditional:
+            numerator = self.program.log_prob(objective.evidence + objective.conditional, **kwargs)
+            denominator = self.program.log_prob(objective.conditional, **kwargs)
+            # and, because we're in log-space...
+            return numerator - denominator
+        else:
+            return self.program.log_prob(objective.evidence, **kwargs)
+
+    # MANAGING THE QUEUE
+
+    def register(self, objective : Objective, intent : Intent):
+        """doc string goes here"""
+
+        # evaluate the objective
+        result = self.evaluate(objective)
+
+        # check if it's well-formed (not NaN, not infinite, etc)
+        if result.isnan():
+            logger.warning(f"Objective {objective} produced NaN.")
+        elif result.isinf():
+            logger.warning(f"Objective {objective} produced infinite result.")
+        # and add to the queue if it's good
+        else:
+            self._queue.append( (objective, result, intent) )
+
+    def maximize(self, objective):
+        """doc string goes here"""
+
+        self.register(objective, intent=Intent.MAX)
+
+    def minimize(self, objective):
+        """doc string goes here"""
+        
+        self.register(objective, intent=Intent.MIN)
+
+    # OPTIMIZATION
+
+    def optimize(self):
+        """doc string goes here"""
+
+        # zero the grads in the optimizer
+        self._optimizer.zero_grad()
+        
+        # compute the losses
+        losses = [value * intent.sign for value, intent in self._queue]
+
+        if losses:
+            loss = stack(losses).sum()
+        else:
+            logger.warning("Optimization triggered with an empty optimization queue.")
+            loss = tensor(0.0)
+
+        # compute gradients and update all the necessary  state
+        loss.backward()
+        self._optimizer.step()
+        self.program.clamp()
+        
+        self._queue = []
+
+        # for debugging, we'll return the average computed loss (NaN if we didn't have any)
+        return loss / len(losses)
+
+    # CONTEXT MANAGER SEMANTICS
+ 
     def __enter__(self):
-        logger.info("Clearing gradients and optimization goals.")
-        self.optimizer.zero_grad()
-        self._maximize, self._minimize = [], []
+        """Clear the optimization queue and return a reference to `self`."""
+        
         return self
 
     def __exit__(self, *args):
-        cost = torch.tensor(0.0)
+        """Optimize."""
 
-        for objective in self._maximize:
-            cost -= objective.value
-        
-        for objective in self._minimize:
-            cost += objective.value
-
-        # then update
-        logger.info("Propagating gradients.")
-
-        if cost.grad_fn is None:
-            logger.warning(f"Cost {cost} has no gradient.")
-        else:
-            cost.backward()
-            self.optimizer.step()
-            self.program.clamp()
-
-        for parameter in self.program._parameters:
-            logger.info(f"Gradient for {parameter.name}: {parameter.value.grad}")
+        self.optimize()
