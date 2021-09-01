@@ -19,21 +19,13 @@ def train(filename, epochs, learning_rate, batch_size, instrument, resolution):
     # load the program and build the optimizer
     program, evidence = load(filename)
 
-    optimizer = Optimizer(program, optimizer="adam", learning_rate=learning_rate)
-
-    # instrumenter = Instrumenter(instrument, context={
-    #     "seed" : seed(),
-    #     "benchmark" : filename,
-    #     "epochs" : epochs,
-    #     "optimizer" : optimizer,
-    #     "learning-rate" : learning_rate
-    # })
+    optimizer = Optimizer(program, learning_rate=learning_rate)
+    embedder = DirectEmbedding()
 
     # train
     for batch in minibatch(evidence, batch_size, epochs=epochs):
         with optimizer as opt:
-            log_prob = batch.log_prob(program, DirectEmbedding())
-            opt.maximize(log_prob)
+            opt.maximize(*embedder.embed_all(batch.data))
 
         if batch.index % resolution == 0:
             log = {

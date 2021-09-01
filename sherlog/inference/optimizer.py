@@ -18,22 +18,41 @@ _STRATEGY_MAP = {
 
 # managing optimization intent
 class Intent(Enum):
+    """Enumeration capturing what we want an optimizer to do to an objective: minimize or maximize."""
+
     MIN = 1
     MAX = -1
 
     @property
-    def sign(self):
+    def sign(self) -> int:
+        """When `target * sign` is minimized, `target` will be adjusted according to the intent."""
+
         return self.value
 
 
 # optimizer context manager
 
 class Optimizer:
-    """Doc string goes here"""
+    """Optimizers coordinate program parameter updates from objective-derived gradients.
+    
+    See also `sherlog.inference.objective`.
+    """
 
     # CONSTRUCTION
 
-    def __init__(self, program : Program, strategy : Strategy, learning_rate : float = 1e-4, **kwargs):
+    def __init__(self, program : Program, strategy : Strategy = Strategy.SGD, learning_rate : float = 1e-4, **kwargs):
+        """Construct an optimizer.
+        
+        Parameters
+        ----------
+        program : Program
+
+        strategy : Strategy (default=SGD)
+            One of `[SGD, Adam]`.
+
+        learning_rate : float (default=1e-4)
+        """
+
         self.program = program
         self.strategy = strategy
 
@@ -55,7 +74,7 @@ class Optimizer:
     # HANDLING OBJECTIVES
 
     def evaluate(self, objective : Objective) -> Tensor:
-        """doc string goes here"""
+        """Evaluate an objective to produce a tensor."""
         
         # convert objective parameters and namespace and self.program_kwargs into the arguments for log_prob
         kwargs = {
@@ -75,7 +94,7 @@ class Optimizer:
     # MANAGING THE QUEUE
 
     def register(self, objective : Objective, intent : Intent):
-        """doc string goes here"""
+        """Register an objective to be optimized."""
 
         # evaluate the objective
         result = self.evaluate(objective)
@@ -87,22 +106,31 @@ class Optimizer:
             logger.warning(f"Objective {objective} produced infinite result.")
         # and add to the queue if it's good
         else:
-            self._queue.append( (objective, result, intent) )
+            self._queue.append( (result, intent) )
 
-    def maximize(self, objective):
-        """doc string goes here"""
+    def maximize(self, *objectives : Objective):
+        """Register an objective to be maximized."""
 
-        self.register(objective, intent=Intent.MAX)
+        for objective in objectives:
+            self.register(objective, intent=Intent.MAX)
 
-    def minimize(self, objective):
-        """doc string goes here"""
+    def minimize(self, *objectives : Objective):
+        """Register an objective to be minimized."""
         
-        self.register(objective, intent=Intent.MIN)
+        for objective in objectives:
+            self.register(objective, intent=Intent.MIN)
 
     # OPTIMIZATION
 
-    def optimize(self):
-        """doc string goes here"""
+    def optimize(self) -> Tensor:
+        """Update the program parameters to satisfy the collective intent of the provided objectives.
+        
+        Returns
+        -------
+        Average computed loss (NaN if no objectives registered).
+        """
+
+        logger.info(f"Starting optimization with {self}...")
 
         # zero the grads in the optimizer
         self._optimizer.zero_grad()
@@ -116,7 +144,9 @@ class Optimizer:
             logger.warning("Optimization triggered with an empty optimization queue.")
             loss = tensor(0.0)
 
-        # compute gradients and update all the necessary  state
+        # compute gradients and update all the necessary state
+        logger.info(f"Updating parameters to minimize loss {loss}...")
+
         loss.backward()
         self._optimizer.step()
         self.program.clamp()
