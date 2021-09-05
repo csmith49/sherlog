@@ -9,8 +9,8 @@ class Objective:
     """Objectives are declarative objects containing all the context needed to produce an optimization target from a program."""
 
     evidence : Evidence
-    conditional : Optional[Evidence]
-    parameters : Optional[Mapping[str, Tensor]]
+    conditional : Optional[Evidence] = None
+    parameters : Optional[Mapping[str, Tensor]] = None
 
 # from typing import TypeVar, List
 # from .embedding import Embedding

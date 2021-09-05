@@ -1,5 +1,6 @@
 import click
-from .cli import cli, console
+from .cli import cli
+from ..interface import console
 
 from ..program import load
 

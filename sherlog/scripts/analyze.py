@@ -4,7 +4,7 @@ import pandas as pd
 import altair_viewer
 
 from .cli import cli
-from ..logs import get
+from ..interface.logs import get
 
 logger = get("scripts.analyze")
 

@@ -1,20 +1,37 @@
 from .objective import Objective
 from ..program import Program
-from .. import logs
+from ..interface import logs
 
 from torch import Tensor, tensor, stack
 from enum import Enum, auto
-from torch.optim import SGD, Adam
+from torch.optim import SGD, Adam, Adagrad
 
 logger = logs.get("optimizer")
 
 # managing torch optimization strategies
-Strategy = Enum("Strategy", "SGD ADAM")
+class Strategy(Enum):
+    """asdf"""
 
-_STRATEGY_MAP = {
-    Strategy.SGD : SGD,
-    Strategy.ADAM : Adam
-}
+    SGD = auto(), SGD, {"learning_rate" : "lr", "momentum" : "momentum", "decay" : "weight_decay"}
+    ADAM = auto(), Adam, {"learning_rate" : "lr", "decay" : "weight_decay"}
+    ADAGRAD = auto(), Adagrad, {"learning_rate" : "lr", "decay" : "weight_decay", "learning_rate_decay" : "lr_decay"}
+
+    @property
+    def torch_constructor(self):
+        return self.value[1]
+
+    def filter_kwargs(self, **kwargs):
+        result = {}
+        mapping = self.value[-1]
+        for key, value in kwargs.items():
+            try:
+                result[mapping[key]] = value
+            except KeyError:
+                pass
+        return result
+
+    def initialize(self, parameters, **kwargs):
+        return self.torch_constructor(parameters, **self.filter_kwargs(**kwargs))
 
 # managing optimization intent
 class Intent(Enum):
@@ -56,17 +73,10 @@ class Optimizer:
         self.program = program
         self.strategy = strategy
 
-        # group kwargs into strategy and program dicts
-        self.strategy_kwargs = {
-            "lr" : learning_rate
-        }
-
-        self.program_kwargs = {
-
-        }
+        self.program_kwargs = {}
 
         # construct the store optimizer
-        self._optimizer = _STRATEGY_MAP[strategy](**self.strategy_kwargs)
+        self._optimizer = self.strategy.initialize(self.program.parameters(), learning_rate=learning_rate)
 
         # the optimization queue
         self._queue = []

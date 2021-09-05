@@ -1,6 +1,6 @@
 """Explanations are the central explanatory element in Sherlog. They capture sufficient generative constraints to ensure a particular outcome."""
 
-from ..logs import get
+from ..interface.logs import get
 
 logger = get("explanation")
 

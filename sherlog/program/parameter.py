@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from torch import Tensor, tensor
-from ..logs import get
+from ..interface.logs import get
 
 logger = get("program.parameter")
 
@@ -37,6 +37,13 @@ class Parameter(ABC):
     def to_tensor(self) -> Tensor:
         return self.value
 
+    @property
+    @abstractmethod
+    def domain(self) -> str:
+        """Return a string representation of the parameter domain."""
+
+        raise NotImplementedError()
+
     # MAGIC METHODS
 
     def __str__(self):
@@ -56,6 +63,7 @@ class UnitIntervalParameter(Parameter):
         
         default : float (default=0.5)
         """
+
         value = tensor(default)
         super().__init__(name, value)
 
@@ -64,7 +72,14 @@ class UnitIntervalParameter(Parameter):
         
         Modifies the parameter in-place.
         """
+
         self.value.clamp_(0, 1)
+
+    @property
+    def domain(self) -> str:
+        """Returns a string representation of the parameter domain."""
+        
+        return "[0, 1]"
 
     def __repr__(self):
         return f"<Unit {self.name}: {self.value}>"
@@ -81,6 +96,7 @@ class PositiveRealParameter(Parameter):
         
         default : float (default=0.5)
         """
+
         value = tensor(default)
         super().__init__(name, value)
     
@@ -89,7 +105,14 @@ class PositiveRealParameter(Parameter):
         
         Modifies the parameter in-place.
         """
+
         self.value.clamp_(self._epsilon, float("inf"))
+
+    @property
+    def domain(self):
+        """Returns a string representation of the parameter domain."""
+
+        return "ℝ⁺"
 
     def __repr__(self):
         return f"<Pos {self.name}: {self.value}>"
@@ -115,6 +138,12 @@ class RealParameter(Parameter):
         Does nothing.
         """
         pass
+
+    @property
+    def domain(self) -> str:
+        """Returns a string representation of the parameter domain."""
+
+        return "ℝ"
 
     def __repr__(self):
         return f"<Real {self.name}: {self.value}>"

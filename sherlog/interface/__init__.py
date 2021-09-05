@@ -1,30 +1,20 @@
 """Contains infrastructure facilitating communication with the OCaml Sherlog server."""
 
-from .socket import connect
-from .server import initialize_server
-from ..config import PORT
-from time import sleep
-from . import server
-from rich.console import Console
+from . import socket, server, instrumentation
+from .console import console
 
 _SOCKET = None
 
-def initialize(port=PORT):
-    """Initialize the Sherlog server. A necessary prerequisite before executing functions in `sherlog.interface`.
-
-    Parameters
-    ----------
-    port : int (default=PORT in `config.py`)
-    """
+def initialize(port : int):
+    """Initialize the Sherlog server. A necessary prerequisite before executing functions in `sherlog.interface`."""
+    
     global _SOCKET
-    initialize_server(port=port)
+    server.initialize_server(port)
     while not _SOCKET:
         try:
-            _SOCKET = connect(port)
+            _SOCKET = socket.connect(port)
         except Exception as e:
             pass
-
-console = Console(markup=False)
 
 class CommunicationError(Exception):
     def __init__(self, message):

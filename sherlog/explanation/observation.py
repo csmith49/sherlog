@@ -1,4 +1,4 @@
-from ..logs import get
+from ..interface.logs import get
 
 logger = get("explanation.observation")
 

@@ -1,6 +1,6 @@
 from socket import socket, AF_INET, SOCK_STREAM
 from json import loads, dumps
-from ..logs import get
+from .logs import get
 import atexit
 
 logger = get("interface.socket")

@@ -1,20 +1,16 @@
 import click
 
-from .. import logs
-from ..interface import console, initialize
+from ..interface import initialize, logs
 
 @click.group()
-@click.option("-l", "--log", multiple=True, type=click.Choice(logs.logged_modules(), case_sensitive=False), help="Enable verbose output via logging")
-@click.option("-p", "--port", type=int)
-def cli(log, port):
+@click.option("-v", "--verbose", multiple=True, type=click.Choice(logs.logged_modules(), case_sensitive=False), help="Enable verbose output via logging")
+@click.option("-p", "--port", type=int, default=8007)
+def cli(verbose, port):
     """Wrapper for common manipulation of Sherlog programs."""
 
     # enable the provided logs
-    if log:
-        logs.enable(*log)
+    if verbose:
+        logs.enable(*verbose)
     
     # initialize the server at the indicated port
-    if port is not None:
-        initialize(port=port)
-    else:
-        initialize()
+    initialize(port)
