@@ -1,6 +1,6 @@
 from ..interface.logs import get
 
-logger = get("program")
+logger = get("program", verbose=True)
 
 from .evidence import Evidence
 from .parameter import Parameter

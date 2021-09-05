@@ -2,7 +2,7 @@
 
 from ..interface.logs import get
 
-logger = get("explanation")
+logger = get("explanation", verbose=True)
 
 from ..pipe import Pipeline, Semantics
 from .semantics.core.target import EqualityIndicator

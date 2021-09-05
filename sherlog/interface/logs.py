@@ -8,6 +8,7 @@ Use `get(module_name)` to acquire a logging object for module `module_name`.
 import logging
 import logging.config
 from rich.logging import RichHandler
+from typing import Iterable
 
 FORMAT = "%(message)s"
 HANDLER = RichHandler()
@@ -18,48 +19,27 @@ logging.basicConfig(
     handlers=[HANDLER]
 )
 
-PREFIX = "sherlog"
-LOGGERS = {}
+_PREFIX = "sherlog"
+_VERBOSE_LOGGERS = {}
 
-def get(module_name):
-    """Acquires a logger for a module.
-    
-    Parameters
-    ----------
-    module_name : str
-        Module name where the logger is being acquired.
-    
-    Returns
-    -------
-    logger
-        Logger object specialized for the provided module.
-    """
-    logger = logging.getLogger(f"{PREFIX}.{module_name}")
-    LOGGERS[module_name] = logger
+def get(name, verbose : bool = False):
+    """Acquire a logger."""
+
+    logger = logging.getLogger(f"{_PREFIX}.{name}")
+    if verbose:
+        _VERBOSE_LOGGERS[name] = logger
     return logger
 
-def logged_modules():
-    """A list of all module names used to acquire a logger.
+def verbose_loggers() -> Iterable[str]:
+    """A list of logger names supporting verbose output."""
 
-    Returns
-    -------
-    list[str]
-    """
-    return list(LOGGERS.keys())
+    yield from _VERBOSE_LOGGERS.keys()
 
-def enable(*args):
-    """Enables verbose output for all loggers from the provided module names.
+def enable(*loggers : str):
+    """Enable verbose output for all identified loggers."""
 
-    Parameters
-    ----------
-    *args : str
-
-    Notes
-    -----
-    Operates by setting the relevant logger's level to INFO.
-    """
-    for module_name in args:
+    for logger in loggers:
         try:
-            LOGGERS[module_name].setLevel(logging.INFO)
+            _VERBOSE_LOGGERS[logger].setLevel(logging.INFO)
         except KeyError:
             pass
