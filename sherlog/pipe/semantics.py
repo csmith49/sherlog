@@ -1,9 +1,12 @@
-import dataclasses
 from .pipe import Pipe
 from .namespace import Namespace
 from .value import Value, Identifier, Literal
 from .pipeline import Pipeline
 from .statement import Statement
+
+from ..interface.logs import get
+
+logger = get("semantics", verbose=True)
 
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Mapping, Any, List, Callable
@@ -32,13 +35,20 @@ class Semantics(Generic[T]):
     def _evaluate_statement(self, statement : Statement, context : Mapping[str, T]) -> T:
         """Apply the semantics to a statement."""
 
+        logger.info(f"Evaluating statement {statement} in context {context}...")
+
         callable = self.namespace.lookup(statement)
         arguments = [self._evaluate_value(arg, context) for arg in statement.arguments]
 
-        return self.pipe.bind(callable, arguments)
+        logger.info(f"Callable and arguments evaluated. Lifting evaluation to {self.pipe.bind}...")
+        result = self.pipe.bind(callable, arguments)
 
-    def _evaluate_program(self, pipeline : Pipeline, context : Mapping[str, T]) -> Mapping[str, T]:
+        logger.info(f"Evaluation result: {result}.")
+        return result
+
+    def _evaluate_pipeline(self, pipeline : Pipeline, context : Mapping[str, T]) -> Mapping[str, T]:
         """Apply the semantics to a program."""
+
         _context = copy(context) # we don't modify the passed-in context
 
         for statement in pipeline.evaluation_order():
@@ -57,14 +67,14 @@ class Semantics(Generic[T]):
             return self._evaluate_statement(obj, context)
 
         if isinstance(obj, Pipeline):
-            return self._evaluate_program(obj, context)
+            return self._evaluate_pipeline(obj, context)
 
     def run(self, pipeline : Pipeline, parameters : Mapping[str, Any]) -> Mapping[str, T]:
         """Apply the semantics to a program with the given parameterization."""
 
         context = {key : self.pipe.unit(value) for key, value in parameters.items()}
 
-        return self._evaluate_program(pipeline, context)
+        return self._evaluate_pipeline(pipeline, context)
 
     def __call__(self, pipeline : Pipeline, parameters : Mapping[str, Any]) -> Mapping[str, T]:
         """Alias for `self.run(pipeline, parameters)`."""
@@ -87,12 +97,13 @@ class NDSemantics(Semantics[List[T]]):
         def bind(callable : Callable[..., List[T]], arguments : List[List[T]]) -> List[T]:
             """Apply a non-deterministic function to a set of non-deterministic arguments."""
 
+            logger.info(f"Initializing non-deterministic application of {callable} on {arguments}...")
+
             # generator loops over all arguments in the cart-prod and uses pipe.bind to stitch context together
             def gen():
                 for args in zip(*arguments):
                     for result in pipe.bind(callable, args):
                         yield result
-                        # yield pipe.bind(lambda *_: result, args)
 
             return list(gen())
 

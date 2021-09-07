@@ -9,9 +9,12 @@ from itertools import filterfalse, chain
 
 from ...pipe import DynamicNamespace, Semantics, Pipe, Statement, Value, Literal
 from ..observation import Observation
+from ...interface.logs import get
 
 from .core.target import Target
 from . import core
+
+logger = get("spyglass", verbose=True)
 
 # utility for ensuring uniqueness in enumeration
 def unique(iterable, key=None):
@@ -103,6 +106,14 @@ class Clue:
 
         return self.value * magic_box * forcing_likelihood * enumerated_likelihood
 
+    # magic methods
+
+    def __str__(self):
+        return str(self.value)
+
+    def __repr__(self):
+        return f"Clue({self.value}, {self.distribution})"
+
 def to_tensor(value : Any) -> Tensor:
     if isinstance(value, Tensor):
         return value
@@ -193,7 +204,7 @@ def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], targe
         return lift_deterministic(locals[statement.function])
 
     # case 4: can't be found
-    raise KeyError(f"{statement.functioon} is not a recognized function.")
+    raise KeyError(f"{statement.function} is not a recognized function.")
 
 # namespace
 

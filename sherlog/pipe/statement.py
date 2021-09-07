@@ -10,7 +10,7 @@ class Statement:
     function : str
     arguments : List[Value]
 
-    def dependencies(self) -> List[str]:
+    def dependencies(self) -> List[Identifier]:
         """Return a list of all dependencies in the right-hand side of the statement."""
         def gen():
             for arg in self.arguments:
@@ -42,3 +42,9 @@ class Statement:
             "function" : self.function,
             "arguments" : [arg.to_json() for arg in self.arguments]
         }
+
+    # magic methods
+    
+    def __str__(self):
+        args = ", ".join([str(arg) for arg in self.arguments])
+        return f"{self.target} <- {self.function}({args})"

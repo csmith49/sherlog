@@ -17,7 +17,7 @@ class Evidence:
     def join(self, other):
         json = {
             "type" : "evidence",
-            "value" : self.to_json["value"] + other.to_json["value"]
+            "value" : self.to_json()["value"] + other.to_json()["value"]
         }
         return Evidence.of_json(json)
 
@@ -30,3 +30,6 @@ class Evidence:
             terms = [str(term["value"]) for term in atom["terms"]]
             atoms.append(f"{rel}({', '.join(terms)})")
         return ", ".join(atoms)
+
+    def __add__(self, other) -> 'Evidence':
+        return self.join(other)

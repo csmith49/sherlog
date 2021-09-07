@@ -10,7 +10,7 @@ from .semantics import spyglass
 from .observation import Observation
 from .history import History
 
-from torch import tensor, Tensor, stack
+from torch import Tensor, stack
 
 from typing import TypeVar, Mapping, Optional, Any, Callable
 
@@ -29,14 +29,19 @@ class Explanation:
     def evaluate(self, parameters : Mapping[str, Tensor], semantics : Semantics[T], default=0.0) -> Mapping[str, T]:
         """Evaluate the explanation."""
 
+        logger.info(f"Evaluating explanation {self} in {semantics} with parameters: {parameters}.")
         store = semantics(self.pipeline, parameters)
+        
+        logger.info(f"Building observation target for {self}...")
         for statement in self.observation.stub(default=default):
             store[statement.target] = semantics.evaluate(statement, store)
+    
         return store
 
     def log_prob(self, parameters : Mapping[str, Tensor]) -> Tensor:
         """Compute the log-probability of the explanation generating the observations."""
 
+        logger.info(f"Constructing spyglass semantics with forcing {self.observation}...")
         sem = spyglass.semantics_factory(
             observation=self.observation,
             target=EqualityIndicator(),
@@ -45,6 +50,7 @@ class Explanation:
         store = self.evaluate(parameters, sem)
         result = stack([clue.surrogate for clue in store["sherlog:target"]]).mean().log()
 
+        logger.info(f"Resulting log-prob: {result}.")
         return result
 
     # SERIALIZATION

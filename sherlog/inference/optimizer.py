@@ -6,7 +6,7 @@ from torch import Tensor, tensor, stack
 from enum import Enum, auto
 from torch.optim import SGD, Adam, Adagrad
 
-logger = logs.get("optimizer")
+logger = logs.get("optimizer", verbose=True)
 
 # managing torch optimization strategies
 class Strategy(Enum):
@@ -97,6 +97,7 @@ class Optimizer:
             numerator = self.program.log_prob(objective.evidence + objective.conditional, **kwargs)
             denominator = self.program.log_prob(objective.conditional, **kwargs)
             # and, because we're in log-space...
+            logger.info(f"{numerator} - {denominator}")
             return numerator - denominator
         else:
             return self.program.log_prob(objective.evidence, **kwargs)

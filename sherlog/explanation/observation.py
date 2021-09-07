@@ -40,10 +40,15 @@ class Observation:
             ]
         else:
             return [
-                Statement("sherlog:keys", "tensorize", self.domain),
-                Statement("sherlog:vals", "tensorize", self.codomain),
+                Statement("sherlog:keys", "tensorize", list(self.domain)),
+                Statement("sherlog:vals", "tensorize", list(self.codomain)),
                 Statement("sherlog:target", "target", [Identifier("sherlog:keys"), Identifier("sherlog:vals")])
             ]
+
+    # magic methods
+
+    def __str__(self):
+        return str(self.mapping)
 
     # SERIALIZATION
     

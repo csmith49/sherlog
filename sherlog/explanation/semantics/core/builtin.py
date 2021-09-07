@@ -15,12 +15,16 @@ def _or(*args):
         prod *= (1 - arg)
     return 1 - prod
 
+def gt(left : Tensor, right : Tensor) -> Tensor:
+    return tensor(1.0) if left >= right else tensor(0.0)
+
 # BUILTIN UTILITIES
 
 _BUILTIN_MAP = {
     "tensorize" : tensorize,
     "identity" : identity,
-    "or" : _or
+    "or" : _or,
+    "gt" : gt
 }
 
 def supported_builtins():

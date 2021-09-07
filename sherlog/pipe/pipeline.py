@@ -40,9 +40,9 @@ class Pipeline:
         
         for target in self.targets():
             for dependency in self.source(target).dependencies():
-                if self.is_target(dependency):
-                    self._dependency_graph.add_node(target, dependency)
-
+                if self.is_target(dependency.value):
+                    self._dependency_graph.add_edge(dependency.value, target)
+        
     def targets(self) -> Iterable[str]:
         """Iterate over all targets in the program."""
 
@@ -71,7 +71,7 @@ class Pipeline:
     def evaluation_order(self) -> Iterable[Statement]:
         """Iterate over all statements in the program in an order suitable for evaluation."""
 
-        for target in reversed(list(topological_sort(self._dependency_graph))):
+        for target in topological_sort(self._dependency_graph):
             yield self.source(target)
 
     # IO
