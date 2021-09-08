@@ -6,7 +6,8 @@ lib/watson/.merlin
 lib/sherlog/.merlin
 lib/interface/.merlin
 lib/data/.merlin
-run
-server
 
 .vscode
+.direnv
+.envrc
+.DS_STORE
