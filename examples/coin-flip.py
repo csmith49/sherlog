@@ -1,4 +1,7 @@
-"""Sherlog example: coin flip."""
+"""Sherlog example: coin flip.
+
+TODO - instrumentation and performance.
+"""
 
 import click
 

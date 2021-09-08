@@ -1,1 +1,0 @@
-# Classical Logic Programming Problems

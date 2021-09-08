@@ -1,4 +1,7 @@
-"""Sherlog example: truncated Gaussian."""
+"""Sherlog example: truncated Gaussian.
+
+TODO - instrumentation and performance.
+"""
 
 from sherlog.inference.embedding import FunctionalEmbedding
 import click

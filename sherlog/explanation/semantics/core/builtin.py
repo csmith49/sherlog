@@ -18,13 +18,17 @@ def _or(*args):
 def gt(left : Tensor, right : Tensor) -> Tensor:
     return tensor(1.0) if left >= right else tensor(0.0)
 
+def add(left : Tensor, right : Tensor) -> Tensor:
+    return left + right
+
 # BUILTIN UTILITIES
 
 _BUILTIN_MAP = {
     "tensorize" : tensorize,
     "identity" : identity,
     "or" : _or,
-    "gt" : gt
+    "gt" : gt,
+    "add" : add
 }
 
 def supported_builtins():
