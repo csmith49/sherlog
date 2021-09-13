@@ -24,9 +24,8 @@
 // generative rules need brackets (for parameters)
 %token LBRACKET
 %token RBRACKET
-
-// at-sign (for context)
-%token AT
+%token LBRACE
+%token RBRACE
 
 // and semicolons for separating the generative part from the logical
 %token SEMICOLON
@@ -34,6 +33,7 @@
 // for inference, we have special tokens for denoting the relevant values
 %token PARAMETER
 %token EVIDENCE
+%token SQUIGARROW
 
 // and colons for separating arguments and the like
 %token COLON
@@ -47,97 +47,83 @@
 
 // core logic programming
 value :
-    | TRUE { Term.Boolean true }
-    | FALSE { Term.Boolean false }
-    | f = FLOAT { Term.Float f }
-    | i = INTEGER { Term.Integer i }
-    | s = SYMBOL { Term.Symbol s }
-    | x = VARIABLE { Term.Variable x }
+    | TRUE; { Term.Boolean true }
+    | FALSE; { Term.Boolean false }
+    | f = FLOAT; { Term.Float f }
+    | i = INTEGER; { Term.Integer i }
+    | s = SYMBOL; { Term.Symbol s }
+    | x = VARIABLE; { Term.Variable x }
     ;
 
 term :
-    | v = value { v }
-    | LBRACKET; RBRACKET { Term.Unit }
+    | v = value; { v }
+    | LBRACKET; RBRACKET; { Term.Unit }
     | v = value; DOUBLECOLON; t = term; { Term.Function ("cons", [v; t]) }
-    | LBRACKET; vs = separated_list(COMMA, value); RBRACKET { 
+    | LBRACKET; vs = separated_nonempty_list(COMMA, value); RBRACKET; { 
         let cons x y = Term.Function ("cons", [x ; y]) in
         CCList.fold_right cons vs Term.Unit
     }
-    | BLANK { Term.Wildcard }
-    | LPARENS; t = term; RPARENS { t }
-    ;
-terms : ts = separated_list(COMMA, term) { ts } ;
-
-atom : 
-    | s = SYMBOL; LPARENS; ts = terms; RPARENS { Atom.make s ts } 
-    | s = SYMBOL; { Atom.make s [] }
-    ;
-atoms : ss = separated_list(COMMA, atom) { ss } ;
-
-clause :
-    | fact = atom; PERIOD { Rule.make fact [] } // fact construction
-    | head = atom; ARROW; body = atoms; PERIOD { Rule.make head body } // rule construction
+    | BLANK; { Term.Wildcard }
+    | t = delimited(LPARENS, term, RPARENS); { t }
     ;
 
-// generative logic programming
-intro_term : f = SYMBOL; LBRACKET; params = terms; RBRACKET { (f, params) } ;
-intro_atom : 
-    | rel = SYMBOL; LPARENS; terms = terms; SEMICOLON; it = intro_term; RPARENS {
-        let rel_term = (Term.Symbol rel) in
-        let function_id, args = it in let context = rel_term :: (terms @ args) in
-        (rel, terms, function_id, args, context)
-    }
-    | rel = SYMBOL; LPARENS; terms = terms; SEMICOLON; it = intro_term; AT; context = terms; RPARENS {
-        let function_id, args = it in (rel, terms, function_id, args, context)
-    }
-    ;
+// relation OR relation(t_1, ..., t_k)
+atom : relation = SYMBOL; terms = loption(delimited(LPARENS, separated_nonempty_list(COMMA, term), RPARENS)) { Atom.make relation terms } ;
 
-intro_clause : 
-    | ia = intro_atom; ARROW; body = atoms; PERIOD {
-        let rel, terms, function_id, args, context = ia in Line.Encode.introduction_rule
-            ~relation:rel ~terms:terms ~function_id:function_id ~arguments:args ~context:context ~body:body
-    } 
-    | ia = intro_atom; PERIOD {
-        let rel, terms, function_id, args, context = ia in Line.Encode.introduction_rule
-            ~relation:rel ~terms:terms ~function_id:function_id ~arguments:args ~context:context ~body:[]
-    }
-    ;
+// <- a_1, ..., a_k OR nothing
+rule_body : atoms = loption(preceded(ARROW, separated_nonempty_list(COMMA, atom))) { atoms };
 
-fuzzy_clause :
-    | w = value; DOUBLECOLON; head = atom; ARROW; body = atoms; PERIOD {
-        Line.Encode.fuzzy_rule ~head:head ~body:body ~weight:w
-    }
-    | w = value; DOUBLECOLON; head = atom; PERIOD {
-        Line.Encode.fuzzy_rule ~head:head ~body:[] ~weight:w
-    }
-    ;
+// fact. OR head <- body.
+rule : head = atom; body = rule_body; PERIOD { Rule.make head body } ;
 
-// inference
-parameter :
-    | PARAMETER; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
-        match dom with
-            | "unit" -> Parameter.make s Parameter.Unit
-            | "positive" | "pos" -> Parameter.make s Parameter.Positive
-            | "real" ->  Parameter.make s Parameter.Real
-            | _ -> raise DomainError
-    }
-    ;
+// {t_1, ..., t_k}
+domain : terms = delimited(LBRACE, separated_nonempty_list(COMMA, term), RBRACE) { terms } ;
 
-evidence :
-    | EVIDENCE; atoms = atoms; PERIOD { Evidence.make atoms }
-    ;
+// f[t_1, ..., t_k]
+function_application : f = SYMBOL; arguments = delimited(LBRACKET, separated_list(COMMA, term), RBRACKET) { (f, arguments) } ;
 
-// generating lines to build program from
+// GENERATIVE FORM
+generation(X) : relation = SYMBOL; LPARENS; terms = separated_list(COMMA, term); SEMICOLON; x = X; RPARENS; body = rule_body; PERIOD; {
+    Line.Generation.make relation terms x body
+};
+
+// f[args]
+introduction : f = function_application; {
+    let function_id, arguments = f in `Introduction (function_id, arguments)
+};
+
+// domain <~ f[args]
+discrete_embedding : domain = domain; SQUIGARROW; f = function_application; {
+    let function_id, arguments = f in `DiscreteEmbedding (domain, function_id, arguments)
+};
+
+// domain <- f[args]
+softmax_embedding : domain = domain; ARROW; f = function_application; {
+    let function_id, arguments = f in `SoftmaxEmbedding (domain, function_id, arguments)
+};
+
+// inference forms
+parameter : PARAMETER; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
+    match dom with
+        | "unit" -> Parameter.make s Parameter.Unit
+        | "positive" | "pos" -> Parameter.make s Parameter.Positive
+        | "real" ->  Parameter.make s Parameter.Real
+        | _ -> raise DomainError
+};
+
+evidence : EVIDENCE; atoms = separated_nonempty_list(COMMA, atom); PERIOD; { Evidence.make atoms };
+
+// generating lines
 line :
-    // core logic programming
-    | clause = clause;              { [`Rule clause] }
-    // generative logic programming
-    | intro_clause = intro_clause;  { intro_clause }
-    // ala problog
-    | fuzzy_clause = fuzzy_clause;  { fuzzy_clause }
-    // inference
-    | parameter = parameter;        { [`Parameter parameter] }
-    | evidence = evidence;          { [`Evidence evidence] }
+    // CORE
+    | rule = rule; { [`Rule rule] }
+    // INFERENCE
+    | parameter = parameter; { [`Parameter parameter] }
+    | evidence = evidence; { [`Evidence evidence] }
+    // GENERATIVE FORMS
+    | introduction = generation(introduction); { Line.Generation.compile introduction }
+    | discrete_embedding = generation(discrete_embedding); { Line.Generation.compile discrete_embedding }
+    | softmax_embedding = generation(softmax_embedding); { Line.Generation.compile softmax_embedding }
     ;
 
 // entrypoint - collects lists of lines
