@@ -35,15 +35,11 @@ module Unification : sig
     val resolve : equality list -> t option
 end
 
-module Generalization : sig
-    type generalization
-
-    val generalize : Term.t -> Term.t -> generalization
-
-    val resolve : generalization list -> t option
+module GeneralizationLattice : sig
+    val generalize : Term.t -> Term.t -> t option
+    val generalizes : Term.t -> Term.t -> bool
 end
 
-(*  *)
 module JSON : sig
     (*  *)
     val encode : t -> JSON.t

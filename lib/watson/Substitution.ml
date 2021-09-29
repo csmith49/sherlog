@@ -69,6 +69,47 @@ module Unification = struct
         | _ -> None
 end
 
+module GeneralizationLattice = struct
+    (* definitional *)
+    
+    type gen_c = Gen of Term.t * Term.t
+    let gen_mk l r = Gen (l, r)
+    let gen_map f = function Gen (x, y) -> Gen (f x, f y)
+    
+    (** [generalize large small] returns a substitution [h] such that [h $ large == small], if one exists *)
+    let rec generalize large small =
+        generalize_aux [ Gen (large, small) ] empty
+    (* one-sided version of Martelli-Montanari unification *)
+    and generalize_aux eqs h = match eqs with
+        | [] -> Some h
+        | Gen (x, y) :: rest when Term.equal x y -> generalize_aux rest h
+        | Gen (Term.Variable x, y) :: rest ->
+            if Term.occurs x y then None else
+            let h = compose h (singleton x  y) in
+            let rest = CCList.map (gen_map (apply h)) rest in
+                generalize_aux rest h
+        | Gen (Term.Function (f, fargs), Term.Function (g, gargs)) :: rest ->
+            if not (CCString.equal f g) then None else
+            if not (CCInt.equal (CCList.length fargs) (CCList.length gargs)) then None else
+            let arg_constraints = CCList.map2 gen_mk fargs gargs in
+                generalize_aux (arg_constraints @ rest) h    
+        | _ -> None
+
+    (** [generalizes large small] returns true iff [generalize large small] returns a generalization witness *)
+    let generalizes large small = generalize large small
+        |> CCOpt.is_some
+
+
+    (* operational *)
+
+    (* goal: anti-unification, or the least-general generalization *)
+
+    (* join computes the lub *)
+
+    (* join_all computes the lub for a set *)
+end
+
+
 module JSON = struct
     let encode sub = sub
         |> to_assoc
