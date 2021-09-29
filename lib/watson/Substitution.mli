@@ -25,19 +25,14 @@ val to_string : t -> string
 
 (*  *)
 module Unification : sig
-    (*  *)
-    type equality
-
-    (*  *)
-    val equate : Term.t -> Term.t -> equality
-
-    (*  *)
-    val resolve : equality list -> t option
+    val unify : Term.t -> Term.t -> t option
 end
 
-module GeneralizationLattice : sig
+module Generalization : sig
     val generalize : Term.t -> Term.t -> t option
     val generalizes : Term.t -> Term.t -> bool
+
+    val join : Term.t -> Term.t -> Term.t
 end
 
 module JSON : sig
@@ -50,9 +45,6 @@ end
 
 (* Infix utilities *)
 module Infix : sig
-    (* alias for Unification.equate *)
-    val (=?=) : Term.t -> Term.t -> Unification.equality
-
     (* alias for apply *)
     val ($) : t -> Term.t -> Term.t
 

@@ -121,7 +121,7 @@ let resolve proof rule = let open CCOpt in
     let rule = rule |> Rule.avoiding_rename (State.variables state) in
     (* unify a discharged atom with the rule head *)
     let* (atom, state) = state |> State.discharge in
-    let* sub = Atom.unify (Rule.head rule) atom in
+    let* sub = Atom.Unification.unify (Rule.head rule) atom in
     (* build the witness with the sub, etc. *)
     let witness = {
         Witness.atom = atom |> Atom.apply sub;

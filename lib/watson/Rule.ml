@@ -34,7 +34,7 @@ let avoiding_rename vars rule =
     let assoc = rule
         |> variables
         |> CCList.map (fun x -> (x, avoid x None)) in
-    let sub = Substitution.of_list assoc in
+    let sub = Substitution.of_assoc assoc in
         apply sub rule
 
 let pp ppf rule = let open Fmt in

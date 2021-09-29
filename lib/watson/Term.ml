@@ -4,14 +4,21 @@ type t =
     | Integer of int
     | Float of float
     | Boolean of bool
-    | Unit
     | Function of string * t list
-    | Wildcard
+    | Unit
 
-let compare l r = match l, r with
-    | Wildcard, _ | _, Wildcard -> 0
-    | _ -> Stdlib.compare l r
-let equal l r = (compare l r) == 0
+let rec hash = function
+    (* use a pair hash w/ vars and symbols to disambiguate *)
+    | Variable x -> CCHash.(pair string string) ("variable", x)
+    | Symbol s -> CCHash.(pair string string) ("symbol", s)
+    | Integer i -> CCHash.int i
+    | Float f -> CCFloat.hash f (* for some reason this isn't in CCHash? *)
+    | Boolean b -> CCHash.bool b
+    | Function (f, args) -> CCHash.(pair string (list hash)) (f, args)
+    | Unit -> 13 (* might as well pick a constant *)
+
+let compare = Stdlib.compare
+let equal l r = (compare l r ) == 0
 
 let rec is_ground = function
     | Variable _ -> false
@@ -37,11 +44,44 @@ let rec pp ppf term = let open Fmt in match term with
     | Float f -> (styled (`Fg `Green) float) ppf f
     | Boolean b -> (styled (`Fg `Green) bool) ppf b
     | Unit -> pf ppf "()"
-    | Wildcard -> (styled (`Faint) string) ppf "_"
     | Function (f, args) ->
         pf ppf "%s(@[<1>%a@])" f (list ~sep:comma pp) args
 
 let to_string = Fmt.to_to_string pp
+
+module Make = struct
+    module Shorthand = struct
+        let v x = Variable x
+        let s x = Symbol x
+        let i x = Integer x
+        let r x = Float x
+        let b x = Boolean x
+        let f x xargs = Function (x, xargs)
+        let u = Unit
+    end
+
+    module Variable = struct
+        let tagged x i =
+            let name = x ^ ":" ^ (CCInt.to_string i) in
+            Variable name
+
+        let rec avoiding variables =
+            avoiding_aux variables 0
+        and avoiding_aux variables counter =
+            let name = avoiding_name counter in
+            if CCList.mem ~eq:CCString.equal name variables then
+                Variable name
+            else
+                avoiding_aux variables (counter + 1)
+        and avoiding_name counter = "avoiding:" ^ (CCInt.to_string counter) 
+
+        let wildcard_counter = ref 0
+        let wildcard = function () ->
+            let counter = !wildcard_counter in
+            let _ = wildcard_counter := !wildcard_counter + 1 in
+            tagged "wildcard" counter
+    end
+end
 
 module JSON = struct
     let lift typ encoder value = `Assoc [
@@ -60,7 +100,6 @@ module JSON = struct
             ("value", `String f);
             ("arguments", `List (args |> CCList.map encode));
         ]
-        | Wildcard -> `Assoc [("type", `String "wildcard")]
 
     let rec decode json = match JSON.Parse.(find string "type" json) with
         | Some "variable" -> json
@@ -84,6 +123,5 @@ module JSON = struct
             let args = json
                 |> JSON.Parse.(find (list decode) "arguments") in
             CCOpt.map2 (fun f -> fun args -> Function (f, args)) f args
-        | Some "wildcard" -> Some Wildcard
         | _ -> None
 end

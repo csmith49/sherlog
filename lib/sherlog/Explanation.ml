@@ -119,7 +119,7 @@ module Compile = struct
         CCList.map f intros
             |> CCList.map fst
             |> CCList.keep_some
-            |> Watson.Substitution.of_list
+            |> Watson.Substitution.of_assoc
 
     let associate_statements (intros : string t) : Target.target t=
         (* get the target renamings *)

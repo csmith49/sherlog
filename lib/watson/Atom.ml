@@ -32,39 +32,28 @@ let variables atom = atom
 let apply h atom = { atom with
     terms = atom.terms |> CCList.map (Substitution.apply h);
 }
-let apply_all h atoms = CCList.map (apply h) atoms
-
-let unifiable left right =
-    (CCString.equal_caseless (relation left) (relation right)) &&
-        (CCInt.equal (arity left) (arity right))
-
-let unify left right = 
-    if unifiable left right then 
-        let constraints = CCList.map2 Substitution.Unification.equate (terms left) (terms right) in
-            Substitution.Unification.resolve_equalities constraints
-    else 
-        None
-
-let embed small large = large
-    |> CCList.map (unify small)
-    |> CCList.keep_some
-
-let rec embed_all small large = match small with
-    (* nothing to unify, no resulting susb *)
-    | [] -> []
-    (* the base case *)
-    | atom :: [] -> embed atom large
-    (* inductive case *)
-    | atom :: rest ->
-        let subs = embed atom large in
-        let subs_rest = subs
-            |> CCList.map (fun s -> apply_all s rest)
-            |> CCList.map (fun r -> embed_all r large) in
-        let extend sub subs = CCList.map (Substitution.compose sub) subs in
-        CCList.map2 extend subs subs_rest |> CCList.flatten
 
 let pp ppf atom = let open Fmt in
     pf ppf "%s(@[<0>%a@])" atom.relation (list ~sep:comma Term.pp) atom.terms
+
+module Unification = struct
+    type uni_c = Uni of Term.t * Term.t
+    let uni_mk l r = Uni (l, r)
+    let uni_map f = function Uni (l, r) -> Uni (f l, f r)
+
+    let rec unify left right =
+        if not (CCString.equal_caseless (relation left) (relation right)) then None else
+        if not (CCInt.equal (arity left) (arity right)) then None else
+        let eqs = CCList.map2 uni_mk (terms left) (terms right) in
+            unify_aux eqs Substitution.empty
+    and unify_aux eqs h = match eqs with
+        | [] -> Some h
+        | Uni (x, y) :: rest -> let open CCOpt in
+            let* s = Substitution.Unification.unify x y in
+            let h = Substitution.compose s h in
+            let rest = CCList.map (uni_map (Substitution.apply h)) rest in
+                (unify_aux rest h)
+end
 
 module JSON = struct
     let encode atom = `Assoc [

@@ -63,7 +63,7 @@ term :
         let cons x y = Term.Function ("cons", [x ; y]) in
         CCList.fold_right cons vs Term.Unit
     }
-    | BLANK; { Term.Wildcard }
+    | BLANK; { Term.Make.Variable.wildcard () }
     | t = delimited(LPARENS, term, RPARENS); { t }
     ;
 

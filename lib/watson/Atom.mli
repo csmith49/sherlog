@@ -14,12 +14,11 @@ val variables : t -> string list
 
 val apply : Substitution.t -> t -> t
 
-val unify : t -> t -> Substitution.t option
-
-val embed : t -> t list -> Substitution.t list
-val embed_all : t list -> t list -> Substitution.t list
-
 val pp : t Fmt.t
+
+module Unification : sig
+    val unify : t -> t -> Substitution.t option
+end
 
 module JSON : sig
     val encode : t -> JSON.t
