@@ -80,11 +80,13 @@ def cli(effective, control, treated, train, batch_size, epochs, learning_rate):
     # iterate over the data, and optimize
     for batch in minibatch(data, batch_size, epochs=epochs):
         optimizer.maximize(*embedder.embed_all(batch.data))
-        optimizer.optimize()
+        batch_loss = optimizer.optimize()
+
+        console.print(batch_loss)
 
     # report the parameter
     for parameter in program._parameters:
-        console.print(parameter.name, parameter.value)
+        console.print(f"{parameter.name} : {parameter.value.item()}")
 
 if __name__ == "__main__":
     cli()

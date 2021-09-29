@@ -1,7 +1,3 @@
-from ..interface.logs import get
-
-logger = get("explanation.observation")
-
 from ..pipe import Value, Identifier, Literal, Statement
 
 from typing import Mapping, Iterable, List

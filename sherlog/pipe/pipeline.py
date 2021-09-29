@@ -93,3 +93,8 @@ class Pipeline:
             "type" : "pipeline",
             "statements" : [stmt.to_json() for stmt in self.statements]
         }
+
+    # magic methods
+
+    def __str__(self):
+        return '\n'.join((str(stmt) for stmt in self.evaluation_order()))

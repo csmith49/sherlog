@@ -1,16 +1,19 @@
 from .objective import Objective
 from ..program import Program
-from ..interface import logs
+from ..interface.instrumentation import minotaur
 
 from torch import Tensor, tensor, stack
 from enum import Enum, auto
 from torch.optim import SGD, Adam, Adagrad
+from typing import Iterable
 
-logger = logs.get("optimizer", verbose=True)
+import logging
+
+logger = logging.getLogger("sherlog.inference.optimizer")
 
 # managing torch optimization strategies
 class Strategy(Enum):
-    """asdf"""
+    """Wrapper around Torch optimizers and their parameterizations."""
 
     SGD = auto(), SGD, {"learning_rate" : "lr", "momentum" : "momentum", "decay" : "weight_decay"}
     ADAM = auto(), Adam, {"learning_rate" : "lr", "decay" : "weight_decay"}
@@ -18,9 +21,13 @@ class Strategy(Enum):
 
     @property
     def torch_constructor(self):
+        """Get the Torch constructor for the indicated strategy."""
+
         return self.value[1]
 
     def filter_kwargs(self, **kwargs):
+        """Remove unecessary keyword arguments to satisfy the parameterization of the indicated strategy."""
+
         result = {}
         mapping = self.value[-1]
         for key, value in kwargs.items():
@@ -30,7 +37,9 @@ class Strategy(Enum):
                 pass
         return result
 
-    def initialize(self, parameters, **kwargs):
+    def initialize(self, parameters : Iterable[Tensor], **kwargs):
+        """Initialize a Torch optimization strategy."""
+
         return self.torch_constructor(parameters, **self.filter_kwargs(**kwargs))
 
 # managing optimization intent
@@ -73,7 +82,7 @@ class Optimizer:
         self.program = program
         self.strategy = strategy
 
-        self.program_kwargs = {}
+        self.program_kwargs = kwargs
 
         # construct the store optimizer
         self._optimizer = self.strategy.initialize(self.program.parameters(), learning_rate=learning_rate)
@@ -97,7 +106,6 @@ class Optimizer:
             numerator = self.program.log_prob(objective.evidence + objective.conditional, **kwargs)
             denominator = self.program.log_prob(objective.conditional, **kwargs)
             # and, because we're in log-space...
-            logger.info(f"{numerator} - {denominator}")
             return numerator - denominator
         else:
             return self.program.log_prob(objective.evidence, **kwargs)
@@ -133,6 +141,7 @@ class Optimizer:
 
     # OPTIMIZATION
 
+    @minotaur("optimize batch")
     def optimize(self) -> Tensor:
         """Update the program parameters to satisfy the collective intent of the provided objectives.
         
@@ -140,8 +149,6 @@ class Optimizer:
         -------
         Average computed loss (NaN if no objectives registered).
         """
-
-        logger.info(f"Starting optimization with {self}...")
 
         # zero the grads in the optimizer
         self._optimizer.zero_grad()
@@ -155,9 +162,6 @@ class Optimizer:
             logger.warning("Optimization triggered with an empty optimization queue.")
             loss = tensor(0.0)
 
-        # compute gradients and update all the necessary state
-        logger.info(f"Updating parameters to minimize loss {loss}...")
-
         loss.backward()
         self._optimizer.step()
         self.program.clamp()
@@ -165,7 +169,9 @@ class Optimizer:
         self._queue = []
 
         # for debugging, we'll return the average computed loss (NaN if we didn't have any)
-        return loss / len(losses)
+        batch_loss = loss / len(losses)
+        minotaur["batch loss"] = batch_loss.item()
+        return batch_loss
 
     # CONTEXT MANAGER SEMANTICS
  

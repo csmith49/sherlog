@@ -4,8 +4,8 @@ type t = Term.t IMap.t
 
 let empty = IMap.empty
 let singleton = IMap.singleton
-let of_list = IMap.of_list
-let to_list = IMap.to_list
+let of_assoc = IMap.of_list
+let to_assoc = IMap.to_list
 
 let rec apply h = function
     | Term.Variable x -> begin match IMap.find_opt x h with
@@ -67,4 +67,21 @@ module Unification = struct
                 let constraints = argument_constraints @ rest in
                     resolve constraints h
         | _ -> None
+end
+
+module JSON = struct
+    let encode sub = sub
+        |> to_assoc
+        |> CCList.map (CCPair.map_snd Term.JSON.encode)
+        |> JSON.Make.assoc
+
+    let decode json = json
+        |> JSON.Parse.(assoc Term.JSON.decode)
+        |> CCOpt.map of_assoc
+end
+
+module Infix = struct
+    let (=?=) = Unification.equate
+    let ($) = apply
+    let (>->) = compose
 end

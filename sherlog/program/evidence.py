@@ -1,3 +1,5 @@
+from json import dumps
+
 class Evidence:
     """Evidence is a goal conjunct."""
 
@@ -27,9 +29,21 @@ class Evidence:
         atoms = []
         for atom in self.json["value"]:
             rel = atom["relation"]
-            terms = [str(term["value"]) for term in atom["terms"]]
+            terms = [term_to_string(t) for t in atom["terms"]]
             atoms.append(f"{rel}({', '.join(terms)})")
         return ", ".join(atoms)
 
     def __add__(self, other) -> 'Evidence':
         return self.join(other)
+
+def term_to_string(json):
+    if json["type"] == "function":
+        function_id = json["value"]
+        args = ", ".join([term_to_string(arg) for arg in json["arguments"]])
+        return f"{function_id}({args})"
+
+    elif json["type"] == "unit":
+        return "[]"
+
+    else:
+        return str(json["value"])

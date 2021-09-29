@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
-from torch import Tensor, tensor
-from ..interface.logs import get
-
-logger = get("program.parameter")
+from torch import Tensor, ones, tensor
+from torch.nn.functional import softmax
 
 # ABSTRACT PARAMETER CLASS
 
@@ -23,8 +21,6 @@ class Parameter(ABC):
         # make sure the value will accumulate gradients
         if not self.value.requires_grad:
             self.value.requires_grad = True
-
-        logger.info(f"Parameter {repr(self)} constructed.")
     
     @abstractmethod
     def clamp(self):
@@ -49,22 +45,23 @@ class Parameter(ABC):
     def __str__(self):
         return f"{self.value:f}"
 
+# Utility
+
+def initialize_parameter(default : float, dimension : int = 1):
+    if dimension == 1:
+        return tensor(default)
+    else:
+        return ones(dimension) * default
+
 # CONCRETE PARAMETER CLASSES
 
 class UnitIntervalParameter(Parameter):
     """Parameter restricted to the interval [0, 1]."""
 
-    def __init__(self, name : str, default : float = 0.5):
-        """Construct a unit parameter.
-        
-        Parameters
-        ----------
-        name : str
-        
-        default : float (default=0.5)
-        """
+    def __init__(self, name : str, dimension : int, default : float = 0.5):
+        """Construct a unit parameter."""
 
-        value = tensor(default)
+        value = initialize_parameter(default=default, dimension=dimension)
         super().__init__(name, value)
 
     def clamp(self):
@@ -87,17 +84,10 @@ class UnitIntervalParameter(Parameter):
 class PositiveRealParameter(Parameter):
     """Parameter restricted to the ray (0, infty]."""
 
-    def __init__(self, name : str, default : float = 0.5):
-        """Construct a positive real parameter.
-        
-        Parameters
-        ----------
-        name : str
-        
-        default : float (default=0.5)
-        """
+    def __init__(self, name : str, dimension : int, default : float = 0.5):
+        """Construct a positive real parameter."""
 
-        value = tensor(default)
+        value = initialize_parameter(default=default, dimension=dimension)
         super().__init__(name, value)
     
     def clamp(self):
@@ -120,16 +110,10 @@ class PositiveRealParameter(Parameter):
 class RealParameter(Parameter):
     """Parameter on the real line."""
 
-    def __init__(self, name : str, default : float = 0.5):
-        """Construct a real parameter.
+    def __init__(self, name : str, dimension : int, default : float = 0.5):
+        """Construct a real parameter."""
         
-        Parameters
-        ----------
-        name : str
-        
-        default : float (default=0.5)
-        """
-        value = tensor(default)
+        value = initialize_parameter(default=default, dimension=dimension)
         super().__init__(name, value)
 
     def clamp(self):
@@ -150,7 +134,7 @@ class RealParameter(Parameter):
 
 # MONKEY PATCH
 
-def of_json(json, epsilon : float = 1e-10) -> Parameter:
+def of_json(json, default : float = 0.5) -> Parameter:
     """Construct a parameter from a JSON-like representation.
     
     Parameters
@@ -168,14 +152,14 @@ def of_json(json, epsilon : float = 1e-10) -> Parameter:
     -------
     Parameter
     """
-    name, domain = json["name"], json["domain"]
+    name, domain, dimension = json["name"], json["domain"], json["dimension"]
 
     if domain == "unit":
-        return UnitIntervalParameter(name)
+        return UnitIntervalParameter(name, dimension, default=default)
     elif domain == "positive":
-        return PositiveRealParameter(name)
+        return PositiveRealParameter(name, dimension, default=default)
     elif domain == "real":
-        return RealParameter(name)
+        return RealParameter(name, dimension, default=default)
     else:
         raise NotImplementedError(f"No implementation for domain {domain}.")
 

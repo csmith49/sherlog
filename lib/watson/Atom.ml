@@ -78,3 +78,7 @@ module JSON = struct
         let* terms = JSON.Parse.(find (list Term.JSON.decode) "terms" json) in
             return (make relation terms)
 end
+
+module Infix = struct
+    let ($) = apply
+end

@@ -2,8 +2,8 @@ import click
 from rich.table import Table
 from .cli import cli
 
-from ..interface import console
-from ..interface.instrumentation import Instrumenter, Timer, Seed
+from ..interface import print
+from ..interface.instrumentation import minotaur
 
 from ..program import load
 from ..inference import Optimizer, minibatch, DirectEmbedding
@@ -13,19 +13,13 @@ from ..inference import Optimizer, minibatch, DirectEmbedding
 @click.option("-e", "--epochs", default=1, help="Number of training epochs")
 @click.option("-l", "--learning-rate", default=0.01, show_default=True, help="Optimizer learning rate")
 @click.option("-b", "--batch-size", default=1, help="Batch size")
-@click.option("-i", "--instrument", type=click.Path(), help="Output file for instrumentation logs")
-def train(filename, epochs, learning_rate, batch_size, instrument):
+@minotaur("train")
+def train(filename, epochs, learning_rate, batch_size):
     """Train FILENAME with the provided parameters."""
 
-    instrumenter = Instrumenter(
-        filepath=instrument,
-        context={
-            "seed" : Seed(),
-            "epochs" : epochs,
-            "learning-rate" : learning_rate,
-            "batch-size" : batch_size
-        }
-    )
+    minotaur["epochs"] = epochs
+    minotaur["learning rate"] = learning_rate
+    minotaur["batch size"] = batch_size
 
     # load the program and build the optimizer
     program, evidence = load(filename)
@@ -35,14 +29,12 @@ def train(filename, epochs, learning_rate, batch_size, instrument):
 
     # train
     for batch in minibatch(evidence, batch_size, epochs=epochs):
-        optimizer.maximize(*embedder.embed_all(batch.data))
-        batch_loss = optimizer.optimize()
+        with minotaur("batch"):
+            optimizer.maximize(*embedder.embed_all(batch.data))
+            optimizer.optimize()
 
-        if batch.index == 0:
-            instrumenter.write(**{
-                "epoch" : batch.epoch,
-                "batch-objective" : (-1 * batch_loss).exp()
-            })
+            minotaur["batch"] = batch.index
+            minotaur["epoch"] = batch.epoch
 
     # output program parameters in fancy table
     parameter_table = Table(title="Inferred Parameters")
@@ -53,4 +45,4 @@ def train(filename, epochs, learning_rate, batch_size, instrument):
     for parameter in program._parameters:
         parameter_table.add_row(parameter.name, str(parameter.value), parameter.domain)
 
-    console.print(parameter_table)
+    print(parameter_table)

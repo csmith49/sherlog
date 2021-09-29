@@ -1,7 +1,8 @@
 """Contains infrastructure facilitating communication with the OCaml Sherlog server."""
 
-from . import socket, server, instrumentation
-from .console import console
+from . import socket, server
+from .instrumentation import instrument
+from .console import print
 
 _SOCKET = None
 

@@ -1,4 +1,3 @@
-from sherlog.program import parameter
 from torch import tensor, stack, Tensor
 from typing import List, Iterable
 

@@ -6,21 +6,24 @@ type domain =
 type t = {
 	name : string;
 	domain : domain;
+	dimension : int;
 }
 
 let name param = param.name
 let domain param = param.domain
+let dimension param = param.dimension
 
-let make name domain = {
+let make name domain dimension = {
 	name = name;
 	domain = domain;
+	dimension = dimension;
 }
 
 let to_string parameter =
 	let domain = match domain parameter with
-		| Unit -> "[0, 1]"
-		| Positive -> "ℝ⁺"
-		| Real -> "ℝ" in
+		| Unit -> "[0, 1]^" ^ (string_of_int parameter.dimension)
+		| Positive -> "ℝ⁺^" ^ (string_of_int parameter.dimension)
+		| Real -> "ℝ^" ^ (string_of_int parameter.dimension) in
 	let name = parameter |> name in
 	name ^ " : " ^ domain
 
@@ -46,12 +49,14 @@ module JSON = struct
 		`Assoc [
 			("type", `String "parameter");
 			("name", `String (parameter |> name));
-			("domain", domain)
+			("domain", domain);
+			("dimension", `Int (parameter |> dimension))
 		]
 
 	let decode json = let open CCOpt in
 		let* name = JSON.Parse.(find string "name" json) in
 		let* domain_rep = JSON.Parse.(find string "domain" json) in
 		let* domain = domain_of_string domain_rep in
-			return (make name domain)
+		let* dimension = JSON.Parse.(find int "dimension" json) in
+			return (make name domain dimension)
 end

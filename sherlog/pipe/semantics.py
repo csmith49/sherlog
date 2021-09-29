@@ -4,10 +4,6 @@ from .value import Value, Identifier, Literal
 from .pipeline import Pipeline
 from .statement import Statement
 
-from ..interface.logs import get
-
-logger = get("semantics", verbose=True)
-
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Mapping, Any, List, Callable
 from copy import copy
@@ -25,25 +21,24 @@ class Semantics(Generic[T]):
         """Apply the semantics to a value."""
 
         if isinstance(value, Identifier):
-            return context[value.value]
+            try:
+                return context[value.value]
+            except KeyError:
+                pass
 
         if isinstance(value, Literal):
             return self.pipe.unit(value.value)
         
-        raise TypeError(f"{value} is not an evaluatable value object.")
+        raise TypeError(f"{value} is not an evaluatable value object in the given context.")
 
     def _evaluate_statement(self, statement : Statement, context : Mapping[str, T]) -> T:
         """Apply the semantics to a statement."""
 
-        logger.info(f"Evaluating statement {statement} in context {context}...")
-
         callable = self.namespace.lookup(statement)
         arguments = [self._evaluate_value(arg, context) for arg in statement.arguments]
 
-        logger.info(f"Callable and arguments evaluated. Lifting evaluation to {self.pipe.bind}...")
         result = self.pipe.bind(callable, arguments)
 
-        logger.info(f"Evaluation result: {result}.")
         return result
 
     def _evaluate_pipeline(self, pipeline : Pipeline, context : Mapping[str, T]) -> Mapping[str, T]:
@@ -96,8 +91,6 @@ class NDSemantics(Semantics[List[T]]):
         # bind closure
         def bind(callable : Callable[..., List[T]], arguments : List[List[T]]) -> List[T]:
             """Apply a non-deterministic function to a set of non-deterministic arguments."""
-
-            logger.info(f"Initializing non-deterministic application of {callable} on {arguments}...")
 
             # generator loops over all arguments in the cart-prod and uses pipe.bind to stitch context together
             def gen():

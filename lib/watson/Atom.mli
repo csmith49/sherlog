@@ -25,3 +25,8 @@ module JSON : sig
     val encode : t -> JSON.t
     val decode : JSON.t -> t option
 end
+
+module Infix : sig
+    (* alias for apply *)
+    val ($) : Substitution.t -> t -> t
+end

@@ -9,12 +9,9 @@ from itertools import filterfalse, chain
 
 from ...pipe import DynamicNamespace, Semantics, Pipe, Statement, Value, Literal
 from ..observation import Observation
-from ...interface.logs import get
 
 from .core.target import Target
 from . import core
-
-logger = get("spyglass", verbose=True)
 
 # utility for ensuring uniqueness in enumeration
 def unique(iterable, key=None):
@@ -117,7 +114,7 @@ class Clue:
 def to_tensor(value : Any) -> Tensor:
     if isinstance(value, Tensor):
         return value
-    elif isinstance(value, (int, float)):
+    elif isinstance(value, (int, float, tuple, list)):
         return tensor(value)
     elif isinstance(value, bool):
         return tensor(1.0) if value else tensor(0.0)

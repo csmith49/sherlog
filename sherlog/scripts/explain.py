@@ -1,6 +1,6 @@
 import click
 from .cli import cli
-from ..interface import console
+from ..interface import print
 
 from ..program import load
 
@@ -13,6 +13,6 @@ def explain(filename, burn_in):
     program, evidence = load(filename)
 
     for datum in evidence:
-        console.print(f"Explaining {datum}:")
+        print(f"Explaining {datum}:")
         explanation = program.sample_posterior(datum, burn_in=burn_in)
-        console.print(f"Pipeline: {explanation.pipeline}")
+        print(f"Pipeline: {explanation.pipeline}")

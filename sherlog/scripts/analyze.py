@@ -4,20 +4,18 @@ import pandas as pd
 import altair_viewer
 
 from .cli import cli
-from ..interface.logs import get
-
-logger = get("scripts.analyze")
+from ..interface import print
 
 def load(filename : str) -> pd.DataFrame:
     """Load a file emitted by an Instrumenter."""
 
-    logger.info(f"Loading data from {filename}.")
+    print(f"Loading data from {filename}.")
     return pd.read_json(filename, lines=True)
 
 def confidence_interval(data : pd.DataFrame, x : str, y : str) -> alt.Chart:
     """Construct a chart plotting the 95% confidence interval of x vs. y across seeds."""
 
-    logger.info(f"Building CI graph of {x} vs {y}.")
+    print(f"Building CI graph of {x} vs {y}.")
     line = alt.Chart(data).mark_line().encode(x=x, y=f"mean({y})")
     band = alt.Chart(data).mark_errorband(extent="ci").encode(x=x, y=y)
     return line + band
@@ -25,7 +23,7 @@ def confidence_interval(data : pd.DataFrame, x : str, y : str) -> alt.Chart:
 def dump(chart : alt.Chart, filename : str):
     """Save the chart to file."""
 
-    logger.info(f"Writing chart to {filename}.")
+    print(f"Writing chart to {filename}.")
     chart.save(filename)
 
 def show(chart : alt.Chart):

@@ -102,15 +102,23 @@ softmax_embedding : domain = domain; ARROW; f = function_application; {
     let function_id, arguments = f in `SoftmaxEmbedding (domain, function_id, arguments)
 };
 
-// inference forms
-parameter : PARAMETER; s = SYMBOL; COLON; dom = SYMBOL; PERIOD {
+// PARAMETERS
+parameter_domain : dom = SYMBOL; {
     match dom with
-        | "unit" -> Parameter.make s Parameter.Unit
-        | "positive" | "pos" -> Parameter.make s Parameter.Positive
-        | "real" ->  Parameter.make s Parameter.Real
+        | "unit" -> Parameter.Unit
+        | "positive" | "pos" -> Parameter.Positive
+        | "real" -> Parameter.Real
         | _ -> raise DomainError
 };
 
+parameter_dimension : LBRACKET; dimension = INTEGER; RBRACKET; { dimension };
+
+parameter :
+    | PARAMETER; name = SYMBOL; COLON; domain = parameter_domain; PERIOD; { Parameter.make name domain 1 }
+    | PARAMETER; name = SYMBOL; COLON; domain = parameter_domain; dimension = parameter_dimension; PERIOD; { Parameter.make name domain dimension }
+    ;
+
+// EVIDENCE
 evidence : EVIDENCE; atoms = separated_nonempty_list(COMMA, atom); PERIOD; { Evidence.make atoms };
 
 // generating lines

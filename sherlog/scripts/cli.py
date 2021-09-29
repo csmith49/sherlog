@@ -1,16 +1,17 @@
 import click
 
-from ..interface import initialize, logs
+from ..interface import initialize
+from ..interface.instrumentation import instrument as enable_instrumentation
 
 @click.group()
-@click.option("-v", "--verbose", multiple=True, type=str, help="Enable verbose output via logging")
+@click.option("-i", "--instrument", type=str, help="Enable instrumentation via Minotaur")
 @click.option("-p", "--port", type=int, default=8007)
-def cli(verbose, port):
+def cli(instrument, port):
     """Wrapper for common manipulation of Sherlog programs."""
 
     # enable the provided logs
-    if verbose:
-        logs.enable(*verbose)
-    
+    if instrument:
+        enable_instrumentation(instrument)
+
     # initialize the server at the indicated port
     initialize(port)
