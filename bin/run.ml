@@ -28,7 +28,7 @@ let _ = Fmt.pr "%a Search width/depth: %a/%a\n"
 
 (* utility functions *)
 
-let posterior = Sherlog.Posterior.uniform
+let posterior = Sherlog.Posterior.default
 
 (* operation to be done per-file *)
 let operate filename =
@@ -56,12 +56,6 @@ let operate filename =
         marker ()
         (Fmt.styled (`Fg `Blue) Fmt.int) (facts |> CCList.length) in
 
-    (* print the program if echo is on *)
-    (* TODO - Program.pp needs cleanup *)
-    let _ = if !echo
-        then Fmt.pr "%a Converted program: %a\n" marker () Sherlog.Program.pp program
-        else () in
-
     (* processing a proof *)
     let process_explanation index _ =
         let _ = Fmt.pr "%a Examining explanation %a...\n"
@@ -79,7 +73,7 @@ let operate filename =
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
         (* compute proofs and process *)
-        let explanations = Sherlog.Program.explanations ~width:!search_width program posterior fact in
+        let explanations = [Sherlog.Program.explanation ~width:!search_width program fact] in
         let _ = Fmt.pr "%a Found %a explanations.\n"
             marker ()
             (Fmt.styled (`Fg `Blue) Fmt.int) (explanations |> CCList.length) in

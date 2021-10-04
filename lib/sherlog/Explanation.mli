@@ -1,27 +1,33 @@
-module Term : sig
+module GroundTerm : sig
     type t
 
-    val of_watson_term : Watson.Term.t -> t option
+    val of_term : Watson.Term.t -> t option
 
-    val to_json : t -> JSON.t
+    module JSON : sig
+        val encode : t -> JSON.t
+    end
 end
 
 module Observation : sig
-    type 'a t = (string * 'a Pipeline.Value.t) list
+    type t = (string * GroundTerm.t Pipeline.Value.t) list
 
-    val to_json : ('a -> JSON.t) -> 'a t -> JSON.t
+    module JSON : sig
+        val encode : t -> JSON.t
+    end
 end
 
-type 'a t = {
-    pipeline : 'a Pipeline.t;
-    observation : 'a Observation.t;
-    history : Search.History.t;
-}
+type t
 
-val pipeline : 'a t -> 'a Pipeline.t
-val observation : 'a t -> 'a Observation.t
-val history : 'a t -> Search.History.t
+module Functional : sig
+    val pipeline : t -> GroundTerm.t Pipeline.t
+    val observations : t -> Observation.t list
+    val history : t -> Search.History.t
 
-val to_json : ('a -> JSON.t) -> 'a t -> JSON.t
+    val make : GroundTerm.t Pipeline.t -> Observation.t list -> Search.History.t -> t
+end
 
-val of_proof : Watson.Proof.t -> Search.History.t -> Term.t t
+module JSON : sig
+    val encode : t -> JSON.t
+end
+
+val of_proof : Proof.t -> Search.History.t -> t

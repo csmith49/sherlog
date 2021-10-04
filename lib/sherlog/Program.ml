@@ -3,19 +3,21 @@
 type t = {
     rules : Watson.Rule.t list;
     parameters : Parameter.t list;
+    posterior : Posterior.t;
 }
 
 (* FUNCTIONAL *)
 
 module Functional = struct
-    let make rules params = {
+    let make rules params posterior = {
         rules=rules;
         parameters=params;
+        posterior=posterior;
     }
 
     let rules prog = prog.rules
     let parameters prog = prog.parameters
-
+    let posterior prog = prog.posterior
 
     let is_introduction_rule rule = rule
         |> Watson.Rule.head
@@ -38,12 +40,14 @@ module JSON = struct
         ("type", `String "program");
         ("rules", prog |> Functional.rules |> CCList.map Watson.Rule.JSON.encode |> JSON.Make.list);
         ("parameters", prog |> Functional.parameters |> CCList.map Parameter.JSON.encode |> JSON.Make.list);
+        ("posterior", prog |> Functional.posterior |> Posterior.JSON.encode);
     ]
 
     let decode json = let open CCOpt in
         let* rules = JSON.Parse.(find (list Watson.Rule.JSON.decode) "rules" json) in
         let* params = JSON.Parse.(find (list Parameter.JSON.decode) "parameters" json) in
-            return (Functional.make rules params)
+        let* posterior = JSON.Parse.(find Posterior.JSON.decode "posterior" json) in
+            return (Functional.make rules params posterior)
 end
 
 (* APPLICATION *)
@@ -66,11 +70,16 @@ end
 
 (* SEARCH *)
 
-let domain : t -> Posterior.t -> (module Search.Domain with type t = Proof.Node.t) = fun program -> fun posterior -> (module struct
+let domain : t -> (module Search.Domain with type t = Proof.Node.t) = fun program -> (module struct
     type t = Proof.Node.t
 
-    let features = fun proof -> Posterior.featurize proof posterior
-    let score = fun fs -> Posterior.score fs posterior
+    let features = fun proof -> Posterior.featurize proof program.posterior
+    let score = fun fs -> Posterior.score fs program.posterior
     let expand = fun node -> node |> Proof.Node.tag |> Proof.Tag.interior
     let expansions = fun node -> Application.apply node program
 end)
+
+let explanation ?width:(width=CCInt.max_int) program conjunct =
+    let initial = Proof.of_conjunct conjunct in
+    let final, history = Search.beam (domain program) width initial in
+    Explanation.of_proof final history

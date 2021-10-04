@@ -2,13 +2,13 @@ type t
 
 module Functional : sig
     val rules : t -> Watson.Rule.t list
+    val parameters : t -> Parameter.t list
+    val posterior : t -> Posterior.t
 
     val introduction_rules : t -> Watson.Rule.t list
     val classical_rules : t -> Watson.Rule.t list
 
-    val parameters : t -> Parameter.t list
-
-    val make : Watson.Rule.t list -> Parameter.t list -> t
+    val make : Watson.Rule.t list -> Parameter.t list -> Posterior.t -> t
 end
 
 module JSON : sig
@@ -16,4 +16,6 @@ module JSON : sig
     val decode : JSON.t -> t option
 end
 
-val domain : t -> Posterior.t -> (module Search.Domain with type t = Proof.Node.t)
+val domain : t -> (module Search.Domain with type t = Proof.Node.t)
+
+val explanation : ?width:int -> t -> Watson.Atom.t list -> Explanation.t

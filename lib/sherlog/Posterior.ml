@@ -57,6 +57,11 @@ let featurize proof posterior = posterior.features
 
 let score featurization posterior = posterior.ensemble |> Ensemble.apply featurization
 
+let default = {
+    features = [Feature.Size];
+    ensemble = Linear [1.0];
+}
+
 module JSON = struct
     let encode posterior = `Assoc [
         ("type", `String "posterior");

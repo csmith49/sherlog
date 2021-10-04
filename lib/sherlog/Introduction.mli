@@ -47,3 +47,7 @@ val of_atom : Watson.Atom.t -> t option
 
 val observed : t -> bool
 (* [observed intro] is true if the target of [intro] is not a variable *)
+
+val sample_site : t -> string
+
+val equal : t -> t -> bool
