@@ -8,17 +8,17 @@ from .observation import Observation
 from .history import History
 
 from torch import Tensor, stack
-from typing import TypeVar, Mapping, Optional, Callable
+from typing import TypeVar, Mapping, Optional, Callable, List
 
 T = TypeVar('T')
 
 class Explanation:
     """Explanations model observations over a generative process."""
 
-    def __init__(self, pipeline : Pipeline, observation : Observation, history : History, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None):
+    def __init__(self, pipeline : Pipeline, observations : List[Observation], history : History, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None):
         """Construct an explanation."""
 
-        self.pipeline, self.observation, self.history = pipeline, observation, history
+        self.pipeline, self.observations, self.history = pipeline, observations, history
         self.locals = locals if locals else {}
 
     @minotaur("evaluate")
@@ -27,8 +27,9 @@ class Explanation:
 
         store = semantics(self.pipeline, parameters)
         
-        for statement in self.observation.stub(default=default):
-            store[statement.target] = semantics.evaluate(statement, store)
+        for index, observation in enumerate(self.observations):
+            for statement in observation.stub(default=default, key=index):
+                store[statement.target] = semantics.evaluate(statement, store)
     
         return store
 
@@ -37,12 +38,17 @@ class Explanation:
         """Compute the log-probability of the explanation generating the observations."""
 
         sem = spyglass.semantics_factory(
-            observation=self.observation,
             target=EqualityIndicator(),
             locals=self.locals
         )
         store = self.evaluate(parameters, sem)
-        result = stack([clue.surrogate for clue in store["sherlog:target"]]).mean().log()
+
+        results = []
+        for index, _ in enumerate(self.observations):
+            result = stack([clue.surrogate for clue in store[f"sherlog:target:{index}"]]).mean().log()
+            results.append(result)
+
+        result = stack(results).max()
 
         minotaur["result"] = result.item()
 

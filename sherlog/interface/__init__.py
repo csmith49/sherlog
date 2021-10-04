@@ -41,18 +41,13 @@ def parse_source(source : str):
     else:
         return response["program"], response["evidence"]
 
-def query(rules, evidence, posterior, width = None):
+def query(program, evidence, width = None):
     """Query a Sherlog program to explain the provided evidence."""
 
     message = {
         "type" : "query-request",
-        "program" : {
-            "type" : "program",
-            "rules" : rules,
-            "parameters" : []
-        },
-        "evidence" : evidence,
-        "posterior" : posterior
+        "program" : program.dump(),
+        "evidence" : evidence.dump()
     }
 
     # add additional config stuff

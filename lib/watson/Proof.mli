@@ -29,6 +29,8 @@ module Witness : sig
 
     val resolved_atom : t -> Atom.t
     (* [resolved_atom witness] is the fact derived during the resolution captured by [witness]. *)
+
+    val to_string : t -> string
 end
 
 val resolve : Obligation.t -> Rule.t -> (Witness.t * Obligation.t) option

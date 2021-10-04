@@ -2,11 +2,8 @@ module Feature = struct
     type t =
         | Size
 
-    let apply proof feature = match feature with
-        | Size ->
-            let algebra = fun _ -> CCList.fold_left CCInt.( + ) 1 in
-            let count = Data.Tree.eval algebra proof in
-                CCFloat.of_int count
+    let apply _ feature = match feature with
+        | Size -> 0.0
 
     module JSON = struct
         let encode = function
@@ -27,9 +24,9 @@ module Ensemble = struct
     type t =
         | Linear of float list
 
-    let apply featurization ensemble = match ensemble with
-        | Linear weights -> CCList.map2 CCFloat.( * ) featurization weights
-            |> CCList.fold_left CCFloat.( + ) 0.0
+    let apply embedding ensemble = match ensemble with
+        | Linear weights -> CCList.map2 ( *. ) embedding weights
+            |> CCList.fold_left ( +. ) 0.0
 
     module JSON = struct
         let encode = function
@@ -52,7 +49,7 @@ type t = {
     ensemble : Ensemble.t;
 }
 
-let featurize proof posterior = posterior.features
+let embed proof posterior = posterior.features
     |> CCList.map (Feature.apply proof)
 
 let score featurization posterior = posterior.ensemble |> Ensemble.apply featurization

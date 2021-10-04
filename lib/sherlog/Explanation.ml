@@ -29,10 +29,28 @@ module GroundTerm = struct
                 ("arguments", `List (args |> CCList.map encode));
             ]
     end
+
+    let lift : Watson.Term.t -> t Pipeline.Value.t option = function
+        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipeline.Value.Identifier id)
+        | (_ as term) -> term
+            |> of_term
+            |> CCOpt.map (fun term -> Pipeline.Value.Literal term)
 end
 
 module Observation = struct
     type t = (string * GroundTerm.t Pipeline.Value.t) list
+
+    let of_branch branch =
+        let assoc_of_intro intro =
+            if Introduction.observed intro then
+                let domain = intro |> Introduction.sample_site in
+                let codomain = intro
+                    |> Introduction.Functional.target
+                    |> GroundTerm.lift
+                    |> CCOpt.get_exn_or "Invalid branch construction." in
+                Some (domain, codomain)
+            else None in
+        CCList.filter_map assoc_of_intro branch
 
     module JSON = struct
         let encode obs = `Assoc [
@@ -47,7 +65,7 @@ end
 type t = {
     pipeline : GroundTerm.t Pipeline.t;
     observations : Observation.t list;
-    history : Search.History.t;
+    history : Proof.Search.History.t;
 }
 
 module Functional = struct
@@ -67,66 +85,14 @@ module JSON = struct
         ("type", `String "explanation");
         ("pipeline", ex |> Functional.pipeline |> Pipeline.to_json GroundTerm.JSON.encode);
         ("observations", ex |> Functional.observations |> CCList.map Observation.JSON.encode |> JSON.Make.list);
-        ("history", ex |> Functional.history |> Search.History.JSON.encode);
+        ("history", ex |> Functional.history |> Proof.Search.History.JSON.encode);
     ]
-end
-
-module Compile = struct
-    
-    let lift : Watson.Term.t -> GroundTerm.t Pipeline.Value.t option = function
-        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipeline.Value.Identifier id)
-        | (_ as term) -> term
-            |> GroundTerm.of_term
-            |> CCOpt.map (fun term -> Pipeline.Value.Literal term)
-    
-    module Branch = struct
-        type t = Proof.Tag.t Data.Tree.path
-
-        let is_successful branch = match CCList.last_opt branch with
-            | Some Proof.Tag.Success -> true
-            | _ -> false
-
-        let introductions branch = branch
-            |> CCList.filter_map Proof.Tag.witness
-            |> CCList.map Watson.Proof.Witness.resolved_atom
-            |> CCList.filter_map Introduction.of_atom
-
-        let observation : t -> Observation.t = fun branch ->
-            let assoc intro =
-                if Introduction.observed intro then
-                    let value = Introduction.Functional.target intro
-                        |> lift
-                        |> CCOpt.get_exn_or "Target not a ground term" in
-                    let site = Introduction.sample_site intro in
-                    Some (site, value)
-                else None in
-            branch
-                |> introductions
-                |> CCList.filter_map assoc
-    end
-
-    module Tree = struct
-        type t = Proof.Tag.t Data.Tree.tree
-
-        let of_proof (proof : Proof.t) : t =
-            let algebra node children = Data.Tree.Node (Proof.Node.tag node, children) in
-            Data.Tree.eval algebra proof
-
-        let branches = Data.Tree.paths
-
-        let introductions tree = tree
-            |> branches
-            |> CCList.filter Branch.is_successful
-            |> CCList.flat_map Branch.introductions
-            |> CCList.uniq ~eq:Introduction.equal
-    end
 end
 
 let of_proof proof history =
     (* get all introductions in the proof *)
     let introductions = proof
-        |> Compile.Tree.of_proof
-        |> Compile.Tree.introductions in
+        |> Proof.introductions in
     (* build the renaming *)
     let substitution = introductions
         |> CCList.filter_map (fun intro -> match Introduction.Functional.target intro with
@@ -140,7 +106,7 @@ let of_proof proof history =
             function_id = Introduction.Functional.function_id intro;
             arguments = Introduction.Functional.arguments intro
                 |> CCList.map (Watson.Substitution.apply sub)
-                |> CCList.map Compile.lift
+                |> CCList.map GroundTerm.lift
                 |> CCList.all_some
                 |> CCOpt.get_exn_or "Invalid Watson terms in introduction.";
         } in
@@ -148,10 +114,8 @@ let of_proof proof history =
         |> CCList.map (statement substitution) in
     (* and observations *)
     let observations = proof
-        |> Compile.Tree.of_proof
-        |> Compile.Tree.branches
-        |> CCList.filter Compile.Branch.is_successful
-        |> CCList.map Compile.Branch.observation in
+        |> Proof.branches
+        |> CCList.map Observation.of_branch in
     (* put it all together *)
     {
         pipeline=pipeline;

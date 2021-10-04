@@ -1,6 +1,6 @@
 from .evidence import Evidence
 from .parameter import Parameter
-from .posterior import UniformPosterior
+from .posterior import Posterior
 
 from ..explanation import Explanation
 from ..interface import query
@@ -18,20 +18,30 @@ logger = logging.getLogger("sherlog.program")
 class Program:
     """Programs coordinate the generation of explanations."""
 
-    def __init__(self, source, parameters, locals : Mapping[str, Callable[..., Tensor]]):
-        self._source = source
+    def __init__(self, rules, parameters, posterior, locals : Mapping[str, Callable[..., Tensor]]):
+        self._rules = rules
         self._parameters = list(parameters)
         self._locals = locals
 
-        self.posterior = UniformPosterior()
+        self.posterior = posterior
 
     @classmethod
     def of_json(cls, json, locals : Optional[Mapping[str, Any]] = None) -> 'Program':
         """Build a program from a JSON-like object."""
 
-        parameters = [Parameter.of_json(parameter) for parameter in json["parameters"]]
         rules = json["rules"]
-        return cls(rules, parameters, locals=locals if locals else {})
+        parameters = [Parameter.of_json(parameter) for parameter in json["parameters"]]
+        posterior = Posterior.of_json(json["posterior"])
+
+        return cls(rules, parameters, posterior, locals=locals if locals else {})
+
+    def dump(self):
+        return {
+            "type" : "program",
+            "rules" : self._rules,
+            "parameters" : [], #TODO: fix this
+            "posterior" : self.posterior.dump()
+        }
 
     # EXPLANATION EVALUATION
     def store(self, **kwargs : Tensor) -> Mapping[str, Tensor]:
@@ -42,9 +52,9 @@ class Program:
 
         # build generator
         def gen():
-            for attempt in range(attempts):
+            for _ in range(attempts):
                     try:
-                        for json in query(self._source, evidence.to_json(), self.posterior.to_json(), width=width):
+                        for json in query(self, evidence, width=width):
                             yield Explanation.of_json(json, locals=self._locals)
                     except TimeoutError:
                         pass

@@ -50,6 +50,10 @@ module Witness = struct
 
     let resolved_atom witness =
         Atom.apply witness.substitution witness.atom
+
+    let to_string witness = witness
+        |> resolved_atom
+        |> Atom.to_string
 end
 
 let resolve obligation rule = let open CCOpt in

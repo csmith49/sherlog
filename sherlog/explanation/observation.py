@@ -29,16 +29,16 @@ class Observation:
 
         yield from self.mapping.values()
 
-    def stub(self, default=None) -> List[Statement]:
+    def stub(self, default=None, key=None) -> List[Statement]:
         if self.is_empty:
             return [
-                Statement("sherlog:target", "identity", [Literal(default)])
+                Statement(f"sherlog:target:{key}", "identity", [Literal(default)])
             ]
         else:
             return [
-                Statement("sherlog:keys", "tensorize", list(self.domain)),
-                Statement("sherlog:vals", "tensorize", list(self.codomain)),
-                Statement("sherlog:target", "target", [Identifier("sherlog:keys"), Identifier("sherlog:vals")])
+                Statement(f"sherlog:keys:{key}", "tensorize", list(self.domain)),
+                Statement(f"sherlog:vals:{key}", "tensorize", list(self.codomain)),
+                Statement(f"sherlog:target:{key}", "target", [Identifier("sherlog:keys"), Identifier("sherlog:vals")])
             ]
 
     # magic methods

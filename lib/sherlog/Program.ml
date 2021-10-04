@@ -75,11 +75,16 @@ let domain : t -> (module Search.Domain with type t = Proof.Node.t) = fun progra
 
     let features = fun proof -> Posterior.featurize proof program.posterior
     let score = fun fs -> Posterior.score fs program.posterior
-    let expand = fun node -> node |> Proof.Node.tag |> Proof.Tag.interior
+    let expand = fun node -> 
+        let _ = node
+            |> Proof.Node.tag
+            |> Proof.Tag.to_string
+            |> print_endline in
+        node |> Proof.Node.tag |> Proof.Tag.interior
     let expansions = fun node -> Application.apply node program
 end)
 
 let explanation ?width:(width=CCInt.max_int) program conjunct =
     let initial = Proof.of_conjunct conjunct in
-    let final, history = Search.beam (domain program) width initial in
-    Explanation.of_proof final history
+    let final = Search.beam (domain program) width initial in
+    Explanation.of_proof final []
