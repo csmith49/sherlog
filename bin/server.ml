@@ -35,7 +35,7 @@ let handler json = let open CCOpt in match JSON.Parse.(find string "type" json) 
             ("program", lines |> Sherlog.IO.program_of_lines |> Sherlog.Program.to_json);
             ("evidence", lines
                 |> Sherlog.IO.evidence_of_lines
-                |> CCList.map Sherlog.Evidence.to_json
+                |> CCList.map Sherlog.Evidence.JSON.encode
                 |> JSON.Make.list
             );
         ] in
@@ -45,7 +45,7 @@ let handler json = let open CCOpt in match JSON.Parse.(find string "type" json) 
         (* core programmatic info *)
         let* program = JSON.Parse.(find Sherlog.Program.of_json "program" json) in
         let* posterior = JSON.Parse.(find Sherlog.Posterior.of_json "posterior" json) in
-        let* query = JSON.Parse.(find Sherlog.Evidence.of_json "evidence" json) in
+        let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "evidence" json) in
         (* parameters for the search *)
         let search_width = JSON.Parse.(find int "search-width" json)
             |> CCOpt.get_or ~default:CCInt.max_int in

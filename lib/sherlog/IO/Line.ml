@@ -9,10 +9,6 @@ type line = t
 module Compile = struct
     open Watson
 
-    let introduction_context relation terms arguments =
-        let relation_symbol = Term.Symbol relation in
-        relation_symbol :: (terms @ arguments)
-
     let introduction_rule
         ~relation:relation
         ~terms:terms
@@ -20,9 +16,10 @@ module Compile = struct
         ~arguments:arguments
         ~body:body =
             let target = Term.Variable "_I" in
-            let context = introduction_context relation terms arguments in
             (* intro <- body *)
-            let intro = Introduction.make target function_id arguments context
+            let context = Introduction.Context.fresh () in
+            let intro = Introduction.Functional.make
+                relation context terms function_id arguments target
                 |> Introduction.to_atom in
             let intro_rule = Rule.make intro body in
             (* head <- body, intro *)

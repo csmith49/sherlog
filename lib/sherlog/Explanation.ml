@@ -92,7 +92,7 @@ module Compile = struct
                 (* note the difference in treatment between variables and symbols *)
                 (* that's due to a semantic shift between Watson variables and Pipeline identifiers *)
                 (* TODO: convert to Introduction.is_constrained *)
-                let seen = match Introduction.target intro with
+                let seen = match Introduction.Functional.target intro with
                     | Watson.Term.Variable _ -> None
                     | (_ as term) -> lift term in
                 (* take `seen` to `(target, seen)` *)
@@ -106,11 +106,11 @@ module Compile = struct
         |> CCList.map (CCPair.make ())
 
     let associate_names (intros : unit t) : string t = intros
-        |> CCList.map (function (_, intro) -> (Introduction.targetless_identifier intro, intro))
+        |> CCList.map (function (_, intro) -> (Introduction.Functional.context intro |> Introduction.Context.to_string, intro))
 
     let target_renaming (intros : string t) : Watson.Substitution.t =
         (* maps the target to the pre-computed name of the intro *)
-        let f (name, intro) = match Introduction.target intro with
+        let f (name, intro) = match Introduction.Functional.target intro with
             | Watson.Term.Variable x ->
                 let target = Watson.Term.Variable name in
                 (Some (x, target), intro)
@@ -128,8 +128,8 @@ module Compile = struct
         let f (name, intro) = 
             let pipeline = {
                 Pipeline.Statement.target = name;
-                function_id = Introduction.function_id intro;
-                arguments = Introduction.arguments intro
+                function_id = Introduction.Functional.function_id intro;
+                arguments = Introduction.Functional.arguments intro
                     |> CCList.map (Watson.Substitution.apply substitution)
                     |> CCList.map lift
                     |> CCList.all_some

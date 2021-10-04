@@ -1,8 +1,9 @@
 type t
 
-val make : Watson.Atom.t list -> t
-
+val of_atoms : Watson.Atom.t list -> t
 val to_atoms : t -> Watson.Atom.t list
 
-val to_json : t -> JSON.t
-val of_json : JSON.t -> t option
+module JSON : sig
+    val encode : t -> JSON.t
+    val decode : JSON.t -> t option
+end

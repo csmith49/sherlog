@@ -119,7 +119,7 @@ parameter :
     ;
 
 // EVIDENCE
-evidence : EVIDENCE; atoms = separated_nonempty_list(COMMA, atom); PERIOD; { Evidence.make atoms };
+evidence : EVIDENCE; atoms = separated_nonempty_list(COMMA, atom); PERIOD; { Evidence.of_atoms atoms };
 
 // generating lines
 line :

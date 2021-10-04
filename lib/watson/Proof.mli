@@ -1,67 +1,48 @@
-module State : sig
+module Obligation : sig
     type t
-    (** an intermediate proof state storing 1. the atoms to be proven and 2. the ground facts already derived *)
+    (* Obligations maintain atoms to-be-resolved *)
 
-    val goal : t -> Atom.t list
-    val cache : t -> Atom.t list
-    
-    val of_atoms : Atom.t list -> Atom.t list -> t
-    val discharge: t -> (Atom.t * t) option
-
-    val apply : Substitution.t -> t -> t
-    val extend : Atom.t list -> Atom.t list -> t -> t
-    val variables : t -> string list
+    val discharge : t -> (Atom.t * t) option
 
     val is_empty : t -> bool
 
-    val reset_goal : t -> Atom.t list -> t
+    val extend : Atom.t list -> t -> t
 
-    val pp : t Fmt.t
-    val to_string : t -> string
+    val apply : Substitution.t -> t -> t
+    val variables : t -> string list
+
+    val of_conjunct : Atom.t list -> t
 end
 
 module Witness : sig
     type t
+    (* Witness to obligation updates *)
 
     val atom : t -> Atom.t
-    (** [atom w] returns the atom resolved in [w] *)
+    (* [atom witness] is the conjunct whose resolution is captured by [witness]. *)
     
     val rule : t -> Rule.t
-    (** [rule w] returns the rule used to resolve [atom w] *)
+    (* [rule witness] *)
 
     val substitution : t -> Substitution.t
-    (** [substitution w] returns the substitution used to resolve [atom w] with [rule w] *)
-   
-    val pp : t Fmt.t
-    (** pretty printer for witnesses *)
+    (* [rule substitution] *)
 
-    val to_string : t -> string
-    (** string conversion for witnesses (derived from [pp]) *)
+    val resolved_atom : t -> Atom.t
+    (* [resolved_atom witness] is the fact derived during the resolution captured by [witness]. *)
 end
 
-type t
+val resolve : Obligation.t -> Rule.t -> (Witness.t * Obligation.t) option
+(* attempt to resolve an atom from the obligation using the provided rule *)
 
-val witnesses : t -> Witness.t list
-(** [witnesses proof] returns a list of all witnesses of resolutions in [proof] *)
+(* Infix Notation *)
 
-val state : t -> State.t
-(** [state proof] returns the proof state containing the unproven obligations *)
-
-val of_atoms : Atom.t list -> Atom.t list -> t
-(** [of_atoms goal cache] builds a proof obligation for [goal] having seen [cache] before *)
-
-val of_state : State.t -> t
-
-val to_atoms : t -> Atom.t list
-(** [to_atoms proof] returns a list of all resolved atoms from [proof] *)
-
-val resolve : t -> Rule.t -> t option
-(** [resolve proof rule] attempts to resolve an atom from the goal of the most recent resolution *)
-
-val is_resolved : t -> bool
-(** [is_resolved proof] returns [true] if all obligations have been satisfied *)
-
-val pp : t Fmt.t
-(** pretty printer for proofs *)
-
-val weak_compare : t -> t -> int
+module Infix : sig
+    val (>>) : Atom.t list -> Obligation.t -> Obligation.t
+    (* Alias for [Obligation.extend] *)
+    
+    val ($) : Substitution.t -> Obligation.t -> Obligation.t
+    (* Alias for [Obligation.apply] *)
+    
+    val (|=)  : Obligation.t -> Rule.t -> (Witness.t * Obligation.t) option
+    (* Alias for [resolve] *)
+end
