@@ -70,3 +70,13 @@ module Zipper : sig
     val of_proof : proof -> t
     val to_proof : t -> proof
 end
+
+module type Algebra = sig
+    type result
+
+    val leaf : leaf -> result
+    val edge : Watson.Proof.Witness.t -> result -> result
+    val interior : result list -> result
+end
+
+val eval : (module Algebra with type result = 'a) -> proof -> 'a

@@ -49,7 +49,7 @@ module Search = struct
         type t = float list
 
         module JSON = struct
-            let encode f = f |> CCList.map JSON.Make.float |> JSON.Make.list
+            let encode f = f |> JSON.Encode.(list float)
             let decode = JSON.Parse.(list float)
         end
     end
@@ -64,12 +64,12 @@ module Search = struct
             let encode choice = `Assoc [
                 ("type", `String "choice");
                 ("embedding", choice.embedding |> Embedding.JSON.encode);
-                ("context", choice.context |> CCList.map Embedding.JSON.encode |> JSON.Make.list);
+                ("context", choice.context |> JSON.Encode.list Embedding.JSON.encode);
             ]
 
             let decode json = let open CCOpt in
-                let* embedding = JSON.Parse.(find Embedding.JSON.decode "embedding" json) in
-                let* context = JSON.Parse.(find (list Embedding.JSON.decode) "context" json) in
+                let* embedding = JSON.Parse.(find "embedding" Embedding.JSON.decode json) in
+                let* context = JSON.Parse.(find "context" (list Embedding.JSON.decode) json) in
                 return {
                     embedding = embedding;
                     context = context;
@@ -112,11 +112,11 @@ module Search = struct
         module JSON = struct
             let encode history = `Assoc [
                 ("type", `String "history");
-                ("choices", history |> CCList.map Choice.JSON.encode |> JSON.Make.list);
+                ("choices", history |> JSON.Encode.list Choice.JSON.encode);
             ]
 
             let decode json = let open CCOpt in
-                let* choices = JSON.Parse.(find (list Choice.JSON.decode) "choices" json) in
+                let* choices = JSON.Parse.(find "choices" (list Choice.JSON.decode) json) in
                 return choices
         end
     end
@@ -199,3 +199,19 @@ module Zipper = struct
         | Some zipper -> to_proof zipper
         | None -> focus zipper
 end
+
+module type Algebra = sig
+    type result
+
+    val leaf : leaf -> result
+    val edge : Witness.t -> result -> result
+    val interior : result list -> result
+end
+
+let rec eval : type a . (module Algebra with type result = a) -> proof -> a = fun (module A) -> function
+    | Leaf leaf -> A.leaf leaf
+    | Interior edges ->
+        let f = function Edge (witness, proof) -> A.edge witness (eval (module A) proof) in
+        edges
+            |> CCList.map f
+            |> A.interior

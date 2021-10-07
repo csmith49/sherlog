@@ -57,14 +57,14 @@ end
 
 module JSON = struct
     let encode atom = `Assoc [
-        ("type", `String "atom");
-        ("relation", `String (relation atom));
-        ("terms", `List (atom |> terms |> CCList.map Term.JSON.encode));
+        ("type", JSON.Encode.string "atom");
+        ("relation", atom |> relation |> JSON.Encode.string);
+        ("terms", atom |> terms |> JSON.Encode.list Term.JSON.encode);
     ]
 
     let decode json = let open CCOpt in
-        let* relation = JSON.Parse.(find string "relation" json) in
-        let* terms = JSON.Parse.(find (list Term.JSON.decode) "terms" json) in
+        let* relation = JSON.Parse.(find "relation" string json) in
+        let* terms = JSON.Parse.(find "terms" (list Term.JSON.decode) json) in
             return (make relation terms)
 end
 

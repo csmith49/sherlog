@@ -55,9 +55,7 @@ module Observation = struct
     module JSON = struct
         let encode obs = `Assoc [
             ("type", `String "observation");
-            ("items", obs
-                |> CCList.map (CCPair.map_snd (Pipeline.Value.to_json GroundTerm.JSON.encode))
-                |> JSON.Make.assoc);
+            ("items", obs |> JSON.Encode.assoc (Pipeline.Value.to_json GroundTerm.JSON.encode));
         ]
     end
 end
@@ -84,7 +82,7 @@ module JSON = struct
     let encode ex = `Assoc [
         ("type", `String "explanation");
         ("pipeline", ex |> Functional.pipeline |> Pipeline.to_json GroundTerm.JSON.encode);
-        ("observations", ex |> Functional.observations |> CCList.map Observation.JSON.encode |> JSON.Make.list);
+        ("observations", ex |> Functional.observations |> JSON.Encode.list Observation.JSON.encode);
         ("history", ex |> Functional.history |> Proof.Search.History.JSON.encode);
     ]
 end

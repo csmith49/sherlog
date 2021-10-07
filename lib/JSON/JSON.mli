@@ -1,28 +1,32 @@
-(* utility functions for parsing and constructing Yojson structures *)
+(** Utility module for producing and consuming Yojson objects. *)
 
-(* alias for shorter signatures *)
 type t = Yojson.Basic.t
-type 'a parser = Yojson.Basic.t -> 'a option
 
-(* common operations for decomposing JSON objects *)
+type 'a parser = t -> 'a option
+type 'a encoder = 'a -> t
+
+(** Functions for constructing JSON parsers. *)
 module Parse : sig
-    val list : 'a parser -> 'a list parser
-    val assoc : 'a parser -> (string * 'a) list parser
-    val find : 'a parser -> string -> 'a parser
-    val identity : t parser
     val string : string parser
     val int : int parser
     val float : float parser
     val bool : bool parser
+    val null : unit parser
+
+    val list : 'a parser -> 'a list parser
+    val assoc : 'a parser -> (string * 'a) list parser
+
+    val find : string -> 'a parser -> 'a parser
 end
 
-(* wrappers for constructing JSON objects *)
-module Make : sig
-    val string : string -> t
-    val int : int -> t
-    val float : float -> t
-    val bool : bool -> t
-    val list : t list -> t
-    val assoc : (string * t) list -> t
-    val null : t
+(** Functions for constructing JSON encoders. *)
+module Encode : sig
+    val string : string encoder
+    val int : int encoder
+    val float : float encoder
+    val bool : bool encoder
+    val null : unit encoder
+
+    val list : 'a encoder -> 'a list encoder
+    val assoc : 'a encoder -> (string * 'a) list encoder
 end

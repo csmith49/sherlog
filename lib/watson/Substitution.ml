@@ -106,8 +106,7 @@ end
 module JSON = struct
     let encode sub = sub
         |> to_assoc
-        |> CCList.map (CCPair.map_snd Term.JSON.encode)
-        |> JSON.Make.assoc
+        |> JSON.Encode.assoc Term.JSON.encode
 
     let decode json = json
         |> JSON.Parse.(assoc Term.JSON.decode)

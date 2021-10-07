@@ -13,7 +13,7 @@ module Feature = struct
                 ]
 
         let decode json = let open CCOpt in
-            let* kind = JSON.Parse.(find string "kind" json) in
+            let* kind = JSON.Parse.(find "kind" string json) in
             match kind with
                 | "size" -> Some Size
                 | _ -> None
@@ -33,13 +33,13 @@ module Ensemble = struct
             | Linear w -> `Assoc [
                     ("type", `String "ensemble");
                     ("kind", `String "linear");
-                    ("weights", w |> CCList.map JSON.Make.float |> JSON.Make.list);
+                    ("weights", w |> JSON.Encode.list JSON.Encode.float);
             ]
 
         let decode json = let open CCOpt in
-            let* kind = JSON.Parse.(find string "kind" json) in
+            let* kind = JSON.Parse.(find "kind" string json) in
             match kind with
-                | "linear" -> let* weights = JSON.Parse.(find (list float) "weights" json) in return (Linear weights)
+                | "linear" -> let* weights = JSON.Parse.(find "weights" (list float) json) in return (Linear weights)
                 | _ -> None
     end
 end
@@ -62,13 +62,13 @@ let default = {
 module JSON = struct
     let encode posterior = `Assoc [
         ("type", `String "posterior");
-        ("features", posterior.features |> CCList.map Feature.JSON.encode |> JSON.Make.list);
+        ("features", posterior.features |> JSON.Encode.list Feature.JSON.encode);
         ("ensemble", posterior.ensemble |> Ensemble.JSON.encode);
     ]
 
     let decode json = let open CCOpt in
-        let* features = JSON.Parse.(find (list Feature.JSON.decode) "features" json) in
-        let* ensemble = JSON.Parse.(find Ensemble.JSON.decode "ensemble" json) in
+        let* features = JSON.Parse.(find "features" (list Feature.JSON.decode) json) in
+        let* ensemble = JSON.Parse.(find "ensemble" Ensemble.JSON.decode json) in
             return {
                 features=features;
                 ensemble=ensemble;

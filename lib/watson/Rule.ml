@@ -52,7 +52,7 @@ module JSON = struct
     ]
 
     let decode json = let open CCOpt in
-        let* head = JSON.Parse.(find Atom.JSON.decode "head" json) in
-        let* body = JSON.Parse.(find (list Atom.JSON.decode) "body" json) in
+        let* head = JSON.Parse.(find "head" Atom.JSON.decode json) in
+        let* body = JSON.Parse.(find "body" (list Atom.JSON.decode) json) in
         return (make head body)
 end

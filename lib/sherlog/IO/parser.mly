@@ -105,17 +105,17 @@ softmax_embedding : domain = domain; ARROW; f = function_application; {
 // PARAMETERS
 parameter_domain : dom = SYMBOL; {
     match dom with
-        | "unit" -> Parameter.Unit
-        | "positive" | "pos" -> Parameter.Positive
-        | "real" -> Parameter.Real
+        | "unit" -> Parameter.Domain.Unit
+        | "positive" | "pos" -> Parameter.Domain.Positive
+        | "real" -> Parameter.Domain.Real
         | _ -> raise DomainError
 };
 
 parameter_dimension : LBRACKET; dimension = INTEGER; RBRACKET; { dimension };
 
 parameter :
-    | PARAMETER; name = SYMBOL; COLON; domain = parameter_domain; PERIOD; { Parameter.make name domain 1 }
-    | PARAMETER; name = SYMBOL; COLON; domain = parameter_domain; dimension = parameter_dimension; PERIOD; { Parameter.make name domain dimension }
+    | PARAMETER; name = SYMBOL; COLON; domain = parameter_domain; PERIOD; { Parameter.Functional.make name domain 1 }
+    | PARAMETER; name = SYMBOL; COLON; domain = parameter_domain; dimension = parameter_dimension; PERIOD; { Parameter.Functional.make name domain dimension }
     ;
 
 // EVIDENCE
