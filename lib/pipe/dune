@@ -1,4 +1,4 @@
 (library
-  (name pipeline)
+  (name pipe)
   (libraries containers JSON)
 )

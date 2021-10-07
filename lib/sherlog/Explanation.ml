@@ -30,15 +30,15 @@ module GroundTerm = struct
             ]
     end
 
-    let lift : Watson.Term.t -> t Pipeline.Value.t option = function
-        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipeline.Value.Identifier id)
+    let lift : Watson.Term.t -> t Pipe.Value.t option = function
+        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipe.Value.Identifier id)
         | (_ as term) -> term
             |> of_term
-            |> CCOpt.map (fun term -> Pipeline.Value.Literal term)
+            |> CCOpt.map (fun term -> Pipe.Value.Literal term)
 end
 
 module Observation = struct
-    type t = (string * GroundTerm.t Pipeline.Value.t) list
+    type t = (string * GroundTerm.t Pipe.Value.t) list
 
     let of_branch branch =
         let assoc_of_intro intro =
@@ -55,13 +55,13 @@ module Observation = struct
     module JSON = struct
         let encode obs = `Assoc [
             ("type", `String "observation");
-            ("items", obs |> JSON.Encode.assoc (Pipeline.Value.to_json GroundTerm.JSON.encode));
+            ("items", obs |> JSON.Encode.assoc (Pipe.Value.JSON.encode GroundTerm.JSON.encode));
         ]
     end
 end
 
 type t = {
-    pipeline : GroundTerm.t Pipeline.t;
+    pipeline : GroundTerm.t Pipe.Pipeline.t;
     observations : Observation.t list;
     history : Proof.Search.History.t;
 }
@@ -81,7 +81,7 @@ end
 module JSON = struct
     let encode ex = `Assoc [
         ("type", `String "explanation");
-        ("pipeline", ex |> Functional.pipeline |> Pipeline.to_json GroundTerm.JSON.encode);
+        ("pipeline", ex |> Functional.pipeline |> Pipe.Pipeline.JSON.encode GroundTerm.JSON.encode);
         ("observations", ex |> Functional.observations |> JSON.Encode.list Observation.JSON.encode);
         ("history", ex |> Functional.history |> Proof.Search.History.JSON.encode);
     ]
@@ -99,17 +99,18 @@ let of_proof proof history =
             )
         |> Watson.Substitution.of_assoc in
     (* construct statements *)
-    let statement sub intro = {
-            Pipeline.Statement.target = Introduction.sample_site intro;
-            function_id = Introduction.Functional.function_id intro;
-            arguments = Introduction.Functional.arguments intro
+    let statement sub intro =
+            let target = Introduction.sample_site intro in
+            let function_id = Introduction.Functional.function_id intro in
+            let arguments = Introduction.Functional.arguments intro
                 |> CCList.map (Watson.Substitution.apply sub)
                 |> CCList.map GroundTerm.lift
                 |> CCList.all_some
-                |> CCOpt.get_exn_or "Invalid Watson terms in introduction.";
-        } in
+                |> CCOpt.get_exn_or "Invalid Watson terms in introduction." in
+            Pipe.Statement.Functional.make target function_id arguments in
     let pipeline = introductions
-        |> CCList.map (statement substitution) in
+        |> CCList.map (statement substitution)
+        |> Pipe.Pipeline.Functional.make in
     (* and observations *)
     let observations = proof
         |> Proof.branches

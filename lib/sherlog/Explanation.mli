@@ -7,11 +7,11 @@ module GroundTerm : sig
         val encode : t -> JSON.t
     end
 
-    val lift : Watson.Term.t -> t Pipeline.Value.t option
+    val lift : Watson.Term.t -> t Pipe.Value.t option
 end
 
 module Observation : sig
-    type t = (string * GroundTerm.t Pipeline.Value.t) list
+    type t = (string * GroundTerm.t Pipe.Value.t) list
 
     module JSON : sig
         val encode : t -> JSON.t
@@ -21,11 +21,11 @@ end
 type t
 
 module Functional : sig
-    val pipeline : t -> GroundTerm.t Pipeline.t
+    val pipeline : t -> GroundTerm.t Pipe.Pipeline.t
     val observations : t -> Observation.t list
     val history : t -> Proof.Search.History.t
 
-    val make : GroundTerm.t Pipeline.t -> Observation.t list -> Proof.Search.History.t -> t
+    val make : GroundTerm.t Pipe.Pipeline.t -> Observation.t list -> Proof.Search.History.t -> t
 end
 
 module JSON : sig
