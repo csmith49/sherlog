@@ -65,6 +65,7 @@ module Zipper : sig
     val next : t -> t option
     val preorder : t -> t option
     val find : (proof -> bool) -> t -> t option
+    val find_all : (proof -> bool) -> t -> t list
 
     (* construction / conversion *)
     val of_proof : proof -> t

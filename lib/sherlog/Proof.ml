@@ -121,6 +121,12 @@ module Search = struct
         end
     end
 
+    module type Domain = sig
+        val select : Watson.Proof.Obligation.t -> bool
+        val expand : Watson.Proof.Obligation.t -> proof
+        val score : Watson.Proof.Obligation.t -> Embedding.t
+    end
+
     let obligation = function
         | Leaf (Frontier obligation) -> Some obligation
         | _ -> None
@@ -191,6 +197,10 @@ module Zipper = struct
     let rec find pred z = let open CCOpt.Infix in
         let check = CCOpt.if_ (fun f -> pred (focus f)) z in
         check <+> ((preorder z) >>= (find pred))
+
+    let rec find_all pred z = match find pred z with
+        | Some z -> z :: (find_all pred z)
+        | None -> []
 
     (* construction / conversion *)
     let of_proof proof = View (proof, [])

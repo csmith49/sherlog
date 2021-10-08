@@ -16,6 +16,4 @@ module JSON : sig
     val decode : JSON.t -> t option
 end
 
-val domain : t -> (module Search.Domain with type t = Proof.Node.t)
-
 val explanation : ?width:int -> t -> Watson.Atom.t list -> Explanation.t
