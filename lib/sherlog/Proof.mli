@@ -13,40 +13,7 @@ val introductions : proof -> Introduction.t list
 
 val branches : proof -> Introduction.t list list
 
-module Search : sig
-    module Embedding : sig
-        type t = float list
-
-        module JSON : sig
-            val encode : t -> JSON.t
-            val decode : JSON.t -> t option
-        end
-    end
-
-    module Choice : sig
-        type t
-
-        module JSON : sig
-            val encode : t -> JSON.t
-            val decode : JSON.t -> t option
-        end
-
-        val choose : 'a list -> ('a -> Embedding.t) -> (Embedding.t -> float) -> ('a * t) CCRandom.t
-    end
-
-    module History : sig
-        type t = Choice.t list
-
-        module JSON : sig
-            val encode : t -> JSON.t
-            val decode : JSON.t -> t option
-        end
-    end
-
-    val obligation : proof -> Watson.Proof.Obligation.t option
-    val expandable : proof -> bool
-    val expand : Watson.Rule.t list -> Watson.Proof.Obligation.t -> proof
-end
+val obligation : proof -> Watson.Proof.Obligation.t option
 
 module Zipper : sig
     type t

@@ -1,6 +1,12 @@
 module Embedding = struct
     type t = float list
 
+    let linear weights embedding =
+        CCList.map2 ( *. ) weights embedding
+            |> CCList.fold_left ( +. ) 0.0
+
+    let stack values = values
+
     module JSON = struct
         let encode f = f |> JSON.Encode.(list float)
         let decode = JSON.Parse.(list float)
@@ -67,6 +73,10 @@ end
 module History = struct
     type t = Choice.t list
 
+    let empty = []
+
+    let append choice history = choice :: history
+
     module JSON = struct
         let encode history = `Assoc [
             ("type", `String "history");
@@ -79,28 +89,26 @@ module History = struct
     end
 end
 
-module type Domain = sig
-    val select : Watson.Proof.Obligation.t -> bool
-    val expand : Watson.Proof.Obligation.t -> proof
-    val score : Watson.Proof.Obligation.t -> Embedding.t
+module type Structure = sig
+    type candidate
+
+    val stop : candidate -> bool
+    val next : candidate -> candidate list
+
+    val embed : candidate -> Embedding.t
+    val score : Embedding.t -> float
 end
 
-let obligation = function
-    | Leaf (Frontier obligation) -> Some obligation
-    | _ -> None
-
-let expandable proof = proof |> obligation |> CCOpt.is_some
-
-let expand rules obligation =
-    (* check if we're already done *)
-    if Obligation.is_empty obligation then (Leaf Success) else
-    (* get the resolutions from rules *)
-    match CCList.filter_map (resolve obligation) rules with
-        (* if there aren't any, the expansion fails *)
-        | [] -> (Leaf Failure)
-        (* otherwise, build the fresh edges and collapes the tree *)
-        | rs ->
-            let mk_edge (witness, obligation) =
-                Edge (witness, Leaf (Frontier obligation)) in
-            let edges = CCList.map mk_edge rs in
-            Interior edges
+let rec random_walk : type a . (module Structure with type candidate = a) -> a -> (a * History.t) CCRandom.t = fun (module S) -> fun start -> fun state ->
+    rw_aux (module S) start History.empty |> CCRandom.run ~st:state
+and rw_aux : type a . (module Structure with type candidate = a) -> a -> History.t -> (a * History.t) CCRandom.t = fun (module S) -> fun value -> fun history -> fun state ->
+    (* check if we've met the early stopping condition *)
+    if S.stop value then (value, history) else
+    match S.next value with
+        (* no follow-ups *)
+        | [] -> (value, history)
+        | candidates ->
+            let value, choice = Choice.choose candidates S.embed S.score
+                |> CCRandom.run ~st:state in
+            let history = History.append choice history in
+                (value, history)

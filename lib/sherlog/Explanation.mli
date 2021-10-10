@@ -23,13 +23,13 @@ type t
 module Functional : sig
     val pipeline : t -> GroundTerm.t Pipe.Pipeline.t
     val observations : t -> Observation.t list
-    val history : t -> Proof.Search.History.t
+    val history : t -> Search.History.t
 
-    val make : GroundTerm.t Pipe.Pipeline.t -> Observation.t list -> Proof.Search.History.t -> t
+    val make : GroundTerm.t Pipe.Pipeline.t -> Observation.t list -> Search.History.t -> t
 end
 
 module JSON : sig
     val encode : t -> JSON.t
 end
 
-val of_proof : Proof.proof -> Proof.Search.History.t -> t
+val of_proof : Proof.proof -> Search.History.t -> t

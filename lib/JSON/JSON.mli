@@ -30,3 +30,11 @@ module Encode : sig
     val list : 'a encoder -> 'a list encoder
     val assoc : 'a encoder -> (string * 'a) list encoder
 end
+
+(* Interface signature *)
+module type JSONable = sig
+    type value
+
+    val encode : value -> t
+    val decode : t -> value option
+end

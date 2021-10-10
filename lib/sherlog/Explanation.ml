@@ -63,7 +63,7 @@ end
 type t = {
     pipeline : GroundTerm.t Pipe.Pipeline.t;
     observations : Observation.t list;
-    history : Proof.Search.History.t;
+    history : Search.History.t;
 }
 
 module Functional = struct
@@ -83,7 +83,7 @@ module JSON = struct
         ("type", `String "explanation");
         ("pipeline", ex |> Functional.pipeline |> Pipe.Pipeline.JSON.encode GroundTerm.JSON.encode);
         ("observations", ex |> Functional.observations |> JSON.Encode.list Observation.JSON.encode);
-        ("history", ex |> Functional.history |> Proof.Search.History.JSON.encode);
+        ("history", ex |> Functional.history |> Search.History.JSON.encode);
     ]
 end
 

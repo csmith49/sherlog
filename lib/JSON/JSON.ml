@@ -72,3 +72,11 @@ module Encode = struct
 
     let assoc encoder ls = `Assoc (CCList.map (CCPair.map_snd encoder) ls)
 end
+
+(* Interface signature *)
+module type JSONable = sig
+    type value
+
+    val encode : value -> t
+    val decode : t -> value option
+end

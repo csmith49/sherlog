@@ -75,7 +75,7 @@ module Application = struct
         | f :: fs -> CCOpt.Infix.(f v <+> seq fs v)
 end
 
-let apply obligation program = let open CCOpt.Infix in
+let apply obligation program =
     let classical = program
         |> Functional.classical_rules
         |> Application.branch in
@@ -90,55 +90,44 @@ let apply obligation program = let open CCOpt.Infix in
         ] in
     CCOpt.get_or ~default:Application.failure result
 
-(* application takes obligation -> proof *)
+let search_structure : (Proof.proof -> bool) -> t -> (module Search.Structure with type candidate = Proof.proof) = fun pred -> fun program -> (module struct
+    type candidate = Proof.proof
 
-let success obligation =
-    if Watson.Proof.Obligation.is_empty obligation then
-        Some (Proof.Leaf Proof.Success)
-    else
-        None
+    let stop = pred
 
-let apply_rules rules obligation 
+    let embed proof = program
+        |> Functional.posterior
+        |> Posterior.embed proof
 
-let apply_rules obligation rules =
-    (* case 1 - obligation already resolved *)
+    let score embedding = program
+        |> Functional.posterior
+        |> Posterior.score embedding
 
-let apply_rule obligation rule =
-    if Watson.Proof.Obligation.is_empty obligation then 
-
-module Application = struct
-    let apply node program =
-        let obligation = node |> Proof.Node.obligation in
-        (* check if we're done *)
-        if Watson.Proof.Obligation.is_empty obligation then
-            [ Proof.success obligation ]
-        (* otherwise get all possible expansions *)
-        else let expansions = program
-            |> Functional.rules
-            |> CCList.map (Watson.Proof.resolve obligation)
-            |> CCList.keep_some in
-        match expansions with
-            | [] -> [ Proof.failure obligation ]
-            | xs -> xs |> CCList.map (fun (w, ob) -> Proof.of_witness w ob)
-end
-
-(* SEARCH *)
-
-let domain : t -> (module Search.Domain with type t = Proof.Node.t) = fun program -> (module struct
-    type t = Proof.Node.t
-
-    let features = fun proof -> Posterior.featurize proof program.posterior
-    let score = fun fs -> Posterior.score fs program.posterior
-    let expand = fun node -> 
-        let _ = node
-            |> Proof.Node.tag
-            |> Proof.Tag.to_string
-            |> print_endline in
-        node |> Proof.Node.tag |> Proof.Tag.interior
-    let expansions = fun node -> Application.apply node program
+    let next proof =
+        (* check if site has an expandable obligation *)
+        let is_site proof = proof |> Proof.obligation |> CCOpt.is_some in
+        (* perform expansion via backwards chaining *)
+        let expand site = let open CCOpt in
+            let* obligation = site
+                |> Proof.Zipper.focus 
+                |> Proof.obligation in
+            let expansion = apply obligation program in
+            let candidate = Proof.Zipper.set_focus expansion site
+                |> Proof.Zipper.to_proof in
+            return candidate in
+        (* compute candidates from the proof *)
+        proof
+            (* find all expansion sites *)
+            |> Proof.Zipper.of_proof
+            |> Proof.Zipper.find_all is_site
+            (* expand if possible *)
+            |> CCList.filter_map expand
 end)
 
-let explanation ?width:(width=CCInt.max_int) program conjunct =
-    let initial = Proof.of_conjunct conjunct in
-    let final = Search.beam (domain program) width initial in
-    Explanation.of_proof final []
+let explanation query program =
+    let stopping_condition = fun _ -> false in
+    let search_structure = search_structure stopping_condition program in
+    let candidate = query
+        |> Proof.of_conjunct in
+    let result = Search.random_walk search_structure candidate in
+        CCRandom.run result

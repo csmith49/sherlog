@@ -25,8 +25,7 @@ module Ensemble = struct
         | Linear of float list
 
     let apply embedding ensemble = match ensemble with
-        | Linear weights -> CCList.map2 ( *. ) embedding weights
-            |> CCList.fold_left ( +. ) 0.0
+        | Linear weights -> Search.Embedding.linear weights embedding
 
     module JSON = struct
         let encode = function
@@ -51,6 +50,7 @@ type t = {
 
 let embed proof posterior = posterior.features
     |> CCList.map (Feature.apply proof)
+    |> Search.Embedding.stack
 
 let score featurization posterior = posterior.ensemble |> Ensemble.apply featurization
 
