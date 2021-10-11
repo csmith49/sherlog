@@ -66,7 +66,8 @@ let operate filename =
             Sherlog.Proof.pp proof in
         let _ = Fmt.pr "%a Deriving explanation...\n"
             marker () in
-        let _ = Sherlog.Explanation.of_proof proof history in
+        let ex = Sherlog.Explanation.of_proof proof history in
+        let _ = Fmt.pr "%a" Sherlog.Explanation.pp ex in
         () in
     
     CCList.iter handle_fact facts

@@ -1,6 +1,8 @@
 module GroundTerm : sig
     type t
 
+    val pp : t Fmt.t
+
     val of_term : Watson.Term.t -> t option
 
     module JSON : sig
@@ -13,12 +15,16 @@ end
 module Observation : sig
     type t = (string * GroundTerm.t Pipe.Value.t) list
 
+    val pp : t Fmt.t
+
     module JSON : sig
         val encode : t -> JSON.t
     end
 end
 
 type t
+
+val pp : t Fmt.t
 
 module Functional : sig
     val pipeline : t -> GroundTerm.t Pipe.Pipeline.t

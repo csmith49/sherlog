@@ -6,6 +6,16 @@ module GroundTerm = struct
         | Function of string * t list
         | Unit
 
+    let rec pp ppf = function
+        | Integer i -> Fmt.pf ppf "%d" i
+        | Float f -> Fmt.pf ppf "%f" f
+        | Boolean true -> Fmt.pf ppf "T"
+        | Boolean false -> Fmt.pf ppf "F"
+        | Unit -> Fmt.pf ppf "*"
+        | Function (f, args) -> Fmt.pf ppf "%s(%a)"
+            f
+            (Fmt.list ~sep:Fmt.comma pp) args
+
     let rec of_term = function
         | Watson.Term.Integer i -> Some (Integer i)
         | Watson.Term.Float f -> Some (Float f)
@@ -40,6 +50,8 @@ end
 module Observation = struct
     type t = (string * GroundTerm.t Pipe.Value.t) list
 
+    let pp ppf _ = Fmt.pf ppf "OBS"
+
     let of_branch branch =
         let assoc_of_intro intro =
             if Introduction.observed intro then
@@ -65,6 +77,10 @@ type t = {
     observations : Observation.t list;
     history : Search.History.t;
 }
+
+let pp ppf ex = Fmt.pf ppf "Pipeline:\n%a\nObservations:\n%a\n"
+    (Pipe.Pipeline.pp GroundTerm.pp) ex.pipeline
+    (Fmt.list Observation.pp) ex.observations
 
 module Functional = struct
     let pipeline ex = ex.pipeline

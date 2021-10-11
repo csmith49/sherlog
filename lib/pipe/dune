@@ -1,4 +1,4 @@
 (library
   (name pipe)
-  (libraries containers JSON)
+  (libraries containers fmt JSON)
 )

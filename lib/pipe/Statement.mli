@@ -1,5 +1,7 @@
 type 'a t
 
+val pp : 'a Fmt.t -> 'a t Fmt.t
+
 module Functional : sig
     val target : 'a t -> string
     val function_id : 'a t -> string

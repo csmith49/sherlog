@@ -1,5 +1,8 @@
 type 'a t = 'a Statement.t list
 
+let pp lit_pp ppf pl = Fmt.pf ppf "%a"
+    (Fmt.list (Statement.pp lit_pp)) pl
+
 module Functional = struct
     let statements pl = pl
     
