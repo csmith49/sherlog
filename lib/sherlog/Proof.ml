@@ -48,6 +48,15 @@ let obligation = function
     | Leaf (Frontier ob) -> Some ob
     | _ -> None
 
+let rec pp ppf proof = let open Fmt in match proof with
+    | Interior edges -> pf ppf "* => @[<1>{%a}@]" (list ~sep:comma edge_pp) edges
+    | Leaf (Frontier _) -> pf ppf "{...}"
+    | Leaf Success -> pf ppf "⟙"
+    | Leaf Failure -> pf ppf "⟘"
+and edge_pp ppf = function Edge (witness, proof) -> let open Fmt in pf ppf "%s : %a"
+    (witness |> Watson.Proof.Witness.resolved_atom |> Watson.Atom.to_string)
+    pp proof
+
 module Zipper = struct
     type t = View of proof * context list
     and context = Context of Witness.t * edge list * edge list
@@ -98,8 +107,13 @@ module Zipper = struct
         let check = CCOpt.if_ (fun f -> pred (focus f)) z in
         check <+> ((preorder z) >>= (find pred))
 
-    let rec find_all pred z = match find pred z with
-        | Some z -> z :: (find_all pred z)
+    let rec find_all (pred : proof -> bool) (z : t) : t list = match find pred z with
+        | Some z ->
+            let children = z
+                |> preorder
+                |> CCOpt.map (find_all pred)
+                |> CCOpt.get_or ~default: [] in
+            z :: children
         | None -> []
 
     (* construction / conversion *)

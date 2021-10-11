@@ -103,12 +103,12 @@ let rec random_walk : type a . (module Structure with type candidate = a) -> a -
     rw_aux (module S) start History.empty |> CCRandom.run ~st:state
 and rw_aux : type a . (module Structure with type candidate = a) -> a -> History.t -> (a * History.t) CCRandom.t = fun (module S) -> fun value -> fun history -> fun state ->
     (* check if we've met the early stopping condition *)
-    if S.stop value then (value, history) else
-    match S.next value with
+    if S.stop value then (value, history)
+    else match S.next value with
         (* no follow-ups *)
         | [] -> (value, history)
         | candidates ->
             let value, choice = Choice.choose candidates S.embed S.score
                 |> CCRandom.run ~st:state in
             let history = History.append choice history in
-                (value, history)
+                rw_aux (module S) value history state

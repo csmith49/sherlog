@@ -15,6 +15,8 @@ val branches : proof -> Introduction.t list list
 
 val obligation : proof -> Watson.Proof.Obligation.t option
 
+val pp : proof Fmt.t
+
 module Zipper : sig
     type t
 

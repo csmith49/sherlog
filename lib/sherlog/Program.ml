@@ -130,4 +130,6 @@ let explanation query program =
     let candidate = query
         |> Proof.of_conjunct in
     let result = Search.random_walk search_structure candidate in
-        CCRandom.run result
+    let proof, history = CCRandom.run result in
+    let _ = Fmt.pr "%a\n" Proof.pp proof in
+        Explanation.of_proof proof history

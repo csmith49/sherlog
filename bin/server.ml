@@ -26,32 +26,28 @@ let rec shuffle xs = match xs with
 
 (* message handling *)
 
-let handler json = let open CCOpt in match JSON.Parse.(find string "type" json) with
+let handler json = let open CCOpt in match JSON.Parse.(find "type" string json) with
     | Some "parse-source-request" ->
-        let* source = JSON.Parse.(find string "source" json) in
+        let* source = JSON.Parse.(find "source" string json) in
         let lines = source |> Sherlog.IO.parse in
         let response = `Assoc [
             ("type", `String "parse-source-response");
             ("program", lines |> Sherlog.IO.program_of_lines |> Sherlog.Program.JSON.encode);
             ("evidence", lines
                 |> Sherlog.IO.evidence_of_lines
-                |> CCList.map Sherlog.Evidence.JSON.encode
-                |> JSON.Make.list
+                |> JSON.Encode.list Sherlog.Evidence.JSON.encode
             );
         ] in
         return response
 
     | Some "query-request" ->
         (* core programmatic info *)
-        let* program = JSON.Parse.(find Sherlog.Program.JSON.decode "program" json) in
-        let* query = JSON.Parse.(find Sherlog.Evidence.JSON.decode "evidence" json) in
-        (* parameters for the search *)
-        let search_width = JSON.Parse.(find int "search-width" json)
-            |> CCOpt.get_or ~default:CCInt.max_int in
+        let* program = JSON.Parse.(find "program" Sherlog.Program.JSON.decode json) in
+        let* query = JSON.Parse.(find "evidence" Sherlog.Evidence.JSON.decode json) in
         (* get explanation *)
         let explanation = query
             |> Sherlog.Evidence.to_atoms
-            |> Sherlog.Program.explanation ~width:search_width program
+            |> fun cs -> Sherlog.Program.explanation cs program
             |> Sherlog.Explanation.JSON.encode in
         let response = `Assoc [
             ("type", `String "query-response");

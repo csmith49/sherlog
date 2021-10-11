@@ -54,9 +54,10 @@ module Unification = struct
             let rest = CCList.map (uni_map (apply h)) rest in
                 unify_aux rest h
         | Uni (Term.Function (f, fargs), Term.Function (g, gargs)) :: rest ->
-            if (CCString.equal f g) && (CCInt.equal (CCList.length fargs) (CCList.length gargs)) then None else
-            let sub_eqs = CCList.map2 uni_mk fargs gargs in
-                unify_aux (sub_eqs @ rest) h
+            if (CCString.equal f g) && (CCInt.equal (CCList.length fargs) (CCList.length gargs)) then
+                let sub_eqs = CCList.map2 uni_mk fargs gargs in
+                    unify_aux (sub_eqs @ rest) h
+            else None
         | _ -> None
 end
 

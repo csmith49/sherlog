@@ -56,31 +56,12 @@ let operate filename =
         marker ()
         (Fmt.styled (`Fg `Blue) Fmt.int) (facts |> CCList.length) in
 
-    (* processing a proof *)
-    let process_explanation index _ =
-        let _ = Fmt.pr "%a Examining explanation %a...\n"
-            marker ()
-            (Fmt.styled (`Fg `Blue) Fmt.int) index in
-        let _ = Fmt.pr "%a Explanation: <todo>\n"
-            marker ()
-            in
+    let explain_fact = fun fact ->
+        let _ = Sherlog.Program.explanation fact program in
+        let _ = print_endline "Handling fact" in
         () in
     
-    (* processing a fact *)
-    let process_fact fact =
-        (* render the found fact *)
-        let _ = Fmt.pr "%a Fact: @[%a@]\n"
-            marker ()
-            (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
-        (* compute proofs and process *)
-        let explanations = [Sherlog.Program.explanation ~width:!search_width program fact] in
-        let _ = Fmt.pr "%a Found %a explanations.\n"
-            marker ()
-            (Fmt.styled (`Fg `Blue) Fmt.int) (explanations |> CCList.length) in
-        let _ = CCList.iteri process_explanation explanations in
-        () in
-
-    CCList.iter process_fact facts
+    CCList.iter explain_fact facts
 
 (* main loop *)
 let _ =
