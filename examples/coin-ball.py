@@ -12,6 +12,7 @@ from sherlog.interface.instrumentation import instrument, minotaur
 
 from torch import nn
 from torch.nn.functional import softmax
+from torch.autograd import anomaly_mode
 from random import choices, gauss
 from enum import Enum, auto
 from colorsys import rgb_to_hsv, hsv_to_rgb
@@ -124,6 +125,8 @@ class ColorModule(nn.Module):
 @click.option("-i", "--instrumentation", type=str, help="Instrumentation log destination.")
 def cli(train, batch_size, epochs, learning_rate, instrumentation):
     
+    anomaly_mode.set_detect_anomaly(True)
+
     # make sure we do this first...
     if instrumentation:
         minotaur.add_filepath_handler(instrumentation)
@@ -164,8 +167,7 @@ def cli(train, batch_size, epochs, learning_rate, instrumentation):
 
     # build the optimizer
     optimizer = Optimizer(program,
-        learning_rate=learning_rate,
-        explanations=10    
+        learning_rate=learning_rate
     )
 
     # iterate over the data and optimize

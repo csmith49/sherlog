@@ -7,7 +7,7 @@ from .semantics import spyglass
 from .observation import Observation
 from .history import History
 
-from torch import Tensor, stack
+from torch import Tensor, stack, tensor
 from typing import TypeVar, Mapping, Optional, Callable, List
 
 T = TypeVar('T')
@@ -38,6 +38,7 @@ class Explanation:
         """Compute the log-probability of the explanation generating the observations."""
 
         sem = spyglass.semantics_factory(
+            observation=Observation({}),
             target=EqualityIndicator(),
             locals=self.locals
         )
@@ -45,10 +46,14 @@ class Explanation:
 
         results = []
         for index, _ in enumerate(self.observations):
-            result = stack([clue.surrogate for clue in store[f"sherlog:target:{index}"]]).mean().log()
-            results.append(result)
+            result = stack([clue.surrogate for clue in store[f"sherlog:target:{index}"]]).mean()
+            if result > 0:
+                results.append(result.log())
 
-        result = stack(results).max()
+        try:
+            result = stack(results).max()
+        except RuntimeError:
+            result = tensor(0.0)
 
         minotaur["result"] = result.item()
 
@@ -64,10 +69,10 @@ class Explanation:
             raise TypeError(f"{json} does not represent an explanation.")
 
         program = Pipeline.of_json(json["pipeline"])
-        observation = Observation.of_json(json["observation"])
+        observations = [Observation.of_json(ob) for ob in json["observations"]]
         history = History.of_json(json["history"])
 
-        return cls(program, observation, history, locals=locals)
+        return cls(program, observations, history, locals=locals)
 
     def to_json(self):
         """Construct a JSON-like encoding for the explanation."""
@@ -75,7 +80,7 @@ class Explanation:
         return {
             "type" : "explanation",
             "program" : self.program.dump(),
-            "observation" : self.observation.dump(),
+            "observations" : self.observation.dump(),
             "history" : self.history.dump()
         }
 

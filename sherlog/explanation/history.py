@@ -9,7 +9,7 @@ class Choice:
     def of_json(cls, json) -> "Choice":
         assert json["type"] == "choice"
 
-        features = tensor(json["features"])
+        features = tensor(json["embedding"])
         context = [tensor(ctx) for ctx in json["context"]]
         return cls(features, context)
 

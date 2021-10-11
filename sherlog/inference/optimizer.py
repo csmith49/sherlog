@@ -120,9 +120,9 @@ class Optimizer:
 
         # check if it's well-formed (not NaN, not infinite, etc)
         if result.isnan():
-            logger.warning(f"Objective {objective} produced NaN.")
+            logger.warning(f"Objective produced NaN. [objective={objective}]")
         elif result.isinf():
-            logger.warning(f"Objective {objective} produced infinite result.")
+            logger.warning(f"Objective produced infinite result. [objective={objective}]")
         # and add to the queue if it's good
         else:
             self._queue.append( (result, intent) )
@@ -158,15 +158,15 @@ class Optimizer:
 
         if losses:
             loss = stack(losses).sum()
+            print("LOSSES", loss)
+            loss.backward()
+            self._optimizer.step()
+            self.program.clamp()
+            self._queue = []
+
         else:
             logger.warning("Optimization triggered with an empty optimization queue.")
             loss = tensor(0.0)
-
-        loss.backward()
-        self._optimizer.step()
-        self.program.clamp()
-        
-        self._queue = []
 
         # for debugging, we'll return the average computed loss (NaN if we didn't have any)
         batch_loss = loss / len(losses)

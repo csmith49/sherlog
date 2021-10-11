@@ -38,7 +38,7 @@ class Observation:
             return [
                 Statement(f"sherlog:keys:{key}", "tensorize", list(self.domain)),
                 Statement(f"sherlog:vals:{key}", "tensorize", list(self.codomain)),
-                Statement(f"sherlog:target:{key}", "target", [Identifier("sherlog:keys"), Identifier("sherlog:vals")])
+                Statement(f"sherlog:target:{key}", "target", [Identifier(f"sherlog:keys:{key}"), Identifier(f"sherlog:vals:{key}")])
             ]
 
     # magic methods

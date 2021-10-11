@@ -47,69 +47,50 @@ class Program:
     def store(self, **kwargs : Tensor) -> Mapping[str, Tensor]:
         return {**kwargs, **{parameter.name : parameter.value for parameter in self._parameters}}
 
-    def explanations(self, evidence : Evidence, quantity : int = 1, attempts : int = 100, width : Optional[int] = None) -> Iterable[Explanation]:
+    def explanation(self, evidence : Evidence, attempts : int = 100) -> Explanation:
         """Sample explanations for the provided evidence."""
 
-        # build generator
-        def gen():
-            for _ in range(attempts):
-                    try:
-                        for json in query(self, evidence, width=width):
-                            yield Explanation.of_json(json, locals=self._locals)
-                    except TimeoutError:
-                        pass
-
-        # get at most quantity explanations
-        yield from islice(gen(), quantity)
+        for _ in range(attempts):
+            try:
+                json = query(self, evidence)
+                return Explanation.of_json(json, locals=self._locals)
+            except TimeoutError:
+                pass
+        raise TimeoutError(f"Explanation sampling timed-out. [evidence={evidence}, attempts={attempts}]")
 
     @minotaur("log-prob", kwargs=("explanations"))
     def log_prob(self,
         evidence : Evidence,
-        explanations : int = 1,
         attempts = 100,
-        width : Optional[int] = None,
         parameters : Optional[Mapping[str, Tensor]] = None,
     ) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence."""
 
         # build -> sample -> evaluate
         store = self.store(**(parameters if parameters else {}))
-        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width)
-        
-        # TODO - factor in posterior
-        log_probs = [explanation.log_prob(store) for explanation in explanations]
 
-        # if no explanations, default
-        if log_probs:
-            result = stack(log_probs).mean()
-        else:
-            result = tensor(0.0)
-            logger.warning(f"No explanations generated for {evidence}. Defaulting log-prob to 0.")
+        explanation = self.explanation(evidence, attempts=attempts)
+        result = explanation.log_prob(store)
 
         minotaur["result"] = result.item()
+        print(result)
         return result
 
     @minotaur("conditional log-prob", kwargs=("explanations"))
     def conditional_log_prob(self,
         evidence : Evidence, condition : Evidence,
-        explanations : int = 1,
         attempts = 100,
-        width : Optional[int] = None,
         parameters : Optional[Mapping[str, Tensor]] = None
     ) -> Tensor:
         """Compute the log-likelihood of the provided evidenced conditioned on another piece of evidence."""
 
         numerator = self.log_prob(evidence.join(condition),
-            explanations=explanations,
             attempts=attempts,
-            width=width,
             parameters=parameters
         )
 
         denominator = self.log_prob(condition,
-            explanations=explanations,
             attempts=attempts,
-            witdth=width,
             parameters=parameters
         )
 

@@ -28,7 +28,7 @@ class Statement:
             raise TypeError(f"{json} does not represent a statement.")
 
         target = json["target"]
-        function = json["function"]
+        function = json["function_id"]
         arguments = [Value.of_json(arg) for arg in json["arguments"]]
 
         return cls(target, function, arguments)
@@ -39,7 +39,7 @@ class Statement:
         return {
             "type" : "statement",
             "target" : self.target,
-            "function" : self.function,
+            "function_id" : self.function,
             "arguments" : [arg.to_json() for arg in self.arguments]
         }
 

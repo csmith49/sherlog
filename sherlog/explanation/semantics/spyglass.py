@@ -164,7 +164,10 @@ def lift_distribution(function_id : str) -> Callable[..., List[Clue]]:
     """Converts a distribution to a function of type * -> clue list."""
 
     def wrapped(*args):
-        distribution = core.distribution.lookup_constructor(function_id)(*args)
+        try:
+            distribution = core.distribution.lookup_constructor(function_id)(*args)
+        except:
+            raise KeyError(f"Cannot construct Spyglass distribution. [function={function_id}, args={args}]")
         # check if we can enumerate
         try:
             enumerated_values = distribution.enumerate_support().unbind()

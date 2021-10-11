@@ -62,4 +62,4 @@ def query(program, evidence, width = None):
     elif response["type"] != "query-response":
         raise CommunicationError(f"Found invalid response type {response['type']}.")
     else:
-        return response["explanations"]
+        return response["explanation"]
