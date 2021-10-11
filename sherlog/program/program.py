@@ -73,7 +73,6 @@ class Program:
         result = explanation.log_prob(store)
 
         minotaur["result"] = result.item()
-        print(result)
         return result
 
     @minotaur("conditional log-prob", kwargs=("explanations"))

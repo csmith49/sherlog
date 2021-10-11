@@ -158,7 +158,6 @@ class Optimizer:
 
         if losses:
             loss = stack(losses).sum()
-            print("LOSSES", loss)
             loss.backward()
             self._optimizer.step()
             self.program.clamp()
