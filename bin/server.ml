@@ -47,7 +47,7 @@ let handler json = let open CCOpt in match JSON.Parse.(find "type" string json) 
         (* get explanation *)
         let explanation = query
             |> Sherlog.Evidence.to_atoms
-            |> fun cs -> Sherlog.Program.proof cs program
+            |> fun cs -> Sherlog.Program.resolve cs program
             |> fun (proof, history) -> Sherlog.Explanation.of_proof proof history
             |> Sherlog.Explanation.JSON.encode in
         let response = `Assoc [
