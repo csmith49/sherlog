@@ -56,12 +56,20 @@ let operate filename =
         marker ()
         (Fmt.styled (`Fg `Blue) Fmt.int) (facts |> CCList.length) in
 
-    let explain_fact = fun fact ->
-        let _ = Sherlog.Program.explanation fact program in
-        let _ = print_endline "Handling fact" in
+    let handle_fact = fun fact ->
+        let _ = Fmt.pr "%a Proving %a...\n"
+            marker ()
+            (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
+        let proof, history = Sherlog.Program.proof fact program in
+        let _ = Fmt.pr "%a Proof:\n%a\n"
+            marker ()
+            Sherlog.Proof.pp proof in
+        let _ = Fmt.pr "%a Deriving explanation...\n"
+            marker () in
+        let _ = Sherlog.Explanation.of_proof proof history in
         () in
     
-    CCList.iter explain_fact facts
+    CCList.iter handle_fact facts
 
 (* main loop *)
 let _ =

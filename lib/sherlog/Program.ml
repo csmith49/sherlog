@@ -124,11 +124,10 @@ let search_structure : (Proof.proof -> bool) -> t -> (module Search.Structure wi
             |> CCList.filter_map expand
 end)
 
-let explanation query program =
+let resolve query program =
     let stopping_condition = fun _ -> false in
     let search_structure = search_structure stopping_condition program in
     let candidate = query
         |> Proof.of_conjunct in
     let result = Search.random_walk search_structure candidate in
-    let proof, history = CCRandom.run result in
-        Explanation.of_proof proof history
+        CCRandom.run result

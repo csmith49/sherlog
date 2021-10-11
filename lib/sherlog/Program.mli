@@ -16,4 +16,4 @@ module JSON : sig
     val decode : JSON.t -> t option
 end
 
-val explanation : Watson.Atom.t list -> t -> Explanation.t
+val resolve : Watson.Atom.t list -> t -> (Proof.proof * Search.History.t)
