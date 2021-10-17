@@ -37,4 +37,5 @@ module type Structure = sig
     val score : Embedding.t -> float
 end
 
+(** randomly walk the search structure *)
 val random_walk : (module Structure with type candidate = 'a) -> 'a -> ('a * History.t) CCRandom.t

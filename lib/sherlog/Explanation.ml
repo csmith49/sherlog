@@ -1,64 +1,15 @@
-module GroundTerm = struct
-    type t =
-        | Integer of int
-        | Float of float
-        | Boolean of bool
-        | Function of string * t list
-        | Unit
-
-    let rec pp ppf = function
-        | Integer i -> Fmt.pf ppf "%d" i
-        | Float f -> Fmt.pf ppf "%f" f
-        | Boolean true -> Fmt.pf ppf "T"
-        | Boolean false -> Fmt.pf ppf "F"
-        | Unit -> Fmt.pf ppf "*"
-        | Function (f, args) -> Fmt.pf ppf "%s(%a)"
-            f
-            (Fmt.list ~sep:Fmt.comma pp) args
-
-    let rec of_term = function
-        | Watson.Term.Integer i -> Some (Integer i)
-        | Watson.Term.Float f -> Some (Float f)
-        | Watson.Term.Boolean b -> Some (Boolean b)
-        | Watson.Term.Unit -> Some Unit
-        | Watson.Term.Function (f, args) -> args
-            |> CCList.map of_term
-            |> CCList.all_some
-            |> CCOpt.map (fun args -> Function (f, args))
-        | _ -> None
-
-    module JSON = struct
-        let rec encode = function
-            | Integer i -> `Int i
-            | Float f -> `Float f
-            | Boolean b -> `Bool b
-            | Unit -> `Null
-            | Function (f, args) -> `Assoc [
-                ("type", `String "function");
-                ("function_id", `String f);
-                ("arguments", `List (args |> CCList.map encode));
-            ]
-    end
-
-    let lift : Watson.Term.t -> t Pipe.Value.t option = function
-        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipe.Value.Identifier id)
-        | (_ as term) -> term
-            |> of_term
-            |> CCOpt.map (fun term -> Pipe.Value.Literal term)
-end
-
 module Observation = struct
-    type t = (string * GroundTerm.t Pipe.Value.t) list
+    type t = (string * Model.Value.t) list
 
-    let pp ppf _ = Fmt.pf ppf "OBS"
+    let pp ppf _ = Fmt.pf ppf "Observation"
 
-    let of_branch branch =
+    let of_introductions branch =
         let assoc_of_intro intro =
             if Introduction.observed intro then
                 let domain = intro |> Introduction.sample_site in
                 let codomain = intro
                     |> Introduction.Functional.target
-                    |> GroundTerm.lift
+                    |> Model.Value.of_term
                     |> CCOpt.get_exn_or "Invalid branch construction." in
                 Some (domain, codomain)
             else None in
@@ -67,19 +18,19 @@ module Observation = struct
     module JSON = struct
         let encode obs = `Assoc [
             ("type", `String "observation");
-            ("items", obs |> JSON.Encode.assoc (Pipe.Value.JSON.encode GroundTerm.JSON.encode));
+            ("items", obs |> JSON.Encode.assoc Model.Value.JSON.encode);
         ]
     end
 end
 
 type t = {
-    pipeline : GroundTerm.t Pipe.Pipeline.t;
+    pipeline : Model.t;
     observations : Observation.t list;
     history : Search.History.t;
 }
 
 let pp ppf ex = Fmt.pf ppf "Pipeline:\n%a\nObservations:\n%a\n"
-    (Pipe.Pipeline.pp GroundTerm.pp) ex.pipeline
+    Model.pp ex.pipeline
     (Fmt.list Observation.pp) ex.observations
 
 module Functional = struct
@@ -97,43 +48,46 @@ end
 module JSON = struct
     let encode ex = `Assoc [
         ("type", `String "explanation");
-        ("pipeline", ex |> Functional.pipeline |> Pipe.Pipeline.JSON.encode GroundTerm.JSON.encode);
+        ("pipeline", ex |> Functional.pipeline |> Model.JSON.encode);
         ("observations", ex |> Functional.observations |> JSON.Encode.list Observation.JSON.encode);
         ("history", ex |> Functional.history |> Search.History.JSON.encode);
     ]
 end
 
+module Branch = struct
+    let rec of_proof = function
+        | Proof.Leaf (Proof.Success) -> [[]]
+        | Interior edges ->
+            let extend = function Proof.Edge (witness, proof) -> proof
+                |> of_proof
+                |> CCList.map (CCList.cons witness) in
+            CCList.flat_map extend edges
+        | _ -> []
+
+    let substitution branch = branch
+        |> CCList.map Watson.Proof.Witness.substitution
+        |> CCList.fold_left Watson.Substitution.compose Watson.Substitution.empty
+
+    let introductions branch =
+        let sub = substitution branch in
+        branch
+            |> CCList.map Watson.Proof.Witness.atom
+            |> CCList.map (Watson.Atom.apply sub)
+            |> CCList.filter_map Introduction.of_atom
+end
+
 let of_proof proof history =
-    (* get all introductions in the proof *)
-    let introductions = proof
-        |> Proof.introductions in
-    (* build the renaming *)
-    let substitution = introductions
-        |> CCList.filter_map (fun intro -> match Introduction.Functional.target intro with
-                | Watson.Term.Variable x -> Some (x, Watson.Term.Variable (Introduction.sample_site intro))
-                | _ -> None
-            )
-        |> Watson.Substitution.of_assoc in
-    (* construct statements *)
-    let statement sub intro =
-            let target = Introduction.sample_site intro in
-            let function_id = Introduction.Functional.function_id intro in
-            let arguments = Introduction.Functional.arguments intro
-                |> CCList.map (Watson.Substitution.apply sub)
-                |> CCList.map GroundTerm.lift
-                |> CCList.all_some
-                |> CCOpt.get_exn_or "Invalid Watson terms in introduction." in
-            Pipe.Statement.Functional.make target function_id arguments in
+    let branches = proof
+        |> Branch.of_proof
+        |> CCList.map Branch.introductions in
+    let introductions = branches
+        |> CCList.concat
+        |> CCList.uniq ~eq:Introduction.equal in
     let pipeline = introductions
-        |> CCList.map (statement substitution)
-        |> Pipe.Pipeline.Functional.make in
-    (* and observations *)
-    let observations = proof
-        |> Proof.branches
-        |> CCList.map Observation.of_branch in
-    (* put it all together *)
+        |> CCList.filter_map Model.Statement.of_introduction
+        |> Model.of_statements in
     {
-        pipeline=pipeline;
-        observations=observations;
-        history=history;
+        pipeline = pipeline;
+        observations = branches |> CCList.map Observation.of_introductions;
+        history = history;
     }

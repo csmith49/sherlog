@@ -13,36 +13,16 @@ let of_conjunct atoms =
     let obligation = Obligation.of_conjunct atoms in
         Leaf (Frontier obligation)
 
-let rec introductions proof = proof |> introductions_aux |> CCOpt.get_or ~default:[]
-and introductions_aux = function
-    | Leaf (Success) -> Some []
-    | Interior edges -> let open CCOpt.Infix in
-        let intro_edge = function Edge (w, proof) ->
-            let* intros = introductions_aux proof in
-            let intro = w
-                |> Witness.resolved_atom
-                |> Introduction.of_atom
-                |> CCOpt.to_list in
-            Some (intro @ intros) in
-        edges
-            |> CCList.map intro_edge
-            |> CCList.fold_left (<+>) None
-    | _ -> None
-
-let rec branches proof = proof |> branches_aux
-and branches_aux = function
-    | Leaf (Success) -> [[]]
-    | Leaf _ -> []
+let rec trim = function
+    | Leaf Failure -> None
+    | Leaf _ as leaf -> Some leaf
     | Interior edges ->
-        let branch_edge = function Edge (w, proof) -> 
-            let intro = w
-                |> Witness.resolved_atom
-                |> Introduction.of_atom
-                |> CCOpt.to_list in
-            proof
-                |> branches
-                |> CCList.map (fun b -> intro @ b) in
-        CCList.flat_map branch_edge edges
+        let edges = CCList.filter_map trim_edge edges in
+        if CCList.is_empty edges then None else
+            Some (Interior edges)
+and trim_edge = function Edge (witness, proof) -> match trim proof with
+    | None -> None
+    | Some proof -> Some (Edge (witness, proof))
 
 let obligation = function
     | Leaf (Frontier ob) -> Some ob

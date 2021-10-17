@@ -121,10 +121,6 @@ let of_atom atom = let open Embedding in
 
 (* utilities *)
 
-let observed intro = match Functional.target intro with
-    | Term.Variable _ -> false
-    | _ -> true
-
 let sample_site intro =
     let terms =
         [Watson.Term.Symbol intro.relation] @ [Watson.Term.Symbol (Context.to_string intro.context)] @ intro.terms @ [Watson.Term.Symbol intro.function_id] @ intro.arguments in
@@ -134,3 +130,9 @@ let sample_site intro =
         |> Base64.encode_exn
 
 let equal left right = (Stdlib.compare left right) == 0
+
+let observation intro = match Functional.target intro with
+    | Term.Variable x -> Some (x, Term.Variable (sample_site intro))
+    | _ -> None
+
+let observed intro = intro |> observation |> CCOpt.is_some
