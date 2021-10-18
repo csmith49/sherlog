@@ -61,9 +61,6 @@ let operate filename =
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
         let proof, history = Sherlog.Program.resolve fact program in
-        let _ = Fmt.pr "%a Proof:\n%a\n"
-            marker ()
-            Sherlog.Proof.pp proof in
         let _ = Fmt.pr "%a Deriving explanation...\n"
             marker () in
         let ex = Sherlog.Explanation.of_proof proof history in

@@ -9,6 +9,11 @@ let pp lit_pp ppf stmt = Fmt.pf ppf "%s <- %s(%a)"
     stmt.function_id
     (Fmt.list ~sep:Fmt.comma (Value.pp lit_pp)) stmt.arguments
 
+let equal lit_eq left right =
+    (CCString.equal left.target right.target) &&
+    (CCString.equal left.function_id right.function_id) &&
+    (CCList.equal (Value.equal lit_eq) left.arguments right.arguments)
+
 module Functional = struct
     let target stmt = stmt.target
     let function_id stmt = stmt.function_id

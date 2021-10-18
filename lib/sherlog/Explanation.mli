@@ -4,7 +4,7 @@ module Observation : sig
     type t = (string * Model.Value.t) list
 
     (* constructed from introduction sets *)
-    val of_introductions : Introduction.t list -> t
+    (* val of_introductions : Introduction.t list -> t *)
 
     val pp : t Fmt.t
 

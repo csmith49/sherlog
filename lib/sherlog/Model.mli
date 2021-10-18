@@ -19,7 +19,11 @@ module Statement : sig
 
     val of_introduction : Introduction.t -> t option
 
+    val make : string -> string -> Watson.Term.t list -> t option
+
     val pp : t Fmt.t
+
+    val equal : t -> t -> bool
 
     module JSON : sig
         val encode : t -> JSON.t

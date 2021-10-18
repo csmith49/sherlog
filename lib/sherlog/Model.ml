@@ -28,6 +28,16 @@ module Value = struct
                 f
                 (Fmt.list ~sep:Fmt.comma pp) args
 
+        let rec equal left right = match left, right with
+            | Integer l, Integer r -> CCInt.equal l r
+            | Float l, Float r -> CCFloat.equal l r
+            | Boolean l, Boolean r -> CCBool.equal l r
+            | Unit, Unit -> true
+            | Function (f, fargs), Function (g, gargs) ->
+                (CCString.equal f g) &&
+                (CCList.equal equal fargs gargs)
+            | _ -> false
+
         module JSON = struct
             let rec encode = function
                 | Integer i -> `Int i
@@ -68,7 +78,16 @@ module Statement = struct
             |> CCList.all_some in
         arguments |> CCOpt.map (Pipe.Statement.Functional.make target function_id)
 
+    let make target function_id terms =
+        let arguments = terms
+            |> CCList.map Value.of_term
+            |> CCList.all_some in
+        arguments
+            |> CCOpt.map (Pipe.Statement.Functional.make target function_id)
+
     let pp = Pipe.Statement.pp Value.Unwrapped.pp
+
+    let equal = Pipe.Statement.equal Value.Unwrapped.equal
 
     module JSON = struct
         let encode = Pipe.Statement.JSON.encode Value.Unwrapped.JSON.encode

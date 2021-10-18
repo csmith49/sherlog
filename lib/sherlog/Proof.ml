@@ -30,7 +30,10 @@ let obligation = function
 
 let rec pp ppf proof = let open Fmt in match proof with
     | Interior edges -> pf ppf "* => @[<1>{%a}@]" (list ~sep:comma edge_pp) edges
-    | Leaf (Frontier _) -> pf ppf "{...}"
+    | Leaf (Frontier obligation) -> begin match Watson.Proof.Obligation.discharge obligation with
+            | Some (atom, _) -> pf ppf "{%a}" Watson.Atom.pp atom
+            | _ -> pf ppf "{}"
+        end
     | Leaf Success -> pf ppf "⟙"
     | Leaf Failure -> pf ppf "⟘"
 and edge_pp ppf = function Edge (witness, proof) -> let open Fmt in pf ppf "%s : %a"

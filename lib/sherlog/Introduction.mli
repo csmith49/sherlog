@@ -39,17 +39,15 @@ module Functional : sig
     val target : t -> Watson.Term.t
 end
 
+val pp : t Fmt.t
+
+val to_string : t -> string
+
 (* atomic embedding *)
 val to_atom : t -> Watson.Atom.t
 val of_atom : Watson.Atom.t -> t option
 
 (* Utilities *)
-
-val observed : t -> bool
-(* [observed intro] is true if the target of [intro] is not a variable *)
-
-val observation : t -> (string * Watson.Term.t) option
-(* [observation intro] maps the target to a sample site, if [intro] is observed *)
 
 val sample_site : t -> string
 (* unique identifier for the introduction *)

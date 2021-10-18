@@ -41,8 +41,17 @@ type t = {
     target : Watson.Term.t;
 }
 
-module Embedding = struct
+let pp ppf intro = Fmt.pf ppf "%s(%a, %a <- %s[%a]) in %s"
+    intro.relation
+    (Fmt.list ~sep:Fmt.comma Watson.Term.pp) intro.terms
+    Watson.Term.pp intro.target
+    intro.function_id
+    (Fmt.list ~sep:Fmt.comma Watson.Term.pp) intro.arguments
+    (intro.context |> Context.to_string)
 
+let to_string = Fmt.to_to_string pp
+
+module Embedding = struct
     (* encode values as terms *)
     module Encode = struct
         let symbol name value = Term.Function (name, [Term.Symbol value])
@@ -129,10 +138,10 @@ let sample_site intro =
         |> CCInt.to_string
         |> Base64.encode_exn
 
-let equal left right = (Stdlib.compare left right) == 0
-
-let observation intro = match Functional.target intro with
-    | Term.Variable x -> Some (x, Term.Variable (sample_site intro))
-    | _ -> None
-
-let observed intro = intro |> observation |> CCOpt.is_some
+let equal left right = 
+    (CCString.equal left.relation right.relation) &&
+    (CCString.equal left.function_id right.function_id) &&
+    (Context.equal left.context right.context) &&
+    (Watson.Term.equal left.target right.target) &&
+    (CCList.equal Watson.Term.equal left.terms right.terms) &&
+    (CCList.equal Watson.Term.equal left.arguments right.arguments)

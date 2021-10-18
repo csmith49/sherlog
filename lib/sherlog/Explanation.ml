@@ -1,19 +1,19 @@
 module Observation = struct
     type t = (string * Model.Value.t) list
 
-    let pp ppf _ = Fmt.pf ppf "Observation"
+    let rec pp ppf obs = Fmt.pf ppf "{%a}"
+        (Fmt.list ~sep:Fmt.comma pair_pp) obs
+    and pair_pp ppf = function (s, v) ->
+        Fmt.pf ppf "%s : %a" s Model.Value.pp v
 
-    let of_introductions branch =
-        let assoc_of_intro intro =
-            if Introduction.observed intro then
-                let domain = intro |> Introduction.sample_site in
-                let codomain = intro
-                    |> Introduction.Functional.target
-                    |> Model.Value.of_term
-                    |> CCOpt.get_exn_or "Invalid branch construction." in
-                Some (domain, codomain)
-            else None in
-        CCList.filter_map assoc_of_intro branch
+    (* let of_introductions branch =
+        let assoc_of_intro intro = match Introduction.observation intro with
+            | Some (domain, codomain) -> begin match Model.Value.of_term codomain with
+                | Some value -> Some (domain, value)
+                | None -> None
+            end
+            | None -> None in
+        CCList.filter_map assoc_of_intro branch *)
 
     module JSON = struct
         let encode obs = `Assoc [
@@ -31,7 +31,7 @@ type t = {
 
 let pp ppf ex = Fmt.pf ppf "Pipeline:\n%a\nObservations:\n%a\n"
     Model.pp ex.pipeline
-    (Fmt.list Observation.pp) ex.observations
+    (Fmt.list ~sep:Fmt.comma Observation.pp) ex.observations
 
 module Functional = struct
     let pipeline ex = ex.pipeline
@@ -64,30 +64,72 @@ module Branch = struct
             CCList.flat_map extend edges
         | _ -> []
 
-    let substitution branch = branch
-        |> CCList.map Watson.Proof.Witness.substitution
-        |> CCList.fold_left Watson.Substitution.compose Watson.Substitution.empty
+    (* build a statement from a context and a witness *)
+    let statement context witness = let open CCOpt in
+        let* intro = witness
+            |> Watson.Proof.Witness.resolved_atom
+            |> Watson.Atom.apply context
+            |> Introduction.of_atom in
+        let target = Introduction.sample_site intro in
+        let function_id = Introduction.Functional.function_id intro in
+        let arguments = intro
+            |> Introduction.Functional.arguments
+            |> CCList.map (Watson.Substitution.apply context) in
+        Model.Statement.make target function_id arguments
 
-    let introductions branch =
-        let sub = substitution branch in
-        branch
-            |> CCList.map Watson.Proof.Witness.atom
-            |> CCList.map (Watson.Atom.apply sub)
-            |> CCList.filter_map Introduction.of_atom
+    (* get the full context from a witness *)
+    let full_context context witness =
+        let resolution_context = witness
+            |> Watson.Proof.Witness.substitution in
+        match witness |> Watson.Proof.Witness.resolved_atom |> Watson.Atom.apply context |> Introduction.of_atom with
+            | None -> resolution_context
+            | Some intro ->
+                let sample_site = Introduction.sample_site intro in
+                begin match Introduction.Functional.target intro |> Watson.Substitution.apply context with
+                    | Watson.Term.Variable id  ->
+                        let binding = Watson.Substitution.singleton id (Watson.Term.Variable sample_site) in
+                        Watson.Substitution.compose resolution_context binding
+                    | _ -> resolution_context
+                end
+
+    let observation context witness = match witness |> Watson.Proof.Witness.resolved_atom |> Watson.Atom.apply context |> Introduction.of_atom with
+        | None -> []
+        | Some intro ->
+            let sample_site = Introduction.sample_site intro in
+            begin match Introduction.Functional.target intro |> Watson.Substitution.apply context with
+                | Watson.Term.Variable _ -> []
+                | (_ as term) ->
+                    let value = term
+                        |> Model.Value.of_term
+                        |> CCOpt.get_exn_or "Invalid value construction" in
+                    [ (sample_site, value) ]
+            end
+    
+    let rec compile witnesses = witnesses |> CCList.rev |> compile_aux Watson.Substitution.empty
+    and compile_aux context = function
+        | [] -> [], []
+        | witness :: rest ->
+            (* update context *)
+            let context = context |> Watson.Substitution.compose (full_context context witness) in
+            (* recurse *)
+            let statements, observations = compile_aux context rest in
+            let observations = (observation context witness) @ observations in
+            match statement context witness with
+                | Some statement -> statement :: statements, observations
+                | _ -> statements, observations
+            (* convert intro to statement *)
 end
-
 let of_proof proof history =
-    let branches = proof
+    let compilation_results = proof
         |> Branch.of_proof
-        |> CCList.map Branch.introductions in
-    let introductions = branches
-        |> CCList.concat
-        |> CCList.uniq ~eq:Introduction.equal in
-    let pipeline = introductions
-        |> CCList.filter_map Model.Statement.of_introduction
-        |> Model.of_statements in
+        |> CCList.map Branch.compile in
+    let statements = compilation_results
+        |> CCList.flat_map fst
+        |> CCList.uniq ~eq:Model.Statement.equal in
+    let observations = compilation_results
+        |> CCList.map snd in
     {
-        pipeline = pipeline;
-        observations = branches |> CCList.map Observation.of_introductions;
+        pipeline = Model.of_statements statements;
+        observations = observations;
         history = history;
     }
