@@ -1,4 +1,4 @@
 (library
     (name data)
-    (libraries containers)
+    (libraries containers yojson)
 )
