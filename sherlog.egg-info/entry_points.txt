@@ -1,0 +1,3 @@
+[console_scripts]
+sherlog = sherlog.scripts.cli:cli
+

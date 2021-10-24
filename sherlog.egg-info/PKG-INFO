@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: sherlog
+Version: 0.9
+Summary: Declarative, deep, probabilistic generative logic programming.
+Home-page: http://github.com/csmith49/sherlog
+Author: Calvin Smith
+Author-email: email@cjsmith.io
+License: MIT
+Platform: UNKNOWN
+Requires-Python: >=3.9
+
+UNKNOWN
+
