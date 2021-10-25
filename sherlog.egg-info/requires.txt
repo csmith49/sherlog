@@ -8,3 +8,4 @@ hashids
 pandas
 altair
 altair_viewer
+storchastic

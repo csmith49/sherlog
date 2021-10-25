@@ -19,7 +19,8 @@ setup(name='sherlog',
         "hashids",
         "pandas",
         "altair",
-        "altair_viewer"
+        "altair_viewer",
+        "storchastic"
     ],
     zip_safe=False,
     entry_points = {

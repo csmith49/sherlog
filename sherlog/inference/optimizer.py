@@ -6,6 +6,7 @@ from torch import Tensor, tensor, stack
 from enum import Enum, auto
 from torch.optim import SGD, Adam, Adagrad
 from typing import Iterable
+from storch import add_cost, backward
 
 import logging
 
@@ -118,14 +119,14 @@ class Optimizer:
         # evaluate the objective
         result = self.evaluate(objective)
 
-        # check if it's well-formed (not NaN, not infinite, etc)
-        if result.isnan():
-            logger.warning(f"Objective produced NaN. [objective={objective}]")
-        elif result.isinf():
-            logger.warning(f"Objective produced infinite result. [objective={objective}]")
-        # and add to the queue if it's good
-        else:
-            self._queue.append( (result, intent) )
+        # # check if it's well-formed (not NaN, not infinite, etc)
+        # if result._tensor.isnan():
+        #     logger.warning(f"Objective produced NaN. [objective={objective}]")
+        # elif result._tensor.isinf():
+        #     logger.warning(f"Objective produced infinite result. [objective={objective}]")
+        # # and add to the queue if it's good
+        # else:
+        self._queue.append( (result, intent) )
 
     def maximize(self, *objectives : Objective):
         """Register an objective to be maximized."""
@@ -150,27 +151,27 @@ class Optimizer:
         Average computed loss (NaN if no objectives registered).
         """
 
-        # zero the grads in the optimizer
-        self._optimizer.zero_grad()
-        
-        # compute the losses
-        losses = [value * intent.sign for value, intent in self._queue]
+        if self._queue:
+            # zero the grads in the optimizer
+            self._optimizer.zero_grad()
 
-        if losses:
-            loss = stack(losses).sum()
-            loss.backward()
+            # register the costs
+            for index, (value, intent) in enumerate(self._queue):
+                add_cost(value * intent.sign, f"cost:{index}")
+
+            # get the gradients and update
+            cost = backward()
             self._optimizer.step()
             self.program.clamp()
             self._queue = []
 
         else:
             logger.warning("Optimization triggered with an empty optimization queue.")
-            loss = tensor(0.0)
+            cost = tensor(float("nan"))
 
         # for debugging, we'll return the average computed loss (NaN if we didn't have any)
-        batch_loss = loss / len(losses)
-        minotaur["batch loss"] = batch_loss.item()
-        return batch_loss
+        minotaur["batch loss"] = cost.item()
+        return cost
 
     # CONTEXT MANAGER SEMANTICS
  

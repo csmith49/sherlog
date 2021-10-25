@@ -72,7 +72,6 @@ class Program:
         explanation = self.explanation(evidence, attempts=attempts)
         result = explanation.log_prob(store)
 
-        minotaur["result"] = result.item()
         return result
 
     @minotaur("conditional log-prob", kwargs=("explanations"))

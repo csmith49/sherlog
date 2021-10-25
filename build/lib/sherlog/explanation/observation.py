@@ -41,12 +41,15 @@ class Observation:
     def check_stub(self, key : str) -> Iterable[Statement]:
         """Stub for evaluating a *non-empty* observation."""
 
-        yield Statement(f"sherlog:keys:{key}", "tensorize", list(self.domain))
-        yield Statement(f"sherlog:vals:{key}", "tensorize", list(self.codomain))
-        yield Statement(f"sherlog:target:{key}", "target", [
-            Identifier(f"sherlog:keys:{key}"),
-            Identifier(f"sherlog:vals:{key}")
-        ])
+        dimensions = []
+
+        for index, (identifier, value) in enumerate(self.mapping.items()):
+            target = f"sherlog:target:{key}:dimension:{index}"
+            dimensions.append(Identifier(target))
+
+            yield Statement(target, "dimension_magnitude", [Identifier(identifier), value])
+        
+        yield Statement(f"sherlog:target:{key}", "equality_ball", dimensions)
 
     def stub(self, key : str, default=None) -> Iterable[Statement]:
         """Stub for evaluating an observation."""
