@@ -186,7 +186,7 @@ class SpyglassNamespace(DynamicNamespace[List[Clue]]):
 
         super().__init__(lookup)
 
-def semantics_factory(observation : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]], width : int):
+def semantics_factory(observation : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]]):
     """Builds a set of spyglass semantics that forces a given observation."""
 
     pipe = Pipe(unit, bind)
