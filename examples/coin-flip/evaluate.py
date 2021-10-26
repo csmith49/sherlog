@@ -25,7 +25,8 @@ result(F) <- flip(coin, F).
 @click.option("-e", "--epochs", default=10, type=int, help="Training epochs.")
 @click.option("-l", "--learning-rate", default=1e-4, type=float, help="Learning rate.")
 @click.option("-i", "--instrumentation", type=str, help="Filepath to save instrumentation logs to.")
-def cli(probability, train, batch_size, epochs, learning_rate, instrumentation):
+@click.option("-s", "--samples", type=int, default=1, help="Number of samples for each explanation log-prob approximation.")
+def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, samples):
     """Train a simple coin flip program."""
 
     # do this first, or we lose some initial messages
@@ -62,7 +63,7 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation):
     # build the optimizer
     print(f"Initializing the optimizer with a learning rate of {learning_rate}...")
 
-    optimizer = Optimizer(program, learning_rate=learning_rate)
+    optimizer = Optimizer(program, learning_rate=learning_rate, samples=samples)
 
     # iterate over the data, and optimize
     for batch in minibatch(data, batch_size, epochs=epochs):

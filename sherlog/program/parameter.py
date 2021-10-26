@@ -96,7 +96,7 @@ class PositiveRealParameter(Parameter):
         Modifies the parameter in-place.
         """
 
-        self.value.clamp_(self._epsilon, float("inf"))
+        self.value.clamp_(1e-5, float("inf"))
 
     @property
     def domain(self):

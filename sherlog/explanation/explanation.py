@@ -42,15 +42,26 @@ class Explanation:
         # the target
         yield from self.target_stub()
 
+    def forcing(self) -> Mapping[str, Tensor]:
+        """Construct the most-specific forcing possible for the explanation."""
+
+        if len(self.observations) == 1:
+            observation = self.observations[0]
+            return {
+                key : tensor(value.value) for key, value in observation.mapping.items()
+            }
+        else:
+            return {}
+
     @minotaur("explanation log-prob")
     def log_prob(self, parameters : Mapping[str, Tensor], samples : int = 1) -> Tensor:
         """Compute the log-probability of the explanation generating the observations."""
 
         # step 1: form the semantics
         semantics = spyglass.semantics_factory(
-            observation = Observation({}), # can't really force with multiple observations
-            target = EqualityIndicator(),  # using 0-1 indicator value for target
-            locals = self.locals
+            forcing = self.forcing(),
+            target  = EqualityIndicator(),
+            locals  = self.locals
         )
 
         # step 2: evaluate the explanation as many times as requested

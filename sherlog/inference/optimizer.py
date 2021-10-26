@@ -66,7 +66,7 @@ class Optimizer:
 
     # CONSTRUCTION
 
-    def __init__(self, program : Program, strategy : Strategy = Strategy.SGD, learning_rate : float = 1e-4, **kwargs):
+    def __init__(self, program : Program, strategy : Strategy = Strategy.SGD, learning_rate : float = 1e-4, samples : int = 1, **kwargs):
         """Construct an optimizer.
         
         Parameters
@@ -77,6 +77,8 @@ class Optimizer:
             One of `[SGD, Adam]`.
 
         learning_rate : float (default=1e-4)
+
+        samples : int (default=1)
         """
 
         self.program = program

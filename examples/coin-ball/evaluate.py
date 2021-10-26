@@ -8,7 +8,7 @@ import click
 from sherlog.program import loads
 from sherlog.inference import minibatch, Optimizer, FunctionalEmbedding
 from sherlog.interface import initialize
-from sherlog.interface.instrumentation import instrument, minotaur
+from sherlog.interface.instrumentation import minotaur
 
 from torch import nn
 from torch.nn.functional import softmax

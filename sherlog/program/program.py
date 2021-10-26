@@ -59,18 +59,14 @@ class Program:
         raise TimeoutError(f"Explanation sampling timed-out. [evidence={evidence}, attempts={attempts}]")
 
     @minotaur("log-prob", kwargs=("explanations"))
-    def log_prob(self,
-        evidence : Evidence,
-        attempts = 100,
-        parameters : Optional[Mapping[str, Tensor]] = None,
-    ) -> Tensor:
+    def log_prob(self, evidence : Evidence, attempts : int = 100, samples : int = 1, parameters : Optional[Mapping[str, Tensor]] = None) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence."""
 
         # build -> sample -> evaluate
         store = self.store(**(parameters if parameters else {}))
 
         explanation = self.explanation(evidence, attempts=attempts)
-        result = explanation.log_prob(store)
+        result = explanation.log_prob(store, samples=samples)
 
         minotaur["result"] = result.item()
         return result
