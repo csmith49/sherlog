@@ -15,7 +15,8 @@ import torchvision.transforms as transforms
 
 SOURCE = \
 """
-digit(X; {0, 1, 2, 3, 4, 5, 6, 7, 8, 9} <- digit_nn[X]).
+digit_weights(X; digit_nn[X]).
+digit(X; categorical[W]) <- digit_weights(X, W).
 
 addition(X, Y; add[X', Y']) <- digit(X, X'), digit(Y, Y').
 """
@@ -127,9 +128,12 @@ def cli(train, test, batch_size, epochs, learning_rate, instrumentation):
     correct = 0
     for _ in range(test):
         image, d = choice(MNIST)
-        result = argmax(program._locals["digit_nn"](image)).item()
+        prediction = program._locals["digit_nn"](image)
+        result = argmax(prediction).item()
 
-        if image == d:
+        print(f"{prediction}, {result}, {d}")
+
+        if result == d:
             correct += 1
 
     print(correct / test)

@@ -21,6 +21,9 @@ def gt(left : Tensor, right : Tensor) -> Tensor:
 def add(left : Tensor, right : Tensor) -> Tensor:
     return left + right
 
+def max(*args):
+    return stack(args).max()
+
 # BUILTIN UTILITIES
 
 _BUILTIN_MAP = {
@@ -28,7 +31,8 @@ _BUILTIN_MAP = {
     "identity" : identity,
     "or" : _or,
     "gt" : gt,
-    "add" : add
+    "add" : add,
+    "max" : max
 }
 
 def supported_builtins():

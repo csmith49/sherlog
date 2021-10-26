@@ -152,7 +152,7 @@ def lift_distribution(distribution_constructor, forcing : Optional[Tensor] = Non
 
     return wrapped
 
-def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], target : Target, locals : Mapping[str, Callable[..., Tensor]]) -> Callable[..., List[Clue]]:
+def spyglass_lookup(statement : Statement, forcing : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]]) -> Callable[..., List[Clue]]:
     """Look up the appropriate callable for a statement."""
 
     # case 0: the target
@@ -179,15 +179,14 @@ def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], targe
 # namespace
 
 class SpyglassNamespace(DynamicNamespace[List[Clue]]):
-    def __init__(self, observation : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]]):
+    def __init__(self, forcing : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]]):
         """Construct a namespace that forces a given observation."""
 
-        forcing = {k : to_tensor(v.value) for k, v in observation.mapping.items() if isinstance(v, Literal)}
         lookup = partial(spyglass_lookup, forcing=forcing, target=target, locals=locals)
 
         super().__init__(lookup)
 
-def semantics_factory(observation : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]]):
+def semantics_factory(observation : Observation, target : Target, locals : Mapping[str, Callable[..., Tensor]], width : int):
     """Builds a set of spyglass semantics that forces a given observation."""
 
     pipe = Pipe(unit, bind)

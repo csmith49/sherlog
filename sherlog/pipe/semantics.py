@@ -5,7 +5,7 @@ from .pipeline import Pipeline
 from .statement import Statement
 
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Mapping, Any, List, Callable, Iterable
+from typing import TypeVar, Generic, Mapping, Any, Iterable
 from copy import copy
 
 T = TypeVar('T')

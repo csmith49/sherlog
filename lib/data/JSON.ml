@@ -48,13 +48,12 @@ let list embedding =
     Embedding.mk embed pullback
 
 let assoc embedding =
-    let embed xs = `Assoc (CCList.map (CCPair.map_snd (Embedding.embed embedding)) xs) in
-    let pullback xs = function
-        | `Assoc xs -> xs
-            |> CCList.map (fun (k, v) -> match Embedding.pullback embedding v with
-                | Some v -> Some (k, v)
-                | _ -> None)
-            |> CCList.all_some
+    let embedding = embedding
+        |> Embedding.pair Embedding.id
+        |> Embedding.list in
+    let embed xs = `Assoc (Embedding.embed embedding xs) in
+    let pullback = function
+        | `Assoc xs -> Embedding.pullback embedding xs
         | _ -> None in
     Embedding.mk embed pullback
 

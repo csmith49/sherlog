@@ -1,6 +1,6 @@
 from ..pipe import Value, Identifier, Literal, Statement
 
-from typing import Mapping, Iterable, List
+from typing import Mapping, Iterable
 
 class Observation:
     """Observations pair identifiers with observed logical values."""
@@ -9,6 +9,8 @@ class Observation:
         """Construct an observation."""
         
         self.mapping = mapping
+
+    # PROPERTIES
 
     @property
     def is_empty(self) -> bool:
@@ -55,6 +57,9 @@ class Observation:
 
     def __str__(self):
         return str(self.mapping)
+
+    def __rich_repr__(self):
+        yield from self.mapping.items()
 
     # SERIALIZATION
     

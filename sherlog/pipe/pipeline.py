@@ -98,3 +98,6 @@ class Pipeline:
 
     def __str__(self):
         return '\n'.join((str(stmt) for stmt in self.evaluation_order()))
+
+    def __rich_repr__(self):
+        yield from self.evaluation_order()

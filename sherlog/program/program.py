@@ -3,7 +3,7 @@ from .parameter import Parameter
 from .posterior import Posterior
 
 from ..explanation import Explanation
-from ..interface import query
+from ..interface import query, print
 from ..interface.instrumentation import minotaur
 
 from typing import Optional, Iterable, Mapping, Any, Callable
