@@ -29,19 +29,29 @@ class Observation:
 
         yield from self.mapping.values()
 
-    def stub(self, default=None, key=None) -> List[Statement]:
-        if self.is_empty:
-            return [
-                Statement(f"sherlog:target:{key}", "identity", [Literal(default)])
-            ]
-        else:
-            return [
-                Statement(f"sherlog:keys:{key}", "tensorize", list(self.domain)),
-                Statement(f"sherlog:vals:{key}", "tensorize", list(self.codomain)),
-                Statement(f"sherlog:target:{key}", "target", [Identifier(f"sherlog:keys:{key}"), Identifier(f"sherlog:vals:{key}")])
-            ]
+    # EVALUATION STUBS
 
-    # magic methods
+    def empty_stub(self, key : str, default = None) -> Iterable[Statement]:
+        yield Statement(f"sherlog:target:{key}", "identity", [Literal(default)])
+
+    def check_stub(self, key : str) -> Iterable[Statement]:
+        yield Statement(f"sherlog:keys:{key}", "tensorize", list(self.domain))
+        yield Statement(f"sherlog:vals:{key}", "tensorize", list(self.codomain))
+        yield Statement(f"sherlog:target:{key}", "target", [
+            Identifier(f"sherlog:keys:{key}"),
+            Identifier(f"sherlog:vals:{key}")
+        ])
+
+    def target_stub(self, key : str, default = None) -> Iterable[Statement]:
+        if self.is_empty:
+            yield from self.empty_stub(key, default=default)
+        else:
+            yield from self.check_stub(key)
+
+    def target_identifier(self, key : str) -> Value:
+        return Identifier(f"sherlog:target:{key}")
+
+    # MAGIC METHODS
 
     def __str__(self):
         return str(self.mapping)

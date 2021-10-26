@@ -5,7 +5,7 @@ from .pipeline import Pipeline
 from .statement import Statement
 
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Mapping, Any, List, Callable
+from typing import TypeVar, Generic, Mapping, Any, List, Callable, Iterable
 from copy import copy
 
 T = TypeVar('T')
@@ -41,12 +41,12 @@ class Semantics(Generic[T]):
 
         return result
 
-    def _evaluate_pipeline(self, pipeline : Pipeline, context : Mapping[str, T]) -> Mapping[str, T]:
+    def _evaluate_statements(self, statements : Iterable[Statement], context : Mapping[str, T]) -> Mapping[str, T]:
         """Apply the semantics to a program."""
 
         _context = copy(context) # we don't modify the passed-in context
 
-        for statement in pipeline.evaluation_order():
+        for statement in statements:
             result = self._evaluate_statement(statement, _context)
             _context[statement.target] = result
 
@@ -64,41 +64,14 @@ class Semantics(Generic[T]):
         if isinstance(obj, Pipeline):
             return self._evaluate_pipeline(obj, context)
 
-    def run(self, pipeline : Pipeline, parameters : Mapping[str, Any]) -> Mapping[str, T]:
+    def run(self, statements : Iterable[Statement], parameters : Mapping[str, Any]) -> Mapping[str, T]:
         """Apply the semantics to a program with the given parameterization."""
 
         context = {key : self.pipe.unit(value) for key, value in parameters.items()}
 
-        return self._evaluate_pipeline(pipeline, context)
+        return self._evaluate_statements(statements, context)
 
-    def __call__(self, pipeline : Pipeline, parameters : Mapping[str, Any]) -> Mapping[str, T]:
+    def __call__(self, statements : Iterable[Statement], parameters : Mapping[str, Any]) -> Mapping[str, T]:
         """Alias for `self.run(pipeline, parameters)`."""
 
-        return self.run(pipeline, parameters)
-
-class NDSemantics(Semantics[List[T]]):
-    """Semantics for non-deterministic evaluation."""
-
-    def __init__(self, pipe : Pipe[T], namespace : Namespace[List[T]]):
-        """Lift the provided pipe to support non-determinism and construct the resulting semantics."""
-
-        # unit closure
-        def unit(value : Any) -> List[T]:
-            """Lift a value to a non-deterministic pipe value."""
-
-            return [pipe.unit(value)]
-
-        # bind closure
-        def bind(callable : Callable[..., List[T]], arguments : List[List[T]]) -> List[T]:
-            """Apply a non-deterministic function to a set of non-deterministic arguments."""
-
-            # generator loops over all arguments in the cart-prod and uses pipe.bind to stitch context together
-            def gen():
-                for args in zip(*arguments):
-                    for result in pipe.bind(callable, args):
-                        yield result
-
-            return list(gen())
-
-        # store the constructed pipe locally
-        super().__init__(Pipe(unit, bind), namespace)
+        return self.run(statements, parameters)
