@@ -169,10 +169,8 @@ class Optimizer:
             logger.warning("Optimization triggered with an empty optimization queue.")
             loss = tensor(0.0)
 
-        # for debugging, we'll return the average computed loss (NaN if we didn't have any)
-        batch_loss = loss / len(losses)
-        minotaur["batch loss"] = batch_loss.item()
-        return batch_loss
+        minotaur["batch loss"] = loss.item()
+        return loss
 
     # CONTEXT MANAGER SEMANTICS
  
