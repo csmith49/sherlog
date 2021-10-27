@@ -8,7 +8,7 @@ lib/sherlog/.merlin
 lib/interface/.merlin
 lib/data/.merlin
 
-*.egg_info
+*.egg-info
 
 .vscode
 .direnv
