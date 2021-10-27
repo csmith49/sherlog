@@ -82,24 +82,24 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
 
             # what is the true probability suggested by the batch?
             head_count = len(list(filter(None, batch.data)))
-            batch_probability = head_count / len(batch.data)
-            print(f"Batch P: {batch_probability:.2f}")
+            print(f"Batch P: {head_count / len(batch.data):.2f}")
 
             # okay, now let's optimize
             optimizer.maximize(*embedder.embed_all(batch.data))
             batch_loss = optimizer.optimize()
 
             # what is the batch loss?
-            batch_loss_delta = old_batch_loss - batch_loss
-            print(f"Batch loss: {batch_loss:.3f} (Δ {batch_loss_delta:.3f})")
-            old_batch_loss = batch_loss
+            print(f"Batch loss: {batch_loss:.3f} (Δ {old_batch_loss - batch_loss:.3f})")
 
-            print(f"P: {program._parameters[0].value.item():.3f} (error: ±{abs(program._parameters[0].value.item() - probability):.3f})")
             # and what is the resulting gradient for the probability?
-            print(f"∇P: {program._parameters[0].value.grad.item():.3f}")
+            parameter = program._parameters[0].value
+            print(f"P: {parameter.item():.3f} (error: ±{abs(parameter.item() - probability):.3f})")
+            print(f"∇P: {parameter.grad.item():.3f}")
 
             minotaur["batch"] = batch.index
             minotaur["epoch"] = batch.epoch
+
+            old_batch_loss = batch_loss
 
     minotaur.exit()
 
