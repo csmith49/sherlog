@@ -21,7 +21,7 @@ observe(V) <- sample(_, V).
 
 @click.command()
 @click.option("-m", "--mean", type=float, default=0.9, help="Mean of Gaussian.")
-@click.option("-s", "--sdev", type=float, default=0.03, help="Standard deviation of Gaussian.")
+@click.option("-s", "--sdev", type=float, default=0.1, help="Standard deviation of Gaussian.")
 @click.option("-t", "--train", default=100, type=int, help="Number of training samples.")
 @click.option("-b", "--batch-size", default=10, type=int, help="Training minibatch size.")
 @click.option("-e", "--epochs", default=10, type=int, help="Training epochs.")
