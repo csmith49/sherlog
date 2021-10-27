@@ -115,6 +115,17 @@ class Program:
         # handle posterior
         yield from self.posterior.parameters()
 
+    def parameter(self, name : str) -> Tensor:
+        """Look up a parameter by name.
+        
+        Will not consider parameters of embedded function approximators."""
+
+        for parameter in self._parameters:
+            if parameter.name == name:
+                return parameter.value
+
+        return None
+
     def clamp(self):
         """Update program parameters in-place to satisfy their domain constraints."""
 
