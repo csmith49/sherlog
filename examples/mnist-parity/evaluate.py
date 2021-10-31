@@ -15,8 +15,22 @@ import torchvision.transforms as transforms
 
 SOURCE = \
 """
-digit(X; {0, 1, 2, 3, 4, 5, 6, 7, 8, 9} <- digit_nn[X]).
-observe(I, D) <- digit(I, D).
+digit(I; {0, 1, 2, 3, 4, 5, 6, 7, 8, 9} <- digit_nn[I]).
+
+even(0).
+even(2).
+even(4).
+even(6).
+even(8).
+
+odd(1).
+odd(3).
+odd(5).
+odd(7).
+odd(9).
+
+observe(I, even) <- digit(I, D), even(D).
+observe(I, odd) <- digit(I, D), odd(D).
 """
 
 class MNISTClassifier(nn.Module):
@@ -39,7 +53,7 @@ class MNISTClassifier(nn.Module):
             nn.Linear(84, 10),
             nn.Softmax(1)
         )
-    
+
     def forward(self, x):
         z = self.encoder(x.unsqueeze(0)).view(-1, 16 * 4 * 4)
         return self.classifier(z).float().squeeze(0)
@@ -71,15 +85,23 @@ def classification_accuracy(classifier, data):
             correct += 1
     return correct / len(data)
 
+def parity_accuracy(classifier, data):
+    correct = 0
+    for datum in data:
+        prediction = argmax(classifier(datum["image"]))
+        if (prediction % 2) == (datum["digit"] % 2):
+            correct += 1
+    return correct / len(data)
+
 @click.command()
 @click.option("--train", default=100, type=int, help="Number of training samples.")
-@click.option("-b", "--batch-size", default=10, type=int, help="Training minibatch size.")
+@click.option("-b", "--batch-size", default=10, type=int, help="Training minibatch size")
 @click.option("-e", "--epochs", default=10, type=int, help="Training epochs.")
 @click.option("-l", "--learning-rate", default=1e-4, type=float, help="Learning rate.")
 @click.option("-s", "--samples", default=100, type=int, help="Number of per-datum samples.")
 def cli(train, batch_size, epochs, learning_rate, samples):
-    """Learn the parameters for a simple MNIST digit classifier."""
-    
+    """Learn the parameters for a simple MNIST digit classifier trained via parity observations."""
+
     # initialize!
     print("Initializing...")
     initialize(port=8007)
@@ -90,11 +112,9 @@ def cli(train, batch_size, epochs, learning_rate, samples):
 
     # load the data
     print(f"Generating {train} training points...")
-
     data = [sample() for _ in range(train)]
-
     embedder = FunctionalEmbedding(
-        evidence=lambda s: f"observe(image, {s['digit']})",
+        evidence=lambda s: "observe(image, even)" if s["digit"] % 2 == 0 else "observe(image, odd)",
         parameters=lambda s: {
             "image" : s["image"]
         }
@@ -124,8 +144,8 @@ def cli(train, batch_size, epochs, learning_rate, samples):
 
         # what is the network doing wrt accuracy?
         classifier = program._locals["digit_nn"]
-        accuracy = classification_accuracy(classifier, batch.data)
-        print(f"Batch accuracy: {accuracy:0.3f}")
+        print(f"Batch classification accuracy: {classification_accuracy(classifier, batch.data):.3f}")
+        print(f"Batch parity accuracy: {parity_accuracy(classifier, batch.data):.3f}")
 
         old_batch_loss = batch_loss
 
