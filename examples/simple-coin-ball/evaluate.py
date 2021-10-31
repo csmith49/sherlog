@@ -2,7 +2,6 @@
 """
 
 import click
-from rich.console import COLOR_SYSTEMS
 
 from sherlog.program import loads
 from sherlog.inference import minibatch, Optimizer, FunctionalEmbedding
@@ -123,7 +122,7 @@ def cli(train, batch_size, epochs, learning_rate):
     old_batch_loss = tensor(0.0)
 
     for batch in minibatch(data, batch_size, epochs=epochs):
-        # we print out a"frame for each batch for debugging purposes...
+        # we print out a frame for each batch for debugging purposes...
         print(f"\n🪙 Batch {batch.index:03d} in Epoch {batch.epoch:03d} 🪙")
 
         # what is the parameterization implied by the batch?
@@ -137,7 +136,6 @@ def cli(train, batch_size, epochs, learning_rate):
         
         color2s = Counter([datum["color2"] for datum in batch.data])
         print(f"urn_two_weights=[{color2s[Color.RED] / len(batch.data):.3f}, {color2s[Color.BLUE] / len(batch.data):.3f}, {color2s[Color.GREEN] / len(batch.data):.3f}]")
-
 
         # okay, now let's optimize
         optimizer.maximize(*embedder.embed_all(batch.data))
