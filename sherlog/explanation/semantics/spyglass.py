@@ -139,7 +139,10 @@ def lift_distribution(distribution_constructor, forcing : Optional[Tensor] = Non
 
     @wraps(distribution_constructor)
     def wrapped(*arguments):
-        distribution = distribution_constructor(*arguments)
+        try:
+            distribution = distribution_constructor(*arguments)
+        except ValueError:
+            raise ValueError(f"Cannot construct distribution. [constructor={distribution_constructor}, arguments={arguments}")
 
         # short-circuit sampling if there's a forcing given
         if forcing is not None:

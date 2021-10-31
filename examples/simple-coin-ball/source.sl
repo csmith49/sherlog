@@ -1,10 +1,9 @@
-face(C; {tails, heads} <- coin_nn[C]).
-color(RGB; {red, green, blue} <- color_nn[RGB]).
-
 # parameters
+!parameter weight : unit.
 !parameter urn_one_weights : unit[2].
 !parameter urn_two_weights : unit[3].
 
+flip(coin; {tails, heads} <~ bernoulli[weight]).
 draw(urn_one; {red, blue} <~ categorical[urn_one_weights]).
 draw(urn_two; {red, green, blue} <~ categorical[urn_two_weights]).
 
@@ -21,10 +20,11 @@ outcome(tails, blue, red, loss).
 outcome(tails, blue, blue, win).
 outocme(tails, blue, green, loss).
 
-game(C, U1, U2, R) <-
-    face(C, F),
-    draw(urn_one, C1), color(U1, C1),
-    draw(urn_two, C2), color(U2, C2),
-    outcome(F, C1, C2, R).
+game(R) <-
+    flip(coin, F),
+    draw(urn_one, B1),
+    draw(urn_two, B2),
+    outcome(F, B1, B2, R).
 
-!evidence game(coin, urn1, urn2, win).
+!evidence game(win).
+!evidence game(loss).
