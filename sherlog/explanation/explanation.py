@@ -2,7 +2,7 @@
 
 from ..pipe import Pipeline, Statement
 from ..interface.instrumentation import minotaur
-from .semantics.core.semiring import PreciseSemiring
+from .semantics.core.semiring import PreciseSemiring, DisjointSumSemiring
 from .semantics import spyglass
 from .observation import Observation
 from .history import History
@@ -58,7 +58,7 @@ class Explanation:
         # step 1: form the semantics
         semantics = spyglass.semantics_factory(
             forcing = self.forcing(),
-            semiring = PreciseSemiring(),
+            semiring = DisjointSumSemiring(),
             locals  = self.locals
         )
 

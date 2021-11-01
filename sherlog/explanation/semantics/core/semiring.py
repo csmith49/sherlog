@@ -85,7 +85,7 @@ class DisjointSumSemiring(Semiring):
         return stack(arguments).sum()
 
     def product(self, *arguments : Tensor) -> Tensor:
-        return stack(arguments).mult()
+        return stack(arguments).prod()
 
     def zero(self, left : Tensor, right : Tensor) -> Tensor:
         if dist(left.float(), right.float()) > self.epsilon:
