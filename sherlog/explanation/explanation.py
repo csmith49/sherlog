@@ -23,11 +23,11 @@ class Explanation:
 
     # evaluation framework
 
-    def target_stub(self) -> Iterable[Statement]:
+    def stub(self) -> Iterable[Statement]:
         """Statement stub for producing final evaluation target from observation results."""
         
-        targets = [observation.target_identifier(key) for key, observation in enumerate(self.observations)]
-        yield Statement("sherlog:target", "max", targets)
+        targets = [observation.target(key) for key, observation in enumerate(self.observations)]
+        yield Statement("sherlog:target", "sum", targets)
 
     def statements(self) -> Iterable[Statement]:
         """Sequence of statements to produce final evaluation target."""
@@ -37,10 +37,10 @@ class Explanation:
         
         # the observations
         for key, observation in enumerate(self.observations):
-            yield from observation.target_stub(key=key, default=0.0)
+            yield from observation.stub(key=key, default=0.0)
 
         # the target
-        yield from self.target_stub()
+        yield from self.stub()
 
     def forcing(self) -> Mapping[str, Tensor]:
         """Construct the most-specific forcing possible for the explanation."""
@@ -94,16 +94,6 @@ class Explanation:
         history = History.of_json(json["history"])
 
         return cls(program, observations, history, locals=locals)
-
-    def to_json(self):
-        """Construct a JSON-like encoding for the explanation."""
-
-        return {
-            "type" : "explanation",
-            "program" : self.program.dump(),
-            "observations" : self.observation.dump(),
-            "history" : self.history.dump()
-        }
 
     # magic methods
 

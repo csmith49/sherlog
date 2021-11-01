@@ -1,20 +1,4 @@
 (*  *)
-module Observation : sig
-    (* assocs from names to concrete values *)
-    type t = (string * Model.Value.t) list
-
-    (* constructed from introduction sets *)
-    (* val of_introductions : Introduction.t list -> t *)
-
-    val pp : t Fmt.t
-
-    (* JSON encoding only *)
-    module JSON : sig
-        val encode : t -> JSON.t
-    end
-end
-
-(*  *)
 type t
 
 module Functional : sig

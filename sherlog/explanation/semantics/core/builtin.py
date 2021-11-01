@@ -24,6 +24,23 @@ def add(left : Tensor, right : Tensor) -> Tensor:
 def max(*args):
     return stack(args).max()
 
+# FOR EVALUATING LITERALS
+# TODO: USE TORCH.DIST HERE
+
+def _literal_equal(left : Tensor, right : Tensor) -> Tensor:
+    return tensor(1.0) if left == right else tensor(0.0)
+
+def _literal_not_equal(left : Tensor, right : Tensor) -> Tensor:
+    return tensor(0.0) if left == right else tensor(1.0)
+
+# FOR EVALUATING OBSERVATIONS
+
+def _observation_product(*args : Tensor) -> Tensor:
+    return stack(args).prod()
+
+def _observation_sum(*args : Tensor) -> Tensor:
+    return stack(args).sum()
+
 # BUILTIN UTILITIES
 
 _BUILTIN_MAP = {
@@ -32,7 +49,13 @@ _BUILTIN_MAP = {
     "or" : _or,
     "gt" : gt,
     "add" : add,
-    "max" : max
+    "max" : max,
+    # LITERALS
+    "equal" : _literal_equal,
+    "not equal" : _literal_not_equal,
+    # OBSERVATIONS
+    "product" : _observation_product,
+    "sum" : _observation_sum
 }
 
 def supported_builtins():

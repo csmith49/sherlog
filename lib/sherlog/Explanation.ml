@@ -1,28 +1,3 @@
-module Observation = struct
-    type t = (string * Model.Value.t) list
-
-    let rec pp ppf obs = Fmt.pf ppf "{%a}"
-        (Fmt.list ~sep:Fmt.comma pair_pp) obs
-    and pair_pp ppf = function (s, v) ->
-        Fmt.pf ppf "%s : %a" s Model.Value.pp v
-
-    (* let of_introductions branch =
-        let assoc_of_intro intro = match Introduction.observation intro with
-            | Some (domain, codomain) -> begin match Model.Value.of_term codomain with
-                | Some value -> Some (domain, value)
-                | None -> None
-            end
-            | None -> None in
-        CCList.filter_map assoc_of_intro branch *)
-
-    module JSON = struct
-        let encode obs = `Assoc [
-            ("type", `String "observation");
-            ("items", obs |> JSON.Encode.assoc Model.Value.JSON.encode);
-        ]
-    end
-end
-
 type t = {
     pipeline : Model.t;
     observations : Observation.t list;
@@ -127,7 +102,8 @@ let of_proof proof history =
         |> CCList.flat_map fst
         |> CCList.uniq ~eq:Model.Statement.equal in
     let observations = compilation_results
-        |> CCList.map snd in
+        |> CCList.map snd
+        |> CCList.map Observation.eq_of_assoc in
     {
         pipeline = Model.of_statements statements;
         observations = observations;

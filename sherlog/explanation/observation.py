@@ -1,65 +1,70 @@
 from ..pipe import Value, Identifier, Literal, Statement
 
+from .literal import Literal
 from typing import Mapping, Iterable
 
 class Observation:
     """Observations pair identifiers with observed logical values."""
 
-    def __init__(self, mapping : Mapping[str, Value]):
+    def __init__(self, literals : Iterable[Literal]):
         """Construct an observation."""
-        
-        self.mapping = mapping
+
+        self.literals = list(literals)
 
     # PROPERTIES
 
     @property
     def is_empty(self) -> bool:
-        """Check if any identifiers are observed."""
+        """Check if the observation contains any literals."""
 
-        return len(self.mapping) == 0
+        return len(self.literals) == 0
 
     @property
     def domain(self) -> Iterable[Identifier]:
         """The domain of the observation."""
 
-        for key in self.mapping.keys():
-            yield Identifier(key)
+        for literal in self.literals:
+            yield literal.domain
 
     @property
     def codomain(self) -> Iterable[Value]:
         """The codomain of the observation."""
 
-        yield from self.mapping.values()
+        for literal in self.literals:
+            yield literal.codomain
 
     # EVALUATION STUBS
+
+    def target(self, key : str) -> Identifier:
+        return Identifier(f"sherlog:target:{key}")
 
     def empty_stub(self, key : str, default = None) -> Iterable[Statement]:
         yield Statement(f"sherlog:target:{key}", "identity", [Literal(default)])
 
     def check_stub(self, key : str) -> Iterable[Statement]:
-        yield Statement(f"sherlog:keys:{key}", "tensorize", list(self.domain))
-        yield Statement(f"sherlog:vals:{key}", "tensorize", list(self.codomain))
-        yield Statement(f"sherlog:target:{key}", "target", [
-            Identifier(f"sherlog:keys:{key}"),
-            Identifier(f"sherlog:vals:{key}")
-        ])
+        targets = []
+        
+        for index, literal in enumerate(self.literals):
+            literal_key = f"{key}:{index}"
+            targets.append(literal.target(literal_key))
 
-    def target_stub(self, key : str, default = None) -> Iterable[Statement]:
+            yield from literal.stub(literal_key)
+
+        yield Statement(self.target(key).value, "product", targets)
+
+    def stub(self, key : str, default = None) -> Iterable[Statement]:
         if self.is_empty:
             yield from self.empty_stub(key, default=default)
         else:
             yield from self.check_stub(key)
 
-    def target_identifier(self, key : str) -> Value:
-        return Identifier(f"sherlog:target:{key}")
-
     # MAGIC METHODS
 
     def __str__(self):
-        return str(self.mapping)
+        return str(self.literals)
 
     def __rich_repr__(self):
-        yield from self.mapping.items()
+        yield from self.literals
 
     # SERIALIZATION
     
@@ -70,15 +75,5 @@ class Observation:
         if json["type"] != "observation":
             raise TypeError(f"{json} does not represent an observation.")
         
-        mapping = {key : Value.of_json(value) for key, value in json["items"].items()}
-        return cls(mapping)
-
-    def to_json(self):
-        """Construct a JSON-like encoding of the observation."""
-
-        return {
-            "type" : "observation",
-            "items" : {
-                key : value.to_json() for key, value in self.mapping.items()
-            }
-        }
+        literals = [Literal.of_json(lit) for lit in json["literals"]]
+        return cls(literals)
