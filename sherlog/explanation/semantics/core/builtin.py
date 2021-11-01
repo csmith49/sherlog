@@ -1,4 +1,4 @@
-from torch import tensor, Tensor, stack
+from torch import tensor, Tensor, stack, dist
 from typing import Callable
 
 # DETERMINISTIC BUILTINS
@@ -25,13 +25,19 @@ def max(*args):
     return stack(args).max()
 
 # FOR EVALUATING LITERALS
-# TODO: USE TORCH.DIST HERE
 
 def _literal_equal(left : Tensor, right : Tensor) -> Tensor:
-    return tensor(1.0) if left == right else tensor(0.0)
+    if dist(left.float(), right.float()) <= 1e-6:
+        return tensor(1.0)
+    else:
+        return tensor(0.0)
 
 def _literal_not_equal(left : Tensor, right : Tensor) -> Tensor:
-    return tensor(0.0) if left == right else tensor(1.0)
+    if dist(left.float(), right.float()) > 1e-6:
+        return tensor(1.0)
+    else:
+        return tensor(0.0)
+
 
 # FOR EVALUATING OBSERVATIONS
 
