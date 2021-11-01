@@ -57,7 +57,7 @@ class Observation:
 
             yield from literal.stub(literal_key)
 
-        yield Statement(self.target(key).value, "product", targets)
+        yield Statement(self.target(key).value, "semiring:product", targets)
 
     def stub(self, key : str, default = None) -> Iterable[Statement]:
         if self.is_empty:

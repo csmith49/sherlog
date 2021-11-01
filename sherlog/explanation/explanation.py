@@ -2,7 +2,7 @@
 
 from ..pipe import Pipeline, Statement
 from ..interface.instrumentation import minotaur
-from .semantics.core.target import EqualityIndicator
+from .semantics.core.semiring import PreciseSemiring
 from .semantics import spyglass
 from .observation import Observation
 from .history import History
@@ -27,7 +27,7 @@ class Explanation:
         """Statement stub for producing final evaluation target from observation results."""
         
         targets = [observation.target(key) for key, observation in enumerate(self.observations)]
-        yield Statement("sherlog:target", "sum", targets)
+        yield Statement("sherlog:target", "semiring:sum", targets)
 
     def statements(self) -> Iterable[Statement]:
         """Sequence of statements to produce final evaluation target."""
@@ -58,7 +58,7 @@ class Explanation:
         # step 1: form the semantics
         semantics = spyglass.semantics_factory(
             forcing = self.forcing(),
-            target  = EqualityIndicator(),
+            semiring = PreciseSemiring(),
             locals  = self.locals
         )
 

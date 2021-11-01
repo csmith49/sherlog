@@ -34,7 +34,7 @@ class Equal(Literal):
     """Represents an equality constraint `variable == target`."""
 
     def stub(self, key : str) -> Iterable[Statement]:
-        yield Statement(self.target(key).value, "equal", [self.domain, self.codomain])
+        yield Statement(self.target(key).value, "semiring:one", [self.domain, self.codomain])
 
     @classmethod
     def of_json(cls, json) -> "Equal":
@@ -49,7 +49,7 @@ class NotEqual(Literal):
     """Represents an inequality constraint `variable != target`."""
 
     def stub(self, key : str) -> Iterable[Statement]:
-        yield Statement(self.target(key).value, "not equal", [self.domain, self.codomain])
+        yield Statement(self.target(key).value, "semiring:zero", [self.domain, self.codomain])
 
     @classmethod
     def of_json(cls, json) -> "NotEqual":

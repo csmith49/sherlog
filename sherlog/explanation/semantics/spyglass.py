@@ -8,7 +8,7 @@ from itertools import filterfalse, chain
 from ...pipe import DynamicNamespace, Semantics, Pipe, Statement, Literal
 from ..observation import Observation
 
-from .core.target import Target
+from .core.semiring import Semiring
 from . import core
 
 # UTILITY
@@ -155,12 +155,8 @@ def lift_distribution(distribution_constructor, forcing : Optional[Tensor] = Non
 
     return wrapped
 
-def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], target : Target, locals : Mapping[str, Callable[..., Tensor]]) -> Callable[..., List[Clue]]:
+def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], semiring : Semiring, locals : Mapping[str, Callable[..., Tensor]]) -> Callable[..., List[Clue]]:
     """Look up the appropriate callable for a statement."""
-
-    # case 0: the target
-    if statement.function == "target":
-        return lift_deterministic(target)
 
     # case 1: function is a distribution
     if statement.function in supported_distributions():
@@ -168,31 +164,35 @@ def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], targe
         forced_value = forcing[statement.target] if statement.target in forcing.keys() else None
         return lift_distribution(distribution_constructor, forcing=forced_value)
 
-    # case 2: function is builtin
+    # case 2: function is a semiring constructor
+    if statement.function in semiring.supported():
+        return lift_deterministic(semiring.lookup(statement.function))
+
+    # case 3: function is builtin
     if statement.function in core.builtin.supported_builtins():
         return lift_deterministic(core.builtin.lookup(statement.function))
 
-    # case 3: function is local
+    # case 4: function is local
     if statement.function in locals.keys():
         return lift_deterministic(locals[statement.function])
 
-    # case 4: can't be found
+    # case 5: can't be found
     raise KeyError(f"{statement.function} is not a recognized function.")
 
 # namespace
 
 class SpyglassNamespace(DynamicNamespace[List[Clue]]):
-    def __init__(self, forcing : Mapping[str, Tensor], target : Target, locals : Mapping[str, Callable[..., Tensor]]):
+    def __init__(self, forcing : Mapping[str, Tensor], semiring : Semiring, locals : Mapping[str, Callable[..., Tensor]]):
         """Construct a namespace that forces a given observation."""
 
-        lookup = partial(spyglass_lookup, forcing=forcing, target=target, locals=locals)
+        lookup = partial(spyglass_lookup, forcing=forcing, semiring=semiring, locals=locals)
 
         super().__init__(lookup)
 
-def semantics_factory(forcing : Mapping[str, Tensor], target : Target, locals : Mapping[str, Callable[..., Tensor]]):
+def semantics_factory(forcing : Mapping[str, Tensor], semiring : Semiring, locals : Mapping[str, Callable[..., Tensor]]):
     """Builds a set of spyglass semantics that forces a given observation."""
 
     pipe = Pipe(unit, bind)
-    namespace = SpyglassNamespace(forcing, target, locals)
+    namespace = SpyglassNamespace(forcing, semiring, locals)
 
     return Semantics(pipe, namespace)
