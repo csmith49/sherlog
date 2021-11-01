@@ -36,7 +36,7 @@ class Observation:
     @property
     def equality(self) -> Mapping[str, Value]:
         result = {
-            lit.domain : lit.codomain for lit in self.literals if isinstance(lit, Equal)
+            lit.domain.value : lit.codomain for lit in self.literals if isinstance(lit, Equal)
         }
         return result
 
