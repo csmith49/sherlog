@@ -48,7 +48,7 @@ class Explanation:
         if len(self.observations) == 1:
             observation = self.observations[0]
             return {
-                key : tensor(value.value) for key, value in observation.mapping.items()
+                key : tensor(value.value) for key, value in observation.equality.items()
             }
         else:
             return {}

@@ -1,6 +1,6 @@
 from ..pipe import Value, Identifier, Literal, Statement
 
-from .literal import Literal
+from .literal import Literal, Equal
 from typing import Mapping, Iterable
 
 class Observation:
@@ -32,6 +32,13 @@ class Observation:
 
         for literal in self.literals:
             yield literal.codomain
+
+    @property
+    def equality(self) -> Mapping[str, Value]:
+        result = {
+            lit.domain : lit.codomain for lit in self.literals if isinstance(lit, Equal)
+        }
+        return result
 
     # EVALUATION STUBS
 
