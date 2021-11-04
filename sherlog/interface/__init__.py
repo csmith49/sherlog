@@ -41,7 +41,7 @@ def parse_source(source : str):
     else:
         return response["program"], response["evidence"]
 
-def query(program, evidence, width = None):
+def query(program, evidence, width = None, path = False):
     """Query a Sherlog program to explain the provided evidence."""
 
     message = {
@@ -53,6 +53,9 @@ def query(program, evidence, width = None):
     # add additional config stuff
     if width:
         message["search-width"] = width
+
+    if path:
+        message["strategy"] = "path"
 
     # send and rec
     response = _SOCKET.communicate(message)

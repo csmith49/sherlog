@@ -11,7 +11,11 @@ end
 
 (* Construction *)
 
-val of_proof : Proof.proof -> Search.History.t -> t
+(** [tree_of_proof] *)
+val tree_of_proof : Proof.proof -> Search.History.t -> t
+
+(** [path_of_proof] *)
+val path_of_proof : Proof.proof -> Search.History.t -> t
 
 (* IO *)
 

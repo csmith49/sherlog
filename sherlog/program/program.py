@@ -52,7 +52,7 @@ class Program:
 
         for _ in range(attempts):
             try:
-                json = query(self, evidence)
+                json = query(self, evidence, path=True)
                 return Explanation.of_json(json, locals=self._locals)
             except TimeoutError:
                 pass

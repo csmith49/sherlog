@@ -44,11 +44,15 @@ let handler json = let open CCOpt in match JSON.Parse.(find "type" string json) 
         (* core programmatic info *)
         let* program = JSON.Parse.(find "program" Sherlog.Program.JSON.decode json) in
         let* query = JSON.Parse.(find "evidence" Sherlog.Evidence.JSON.decode json) in
+        let strategy = JSON.Parse.(find "strategy" string json)
+            |> CCOpt.get_or ~default:"tree" in
         (* get explanation *)
         let explanation = query
             |> Sherlog.Evidence.to_atoms
             |> fun cs -> Sherlog.Program.resolve cs program
-            |> fun (proof, history) -> Sherlog.Explanation.of_proof proof history
+            |> fun (proof, history) -> begin match strategy with
+                | "tree" -> Sherlog.Explanation.tree_of_proof proof history
+                | "path" | _ -> Sherlog.Explanation.path_of_proof proof history end
             |> Sherlog.Explanation.JSON.encode in
         let response = `Assoc [
             ("type", `String "query-response");

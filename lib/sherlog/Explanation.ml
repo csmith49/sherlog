@@ -94,7 +94,11 @@ module Branch = struct
                 | _ -> statements, observations
             (* convert intro to statement *)
 end
-let of_proof proof history =
+
+(* CONSTRUCTION *)
+
+(* TREE EXPLANATION *)
+let tree_of_proof proof history =
     let compilation_results = proof
         |> Branch.of_proof
         |> CCList.map Branch.compile in
@@ -107,5 +111,22 @@ let of_proof proof history =
     {
         pipeline = Model.of_statements statements;
         observations = observations;
+        history = history;
+    }
+
+(* PATH EXPLANATION *)
+let path_of_proof proof history =
+    let branch = proof
+        |> Branch.of_proof
+        |> CCList.hd in
+    let intermediate_representation = Branch.compile branch in
+    let statements = intermediate_representation
+        |> fst in
+    let observation = intermediate_representation
+        |> snd
+        |> Observation.eq_of_assoc in
+    {
+        pipeline = Model.of_statements statements;
+        observations = [observation];
         history = history;
     }
