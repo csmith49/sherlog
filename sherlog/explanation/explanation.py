@@ -62,6 +62,8 @@ class Explanation:
             locals  = self.locals
         )
 
+        print(self.forcing())
+
         # step 2: evaluate the explanation as many times as requested
         results = []
         for _ in range(samples):

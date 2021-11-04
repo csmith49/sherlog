@@ -22,6 +22,7 @@ module Choice : sig
 end
 
 module History : sig
+    (** A history is a sequence of choices *)
     type t
 
     module JSON : (JSON.JSONable with type value := t)

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from torch import Tensor, ones, tensor
-from torch.nn.functional import softmax
+from torch import Tensor, ones, tensor, softmax
 
 # ABSTRACT PARAMETER CLASS
 

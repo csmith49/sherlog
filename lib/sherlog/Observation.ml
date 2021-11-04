@@ -37,7 +37,7 @@ type t = Literal.t list
 
 let eq_of_assoc xs = xs |> CCList.map (CCPair.merge Literal.eq)
 
-let pp ppf observation = Fmt.pf ppf "%a" (Fmt.list ~sep:Fmt.comma Literal.pp) observation
+let pp ppf observation = Fmt.pf ppf "{%a}" (Fmt.list ~sep:Fmt.comma Literal.pp) observation
 
 module JSON = struct
     let encode observation = `Assoc [

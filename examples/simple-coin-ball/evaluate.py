@@ -114,7 +114,6 @@ def cli(train, batch_size, epochs, learning_rate):
     print(f"Initializing the optimizer with a learning rate of {learning_rate}...")
     optimizer = Optimizer(
         program=program,
-        samples=10,
         learning_rate=learning_rate
     )
 

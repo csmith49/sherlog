@@ -114,12 +114,16 @@ let tree_of_proof proof history =
         history = history;
     }
 
+let _ = CCRandom.self_init ()
+
 (* PATH EXPLANATION *)
 let path_of_proof proof history =
     let branch = proof
         |> Branch.of_proof
-        |> CCList.hd in
-    let intermediate_representation = Branch.compile branch in
+        |> CCRandom.pick_list in
+    let intermediate_representation = branch
+        |> CCRandom.run ~st:(CCRandom.get_state ())
+        |> Branch.compile in
     let statements = intermediate_representation
         |> fst in
     let observation = intermediate_representation
