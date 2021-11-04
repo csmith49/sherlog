@@ -1,4 +1,0 @@
-(library
-    (name robdd)
-    (libraries containers)
-)

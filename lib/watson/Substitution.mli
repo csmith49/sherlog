@@ -1,6 +1,9 @@
 (*  *)
 type t
 
+val compare : t -> t -> int
+val equal : t -> t -> bool
+
 (* Construction *)
 val empty : t
 val singleton : string -> Term.t -> t

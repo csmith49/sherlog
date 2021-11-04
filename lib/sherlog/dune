@@ -1,5 +1,5 @@
 (library
     (name sherlog)
-    (libraries watson pipe data JSON containers fmt base64)
+    (libraries watson pipe search data JSON containers fmt base64)
 )
 (include_subdirs unqualified)

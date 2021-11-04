@@ -2,6 +2,9 @@ module IMap = CCMap.Make(CCString)
 
 type t = Term.t IMap.t
 
+let compare = IMap.compare Term.compare
+let equal = IMap.equal Term.equal
+
 let empty = IMap.empty
 let singleton = IMap.singleton
 let of_assoc = IMap.of_list

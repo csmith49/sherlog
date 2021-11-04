@@ -2,6 +2,9 @@ module Obligation : sig
     type t
     (* Obligations maintain atoms to-be-resolved *)
 
+    val compare : t -> t -> int
+    val equal : t -> t -> bool
+
     val discharge : t -> (Atom.t * t) option
 
     val is_empty : t -> bool
@@ -17,6 +20,9 @@ end
 module Witness : sig
     type t
     (* Witness to obligation updates *)
+
+    val compare : t -> t -> int
+    val equal : t -> t -> bool
 
     val atom : t -> Atom.t
     (* [atom witness] is the conjunct whose resolution is captured by [witness]. *)

@@ -30,14 +30,19 @@ module JSON = struct
 end
 
 module Branch = struct
-    let rec of_proof = function
-        | Proof.Leaf (Proof.Success) -> [[]]
-        | Interior edges ->
-            let extend = function Proof.Edge (witness, proof) -> proof
-                |> of_proof
-                |> CCList.map (CCList.cons witness) in
-            CCList.flat_map extend edges
-        | _ -> []
+    type t = Watson.Proof.Witness.t list
+    let of_proof = Proof.eval (module struct
+        type result = t list
+
+        let leaf = function
+            | Proof.Success -> [[]]
+            | _ -> []
+
+        let edge witness branches = branches
+            |> CCList.map (CCList.cons witness)
+        
+        let interior results = CCList.flatten results
+    end)
 
     (* build a statement from a context and a witness *)
     let statement context witness = let open CCOpt in

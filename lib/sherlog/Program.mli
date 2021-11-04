@@ -16,4 +16,4 @@ module JSON : sig
     val decode : JSON.t -> t option
 end
 
-val resolve : Watson.Atom.t list -> t -> (Proof.proof * Search.History.t)
+val space : t -> (module Search.Algorithms.Space with type candidate = Branch.t)

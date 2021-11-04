@@ -11,6 +11,13 @@ let make head body = {
 let head rule = rule.head
 let body rule = rule.body
 
+let compare left right =
+    (* compare heads *)
+    let head_compare = Atom.compare left.head right.head in
+    if head_compare != 0 then head_compare else
+    (CCList.compare Atom.compare) left.body right.body
+let equal left right = (compare left right) == 0
+
 let variables rule =
     let hvars = rule |> head |> Atom.variables in
     let bvars = rule |> body |> CCList.flat_map Atom.variables in

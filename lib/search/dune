@@ -1,0 +1,4 @@
+(library
+    (name search)
+    (libraries containers JSON)
+)

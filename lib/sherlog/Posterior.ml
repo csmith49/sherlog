@@ -2,62 +2,35 @@ module Feature = struct
     type t =
         | Size
 
-    let apply _ feature = match feature with
-        | Size -> 0.0
+    let apply feature branch = match feature with
+        | Size -> branch
+            |> Branch.witnesses
+            |> CCList.length
+            |> CCFloat.of_int
 
     module JSON = struct
         let encode = function
             | Size -> `Assoc [
-                    ("type", `String "feature");
+                    ("type", `String "features");
                     ("kind", `String "size");
                 ]
 
         let decode json = let open CCOpt in
-            let* kind = JSON.Parse.(find "kind" string json) in
+            let* kind = JSON.Parse.(find "kindd" string json) in
             match kind with
                 | "size" -> Some Size
                 | _ -> None
     end
 end
 
-module Ensemble = struct
-    type t =
-        | Linear of float list
+type t = (float * Feature.t) list
 
-    let apply embedding ensemble = match ensemble with
-        | Linear weights -> Search.Embedding.linear weights embedding
 
-    module JSON = struct
-        let encode = function
-            | Linear w -> `Assoc [
-                    ("type", `String "ensemble");
-                    ("kind", `String "linear");
-                    ("weights", w |> JSON.Encode.list JSON.Encode.float);
-            ]
+let embedding posterior = posterior
+    |> CCList.map (CCPair.map_snd Feature.apply)
+    |> Search.Embedding.of_features
 
-        let decode json = let open CCOpt in
-            let* kind = JSON.Parse.(find "kind" string json) in
-            match kind with
-                | "linear" -> let* weights = JSON.Parse.(find "weights" (list float) json) in return (Linear weights)
-                | _ -> None
-    end
-end
-
-type t = {
-    features : Feature.t list;
-    ensemble : Ensemble.t;
-}
-
-let embed proof posterior = posterior.features
-    |> CCList.map (Feature.apply proof)
-    |> Search.Embedding.stack
-
-let score featurization posterior = posterior.ensemble |> Ensemble.apply featurization
-
-let default = {
-    features = [Feature.Size];
-    ensemble = Linear [1.0];
-}
+let apply posterior branch = embedding posterior branch
 
 module JSON = struct
     let encode posterior = `Assoc [
