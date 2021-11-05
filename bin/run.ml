@@ -60,10 +60,14 @@ let operate filename =
         let _ = Fmt.pr "%a Proving %a...\n"
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
-        let proof, history = Sherlog.Program.resolve fact program in
+        let search = Search.Algorithms.beam_search
+            (Sherlog.Program.space program)
+            !search_width 
+            (Sherlog.Branch.of_conjunct fact) in
+        let branch, history = Search.Algorithms.run search in
         let _ = Fmt.pr "%a Deriving explanation...\n"
             marker () in
-        let ex = Sherlog.Explanation.tree_of_proof proof history in
+        let ex = Sherlog.Explanation.of_branch branch history in
         let _ = Fmt.pr "%a" Sherlog.Explanation.pp ex in
         () in
     

@@ -43,20 +43,19 @@ let handler json = let open CCOpt in match JSON.Parse.(find "type" string json) 
     | Some "query-request" ->
         (* core programmatic info *)
         let* program = JSON.Parse.(find "program" Sherlog.Program.JSON.decode json) in
-        let* query = JSON.Parse.(find "evidence" Sherlog.Evidence.JSON.decode json) in
-        let strategy = JSON.Parse.(find "strategy" string json)
-            |> CCOpt.get_or ~default:"tree" in
+        let* evidence = JSON.Parse.(find "evidence" Sherlog.Evidence.JSON.decode json) in
+
         (* get explanation *)
-        let explanation = query
-            |> Sherlog.Evidence.to_atoms
-            |> fun cs -> Sherlog.Program.resolve cs program
-            |> fun (proof, history) -> begin match strategy with
-                | "tree" -> Sherlog.Explanation.tree_of_proof proof history
-                | "path" | _ -> Sherlog.Explanation.path_of_proof proof history end
-            |> Sherlog.Explanation.JSON.encode in
+        let query = Sherlog.Evidence.to_atoms evidence in
+        let search = Search.Algorithms.beam_search
+            (Sherlog.Program.space program)
+            10
+            (Sherlog.Branch.of_conjunct query) in
+        let branch, history = Search.Algorithms.run search in
+        let explanation = Sherlog.Explanation.of_branch branch history in
         let response = `Assoc [
             ("type", `String "query-response");
-            ("explanation", explanation)
+            ("explanation", Sherlog.Explanation.JSON.encode explanation)
         ] in
         return response
 

@@ -29,21 +29,7 @@ module JSON = struct
     ]
 end
 
-module Branch = struct
-    type t = Watson.Proof.Witness.t list
-    let of_proof = Proof.eval (module struct
-        type result = t list
-
-        let leaf = function
-            | Proof.Success -> [[]]
-            | _ -> []
-
-        let edge witness branches = branches
-            |> CCList.map (CCList.cons witness)
-        
-        let interior results = CCList.flatten results
-    end)
-
+module IR = struct
     (* build a statement from a context and a witness *)
     let statement context witness = let open CCOpt in
         let* intro = witness
@@ -102,40 +88,20 @@ end
 
 (* CONSTRUCTION *)
 
-(* TREE EXPLANATION *)
-let tree_of_proof proof history =
-    let compilation_results = proof
-        |> Branch.of_proof
-        |> CCList.map Branch.compile in
-    let statements = compilation_results
+let rec of_branch branch history =
+    of_branches [branch] history
+and of_branches branches history =
+    let ir = branches
+        |> CCList.map Branch.witnesses
+        |> CCList.map IR.compile in
+    let statements = ir
         |> CCList.flat_map fst
         |> CCList.uniq ~eq:Model.Statement.equal in
-    let observations = compilation_results
+    let observations = ir
         |> CCList.map snd
         |> CCList.map Observation.eq_of_assoc in
     {
         pipeline = Model.of_statements statements;
         observations = observations;
-        history = history;
-    }
-
-let _ = CCRandom.self_init ()
-
-(* PATH EXPLANATION *)
-let path_of_proof proof history =
-    let branch = proof
-        |> Branch.of_proof
-        |> CCRandom.pick_list in
-    let intermediate_representation = branch
-        |> CCRandom.run ~st:(CCRandom.get_state ())
-        |> Branch.compile in
-    let statements = intermediate_representation
-        |> fst in
-    let observation = intermediate_representation
-        |> snd
-        |> Observation.eq_of_assoc in
-    {
-        pipeline = Model.of_statements statements;
-        observations = [observation];
         history = history;
     }

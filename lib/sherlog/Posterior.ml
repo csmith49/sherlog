@@ -1,8 +1,8 @@
-module Feature = struct
+module Operation = struct
     type t =
         | Size
 
-    let apply feature branch = match feature with
+    let apply operation branch = match operation with
         | Size -> branch
             |> Branch.witnesses
             |> CCList.length
@@ -11,39 +11,65 @@ module Feature = struct
     module JSON = struct
         let encode = function
             | Size -> `Assoc [
-                    ("type", `String "features");
+                    ("type", `String "operation");
                     ("kind", `String "size");
                 ]
 
         let decode json = let open CCOpt in
-            let* kind = JSON.Parse.(find "kindd" string json) in
+            let* kind = JSON.Parse.(find "kind" string json) in
             match kind with
                 | "size" -> Some Size
                 | _ -> None
     end
 end
 
-type t = (float * Feature.t) list
+module Feature = struct
+    type t = {
+        weight : float;
+        operation : Operation.t;
+    }
 
+    let apply feature branch = Operation.apply feature.operation branch
+    let weight feature = feature.weight
+
+    let tuple feature = (weight feature, apply feature)
+
+    module JSON = struct
+        let encode feature = `Assoc [
+            ("type", `String "feature");
+            ("weight", `Float feature.weight);
+            ("operation", Operation.JSON.encode feature.operation);
+        ]
+
+        let decode json = let open CCOpt in
+            let* weight = JSON.Parse.(find "weight" float json) in
+            let* operation = JSON.Parse.(find "operation" Operation.JSON.decode json) in
+            return {
+                weight = weight;
+                operation = operation;
+            }
+    end
+end
+
+type t = Feature.t list
 
 let embedding posterior = posterior
-    |> CCList.map (CCPair.map_snd Feature.apply)
+    |> CCList.map Feature.tuple
     |> Search.Embedding.of_features
 
 let apply posterior branch = embedding posterior branch
 
+let of_operations assoc = assoc
+    |> CCList.map (fun (w, op) -> {Feature.weight = w; operation = op})
+
+let default = of_operations [(1.0, Operation.Size)]
+
+
 module JSON = struct
     let encode posterior = `Assoc [
         ("type", `String "posterior");
-        ("features", posterior.features |> JSON.Encode.list Feature.JSON.encode);
-        ("ensemble", posterior.ensemble |> Ensemble.JSON.encode);
+        ("features", JSON.Encode.list Feature.JSON.encode posterior);
     ]
 
-    let decode json = let open CCOpt in
-        let* features = JSON.Parse.(find "features" (list Feature.JSON.decode) json) in
-        let* ensemble = JSON.Parse.(find "ensemble" Ensemble.JSON.decode json) in
-            return {
-                features=features;
-                ensemble=ensemble;
-            }
+    let decode json = JSON.Parse.(find "features" (list Feature.JSON.decode) json)
 end
