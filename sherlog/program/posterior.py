@@ -4,56 +4,61 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Iterable
 from torch import ones, tensor, Tensor
 
-class Ensemble(ABC): pass
-
-class LinearEnsemble(Ensemble):
-    def __init__(self, weights):
-        self.weights = tensor(weights, requires_grad=True)
-
-    def parameters(self) -> Iterable[Tensor]:
-        yield self.weights
+class Operation:
+    def __init__(self, json):
+        self.source = json
 
     @classmethod
-    def of_json(cls, json) -> "LinearEnsemble":
-        """"Construct a Linear Ensemble from a JSON-like encoding."""
+    def of_json(cls, json) -> "Operation":
+        assert json["type"] == "operation"
 
-        assert json["kind"] == "linear"
+        return cls(json)
 
-        weights = json["weights"]
-        return cls(weights)
-
-    def dump(self):
-        return {
-            "type" : "ensemble",
-            "kind" : "linear",
-            "weights" : self.weights.tolist()
-        }
+    def to_json(self):
+        return self.source
 
 class Feature:
-    def __init__(self, json):
-        self.json = json
-
-class Posterior:
-    def __init__(self, features : List[Feature], ensemble : Ensemble):
-        """Construct a posterior."""
-
-        self.features = features
-        self.ensemble = ensemble
+    def __init__(self, weight, operation : Operation):
+        self.weight = weight
+        self.operation = operation
 
     @classmethod
-    def of_json(cls, json):
-        assert json["type"] == "posterior"
+    def of_json(cls, json) -> "Feature":
+        assert json["type"] == "feature"
 
-        features = json["features"]
-        ensemble = LinearEnsemble.of_json(json["ensemble"])
-        return cls(features, ensemble)
+        weight = json["weight"]
+        operation = Operation.of_json(json["operation"])
 
-    def dump(self):
+        return cls(weight, operation)
+
+    def to_json(self):
         return {
-            "type" : "posterior",
-            "features" : self.features,
-            "ensemble" : self.ensemble.dump()
+            "type" : "feature",
+            "weight" : self.weight,
+            "operation" : self.operation.to_json()
         }
 
     def parameters(self) -> Iterable[Tensor]:
-        yield from self.ensemble.parameters()
+        yield self.weight
+
+class Posterior:
+    def __init__(self, features : List[Feature]):
+        self.features = features
+
+    @classmethod
+    def of_json(cls, json) -> "Posterior":
+        assert json["type"] == "posterior"
+
+        features = [Feature.of_json(feature) for feature in json["features"]]
+
+        return cls(features)
+
+    def to_json(self):
+        return {
+            "type" : "posterior",
+            "features" : [feature.to_json() for feature in self.features]
+        }
+
+    def parameters(self) -> Iterable[Tensor]:
+        for feature in self.features:
+            yield from feature.parameters()

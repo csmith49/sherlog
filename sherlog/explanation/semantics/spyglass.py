@@ -88,7 +88,7 @@ class Clue:
         """Surrogate optimization value."""
 
         # default to a likelihood of 1
-        mb, forcing, enumerated = [tensor(0.0)], [tensor(0.0)], [tensor(0.0)]
+        mb, forcing = [tensor(0.0)], [tensor(0.0)]
 
         # construct magic box and forcing scaling values in one pass
         for dependency in self.dependencies:
