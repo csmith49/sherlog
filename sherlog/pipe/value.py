@@ -51,6 +51,14 @@ class Identifier(Value):
             "value" : self.value
         }
 
+    # magic methods
+    
+    def __str__(self):
+        return self.value
+
+    def __rich_repr__(self):
+        yield self.value
+
 class Literal(Value):
     """Pipe value with an existing interpretation."""
 
@@ -79,6 +87,14 @@ class Literal(Value):
             "type" : "literal",
             "value" : self.value
         }
+
+    # magic methods
+
+    def __str__(self):
+        return str(self.value)
+
+    def __rich_repr__(self):
+        yield self.value
 
 # MONKEY PATCH FOR IO ON VALUE ABC
 

@@ -1,109 +1,106 @@
-from ..logs import get
-
-logger = get("program")
-
 from .evidence import Evidence
 from .parameter import Parameter
-from .posterior import UniformPosterior
+from .posterior import Posterior
 
 from ..explanation import Explanation
-from ..interface import query
+from ..interface import query, minotaur
 
 from typing import Optional, Iterable, Mapping, Any, Callable
-from itertools import islice
-from torch import Tensor, tensor, stack, no_grad
+from torch import Tensor, no_grad
 from random import random
+
+import logging
+
+logger = logging.getLogger("sherlog.program")
 
 class Program:
     """Programs coordinate the generation of explanations."""
 
-    def __init__(self, source, parameters, locals : Mapping[str, Callable[..., Tensor]]):
-        self._source = source
+    def __init__(self, rules, parameters, posterior, locals : Mapping[str, Callable[..., Tensor]]):
+        self._rules = rules
         self._parameters = list(parameters)
+        self._posterior = posterior
+        
         self._locals = locals
 
-        self.posterior = UniformPosterior()
+        # cache for explanation queries
+        self._cache = {}
+
+    # IO
 
     @classmethod
     def of_json(cls, json, locals : Optional[Mapping[str, Any]] = None) -> 'Program':
         """Build a program from a JSON-like object."""
-        parameters = [Parameter.of_json(parameter) for parameter in json["parameters"]]
+
         rules = json["rules"]
-        return cls(rules, parameters, locals=locals if locals else {})
+        parameters = [Parameter.of_json(parameter) for parameter in json["parameters"]]
+        posterior = Posterior.of_json(json["posterior"])
+
+        return cls(rules, parameters, posterior, locals=locals if locals else {})
+
+    def to_json(self):
+        """Return a JSON representation of the program."""
+        # TODO: fix parameter representation; they're not used for queries, but they *might* be later
+
+        return {
+            "type" : "program",
+            "rules" : self._rules,
+            "parameters" : [],
+            "posterior" : self._posterior.to_json()
+        }
 
     # EXPLANATION EVALUATION
+
     def store(self, **kwargs : Tensor) -> Mapping[str, Tensor]:
+        """Evaluation store for explanations generated from the program."""
+
         return {**kwargs, **{parameter.name : parameter.value for parameter in self._parameters}}
 
-    def explanations(self, evidence : Evidence, quantity : int = 1, attempts : int = 100, width : Optional[int] = None) -> Iterable[Explanation]:
+    @minotaur("program/explanation", kwargs=("cache"))
+    def explanation(self, evidence : Evidence, cache : bool = False, **kwargs) -> Explanation:
         """Sample explanations for the provided evidence."""
+        
+        # check if the evidence is cached
+        if cache and evidence in self._cache.keys():
+            explanation = self._cache[evidence]
+        else:
+            json = query(self, evidence)
+            explanation = Explanation.of_json(json, locals=self._locals)
+             
+        # cache the explanation if requested
+        if cache:
+            self._cache[evidence] = explanation
 
-        logger.info(f"Sampling explanations for evidence {evidence}...")
+        return explanation
 
-        # build generator
-        def gen():
-            for attempt in range(attempts):
-                logger.info(f"Starting explanation generation attempt {attempt}...")
-
-                try:
-                    for json in query(self._source, evidence.to_json(), self.posterior.to_json(), width=width):
-                        yield Explanation.of_json(json, locals=self._locals)
-                except TimeoutError:
-                    logger.warning(f"Explanation generation attempt {attempt} timed out. Restarting...")
-
-        # get at most quantity explanations
-        yield from islice(gen(), quantity)
-
-    def log_prob(self,
-        evidence : Evidence,
-        explanations : int = 1,
-        attempts = 100,
-        width : Optional[int] = None,
-        parameters : Optional[Mapping[str, Tensor]] = None,
-    ) -> Tensor:
+    @minotaur("program/log-prob")
+    def log_prob(self, evidence : Evidence, parameters : Optional[Mapping[str, Tensor]] = None, **kwargs) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence."""
-
-        logger.info(f"Evaluating log-prob for {evidence}...")
 
         # build -> sample -> evaluate
         store = self.store(**(parameters if parameters else {}))
-        explanations = self.explanations(evidence, quantity=explanations, attempts=attempts, width=width)
-        # log_probs = [explanation.log_prob(store) - self.posterior.log_prob(explanation) for explanation in explanations]
-        log_probs = [explanation.log_prob(store) for explanation in explanations]
 
-        # if no explanations, default
-        if log_probs:
-            result = stack(log_probs).mean()
-            logger.info(f"Log-prob for {evidence}: {result:f}.")
-        else:
-            result = tensor(0.0)
-            logger.info("No explanations generated. Defaulting to log-prob of 0.0.")
+        explanation = self.explanation(evidence, **kwargs)
+        result = explanation.log_prob(store, **kwargs)
 
+        minotaur["result"] = result.item()
         return result
 
+    @minotaur("program/conditional-log-prob")
     def conditional_log_prob(self,
         evidence : Evidence, condition : Evidence,
-        explanations : int = 1,
-        attempts = 100,
-        width : Optional[int] = None,
-        parameters : Optional[Mapping[str, Tensor]] = None
+        parameters : Optional[Mapping[str, Tensor]] = None,
+        **kwargs
     ) -> Tensor:
         """Compute the log-likelihood of the provided evidenced conditioned on another piece of evidence."""
 
-        numerator = self.log_prob(evidence.join(condition),
-            explanations=explanations,
-            attempts=attempts,
-            width=width,
-            parameters=parameters
-        )
+        numerator = self.log_prob(evidence.join(condition), parameters=parameters, **kwargs)
 
-        denominator = self.log_prob(condition,
-            explanations=explanations,
-            attempts=attempts,
-            witdth=width,
-            parameters=parameters
-        )
+        denominator = self.log_prob(condition, parameters=parameters, **kwargs)
 
+        minotaur["numerator"] = numerator.item()
+        minotaur["denominator"] = denominator.item()
+        minotaur["result"] = (numerator - denominator).item()
         return numerator - denominator
 
     def parameters(self, locals : Optional[Mapping[str, Any]] = None) -> Iterable[Tensor]:
@@ -125,37 +122,50 @@ class Program:
                     yield from obj.parameters()
 
         # handle posterior
-        yield from self.posterior.parameters()
+        yield from self._posterior.parameters()
+
+    def parameter(self, name : str) -> Tensor:
+        """Look up a parameter by name.
+        
+        Will not consider parameters of embedded function approximators."""
+
+        for parameter in self._parameters:
+            if parameter.name == name:
+                return parameter.value
+
+        return None
 
     def clamp(self):
         """Update program parameters in-place to satisfy their domain constraints."""
-
-        logger.info(f"Clamping parameters for {self}...")
 
         with no_grad():
             for parameter in self._parameters:
                 parameter.clamp()
 
+    @minotaur("program/sample-posterior", kwargs=("burn in"))
     def sample_posterior(self, evidence : Evidence, burn_in : int = 100) -> Iterable[Explanation]:
-        """Sample explanation from the posterior.
-        
-        Note, this actually samples from the prior right now.
-        """
+        """Sample explanation from the posterior."""
 
-        logger.info(f"Sampling explanations from the posterior for {evidence} with {burn_in} burn-in steps.")
+        # TODO - this actually samples from the prior right now; fix this discrepancy
 
         sample, sample_likelihood = None, 0.0001
         for step in range(burn_in):
-            # sample a new explanation and compute likelihood
-            explanation = next(self.explanations(evidence, quantity=1))
-            store = self.store()
-            explanation_likelihood = explanation.log_prob(store).exp()
+            with minotaur("step"):
+                # sample a new explanation and compute likelihood
+                explanation = next(self.explanations(evidence, quantity=1))
+                store = self.store()
+                explanation_likelihood = explanation.log_prob(store).exp()
 
-            # accept / reject
-            ratio = explanation_likelihood / sample_likelihood
-            if random() <= ratio:
-                logger.info(f"Step {step}: sample accepted with likelihood ratio {ratio}.")
-                sample, sample_likelihood = explanation, explanation_likelihood
+                minotaur["likelihood"] = explanation_likelihood.item()
+
+                # accept / reject
+                ratio = explanation_likelihood / sample_likelihood
+                if random() <= ratio:
+                    logger.info(f"Step {step}: sample accepted with likelihood ratio {ratio}.")
+                    sample, sample_likelihood = explanation, explanation_likelihood
+                    minotaur["result"] = True
+                else:
+                    minotaur["result"] = False
 
         if sample is None:
             logger.warning(f"No sample accepted after {burn_in} burn-in steps.")

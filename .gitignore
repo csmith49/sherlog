@@ -1,4 +1,5 @@
 _build
+build
 **/__pycache__
 bin/.merlin
 lib/.merlin
@@ -6,7 +7,10 @@ lib/watson/.merlin
 lib/sherlog/.merlin
 lib/interface/.merlin
 lib/data/.merlin
-run
-server
+
+*.egg-info
 
 .vscode
+.direnv
+.envrc
+.DS_STORE

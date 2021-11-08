@@ -1,50 +1,82 @@
 """Explanations are the central explanatory element in Sherlog. They capture sufficient generative constraints to ensure a particular outcome."""
 
-from ..logs import get
-
-logger = get("explanation")
-
-from ..pipe import Pipeline, Semantics
-from .semantics.core.target import EqualityIndicator
+from ..pipe import Pipeline, Statement
+from ..interface import minotaur
+from .semantics.core.semiring import PreciseSemiring, DisjointSumSemiring
 from .semantics import spyglass
 from .observation import Observation
 from .history import History
 
-from torch import tensor, Tensor, stack
-
-from typing import TypeVar, Mapping, Optional, Any, Callable
+from torch import Tensor, stack, tensor
+from typing import TypeVar, Mapping, Optional, Callable, List, Iterable
 
 T = TypeVar('T')
 
 class Explanation:
     """Explanations model observations over a generative process."""
 
-    def __init__(self, pipeline : Pipeline, observation : Observation, history : History, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None):
+    def __init__(self, pipeline : Pipeline, observations : List[Observation], history : History, locals : Optional[Mapping[str, Callable[..., Tensor]]] = None):
         """Construct an explanation."""
 
-        logger.info(f"Explanation {self} built.")
-        self.pipeline, self.observation, self.history = pipeline, observation, history
+        self.pipeline, self.observations, self.history = pipeline, observations, history
         self.locals = locals if locals else {}
 
-    def evaluate(self, parameters : Mapping[str, Tensor], semantics : Semantics[T], default=0.0) -> Mapping[str, T]:
-        """Evaluate the explanation."""
+    # evaluation framework
 
-        store = semantics(self.pipeline, parameters)
-        for statement in self.observation.stub(default=default):
-            store[statement.target] = semantics.evaluate(statement, store)
-        return store
+    def stub(self) -> Iterable[Statement]:
+        """Statement stub for producing final evaluation target from observation results."""
+        
+        targets = [observation.target(key) for key, observation in enumerate(self.observations)]
+        yield Statement("sherlog:target", "semiring:sum", targets)
 
-    def log_prob(self, parameters : Mapping[str, Tensor]) -> Tensor:
+    def statements(self) -> Iterable[Statement]:
+        """Sequence of statements to produce final evaluation target."""
+
+        # the program
+        yield from self.pipeline.evaluation_order()
+        
+        # the observations
+        for key, observation in enumerate(self.observations):
+            yield from observation.stub(key=key, default=0.0)
+
+        # the target
+        yield from self.stub()
+
+    @minotaur("explanation/forcing", kwargs=("force"))
+    def forcing(self, force : bool = True, **kwargs) -> Mapping[str, Tensor]:
+        """Construct the most-specific forcing possible for the explanation."""
+
+        if len(self.observations) == 1 and force:
+            observation = self.observations[0]
+            return {key : tensor(value.value) for key, value in observation.equality.items()}
+        else:
+            return {}
+
+    @minotaur("explanation/log-prob", kwargs=("samples"))
+    def log_prob(self, parameters : Mapping[str, Tensor], samples : int = 1, **kwargs) -> Tensor:
         """Compute the log-probability of the explanation generating the observations."""
 
-        sem = spyglass.semantics_factory(
-            observation=self.observation,
-            target=EqualityIndicator(),
-            locals=self.locals
+        # step 1: form the semantics
+        semantics = spyglass.semantics_factory(
+            forcing = self.forcing(**kwargs),
+            semiring = DisjointSumSemiring(),
+            locals  = self.locals
         )
-        store = self.evaluate(parameters, sem)
-        result = stack([clue.surrogate for clue in store["sherlog:target"]]).mean().log()
 
+        # step 2: evaluate the explanation as many times as requested
+        results = []
+        for _ in range(samples):
+            store = semantics(self.statements(), parameters)
+            result = store["sherlog:target"].surrogate
+            results.append(result)
+
+        # MC approx. of log-prob
+        try:
+            result = stack(results).mean().log()
+        except RuntimeError:
+            result = tensor(0.0)
+
+        minotaur["result"] = result.item()
         return result
 
     # SERIALIZATION
@@ -57,17 +89,16 @@ class Explanation:
             raise TypeError(f"{json} does not represent an explanation.")
 
         program = Pipeline.of_json(json["pipeline"])
-        observation = Observation.of_json(json["observation"])
+        observations = [Observation.of_json(ob) for ob in json["observations"]]
         history = History.of_json(json["history"])
 
-        return cls(program, observation, history, locals=locals)
+        return cls(program, observations, history, locals=locals)
 
-    def to_json(self):
-        """Construct a JSON-like encoding for the explanation."""
+    # magic methods
 
-        return {
-            "type" : "explanation",
-            "program" : self.program.dump(),
-            "observation" : self.observation.dump(),
-            "history" : self.history.dump()
-        }
+    def __str__(self):
+        return f"{self.pipeline}\n{self.observation}"
+
+    def __rich_repr__(self):
+        yield self.pipeline
+        yield from self.observations

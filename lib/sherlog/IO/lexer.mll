@@ -35,14 +35,16 @@ rule read = parse
     | ")" { RPARENS }
     | "[" { LBRACKET }
     | "]" { RBRACKET }
+    | "{" { LBRACE }
+    | "}" { RBRACE }
     (* symbols *)
     | underscore { BLANK }
     | ";" { SEMICOLON }
     | "<-" { ARROW }
     | ":-" { ARROW }
+    | "<~" { SQUIGARROW }
     | "::" { DOUBLECOLON }
     | ":" { COLON }
-    | "@" { AT }
     | "." { PERIOD }
     | "," { COMMA }
     (* inference tokens *)

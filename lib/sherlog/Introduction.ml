@@ -1,109 +1,147 @@
 open Watson
 
-module type ATTRIBUTE_EMBEDDING = sig
-  type attribute
-
-  val key : string
-  val to_term : attribute -> Watson.Term.t
-  val of_term : Watson.Term.t -> attribute option
-end
-
-module Target = struct
-  type t = Term.t
-  let key = "sl:target"
-  let to_term target = Term.Function (key, [target])
-  let of_term = function
-    | Term.Function (k, [target]) when CCString.equal k key -> Some target
-    | _ -> None
-end
-
-module FunctionID = struct
-  type t = string
-  let key = "sl:function_id"
-  let to_term function_id = Term.Function (key, [Term.Symbol function_id])
-  let of_term = function
-    | Term.Function (k, [Term.Symbol function_id]) when CCString.equal k key -> Some function_id
-    | _ -> None
-end
-
-module Arguments = struct
-  type t = Term.t list
-  let key = "sl:arguments"
-  let to_term arguments = Term.Function (key, arguments)
-  let of_term = function
-    | Term.Function (k, arguments) when CCString.equal k key -> Some arguments
-    | _ -> None
-end
-
 module Context = struct
-  type t = Term.t list
-  let key = "sl:context"
-  let to_term context = Term.Function (key, context)
-  let of_term = function
-    | Term.Function (k, context) when CCString.equal k key -> Some context
-    | _ -> None
+    type t = Context of string
+
+    (* construction *)
+    module Seed = struct
+        let counter = ref 0
+
+        let get ?salt:(salt=1237) () =
+            let result = !counter in
+            let _ = counter := result + 1 in
+            CCInt.logxor result salt
+    end
+    let fresh () =
+        let hash = ()
+            |> Seed.get
+            |> CCInt.to_string
+            |> Base64.encode_exn in
+        Context hash
+
+    (* conversion *)
+    let to_string = function Context str -> str
+    let of_string str = Context str
+
+    (* comparison *)
+    let compare left right = match left, right with
+        | Context l, Context r -> CCString.compare l r
+    
+    let equal left right = (compare left right) == 0
+    
+    let hash = function Context str -> (CCHash.pair CCHash.string CCHash.string) ("context", str)
 end
 
 type t = {
-  target : Target.t;
-  function_id : FunctionID.t;
-  arguments : Arguments.t;
-  context : Context.t;
+    relation : string;
+    context : Context.t;
+    terms : Watson.Term.t list;
+    function_id : string;
+    arguments : Watson.Term.t list;
+    target : Watson.Term.t;
 }
 
-let make target function_id arguments context = {
-  target = target;
-  function_id = function_id;
-  arguments = arguments;
-  context = context;
-}
+let pp ppf intro = Fmt.pf ppf "%s(%a, %a <- %s[%a]) in %s"
+    intro.relation
+    (Fmt.list ~sep:Fmt.comma Watson.Term.pp) intro.terms
+    Watson.Term.pp intro.target
+    intro.function_id
+    (Fmt.list ~sep:Fmt.comma Watson.Term.pp) intro.arguments
+    (intro.context |> Context.to_string)
 
-let target intro = intro.target
-let function_id intro = intro.function_id
-let arguments intro = intro.arguments
-let context intro = intro.context
+let to_string = Fmt.to_to_string pp
 
-let relation = "sl:introduction"
+module Embedding = struct
+    (* encode values as terms *)
+    module Encode = struct
+        let symbol name value = Term.Function (name, [Term.Symbol value])
 
-let to_atom intro = Atom.make relation [
-  Target.to_term intro.target;
-  FunctionID.to_term intro.function_id;
-  Arguments.to_term intro.arguments;
-  Context.to_term intro.context;
+        let singleton name value = Term.Function (name, [value])
+
+        let list name values = Term.Function (name, values)
+    end
+
+    (* decode terms to values *)
+    module Decode = struct
+        let symbol name = function
+            | Term.Function (f, [Term.Symbol value]) when CCString.equal f name -> Some value
+            | _ -> None
+
+        let singleton name = function
+            | Term.Function (f, [value]) when CCString.equal f name -> Some value
+            | _ -> None
+
+        let list name = function
+            | Term.Function (f, values) when CCString.equal f name -> Some values
+            | _ -> None
+    end
+
+    (* keys for denoting the content of the embedded term *)
+    module Keys = struct
+        let atom = "sl:intro"
+        let relation = "sl:relation"
+        let context = "sl:context"
+        let terms = "sl:terms"
+        let function_id = "sl:function_id"
+        let arguments = "sl:arguments"
+        let target = "sl:target"
+    end
+end
+
+module Functional = struct
+    let make relation context terms function_id arguments target = {
+        relation=relation;
+        context=context;
+        terms=terms;
+        function_id=function_id;
+        arguments=arguments;
+        target=target;
+    }
+
+    let relation intro = intro.relation
+    let context intro = intro.context
+    let terms intro = intro.terms
+    let function_id intro = intro.function_id
+    let arguments intro = intro.arguments
+    let target intro = intro.target
+end
+
+let to_atom intro = let open Embedding in Atom.make Keys.atom [
+    intro |> Functional.relation |> Encode.symbol Keys.relation;
+    intro |> Functional.context |> Context.to_string |> Encode.symbol Keys.context;
+    intro |> Functional.terms |> Encode.list Keys.terms;
+    intro |> Functional.function_id |> Encode.symbol Keys.function_id;
+    intro |> Functional.arguments |> Encode.list Keys.arguments;
+    intro |> Functional.target |> Encode.singleton Keys.target;
 ]
 
-let of_atom atom =
-  (* check the relation is correct *)
-  if not (CCString.equal (Atom.relation atom) relation) then None else
-  (* unpack the arguments *)
-  let open CCOpt in match Atom.terms atom with
-    | [target; function_id; arguments; context] ->
-      (* convert arguments, fail-through if None encountered *)
-      let* target = Target.of_term target in
-      let* function_id = FunctionID.of_term function_id in
-      let* arguments = Arguments.of_term arguments in
-      let* context = Context.of_term context in
-      (* wraps result in Some *)
-      return (make target function_id arguments context)
-    | _ -> None
+let of_atom atom = let open Embedding in
+    if not (CCString.equal (Atom.relation atom) Keys.atom) then None else
+    let open CCOpt in match Atom.terms atom with
+        | [relation; context; terms; function_id; arguments; target] ->
+            let* relation = Decode.symbol Keys.relation relation in
+            let* context = Decode.symbol Keys.context context in
+            let* terms = Decode.list Keys.terms terms in
+            let* function_id = Decode.symbol Keys.function_id function_id in
+            let* arguments = Decode.list Keys.arguments arguments in
+            let* target = Decode.singleton Keys.target target in
+            return (Functional.make relation (Context.of_string context) terms function_id arguments target)
+        | _ -> None
 
-let targetless_identifier intro =
-  let function_id = intro
-    |> function_id in
-  let arguments = intro
-    |> arguments
-    |> CCList.map Term.to_string
-    |> CCString.concat ", " in
-  let context = intro
-    |> context
-    |> CCList.map Term.to_string
-    |> CCString.concat ", " in
-  function_id ^ "[" ^ arguments ^ "|" ^ context ^ "]"
+(* utilities *)
 
-let is_constrained intro = match intro.target with
-  | Watson.Term.Variable _ -> true
-  | _ -> false
+let sample_site intro =
+    let terms =
+        [Watson.Term.Symbol intro.relation] @ [Watson.Term.Symbol (Context.to_string intro.context)] @ intro.terms @ [Watson.Term.Symbol intro.function_id] @ intro.arguments in
+    let hash = (CCHash.list Watson.Term.hash) terms in
+    hash
+        |> CCInt.to_string
+        |> Base64.encode_exn
 
-let introduction_consistency_tag intro =
-  let r = Watson.Term.Symbol intro.function_id in
-  r :: (intro.arguments @ intro.context)
+let equal left right = 
+    (CCString.equal left.relation right.relation) &&
+    (CCString.equal left.function_id right.function_id) &&
+    (Context.equal left.context right.context) &&
+    (Watson.Term.equal left.target right.target) &&
+    (CCList.equal Watson.Term.equal left.terms right.terms) &&
+    (CCList.equal Watson.Term.equal left.arguments right.arguments)

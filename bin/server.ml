@@ -26,38 +26,35 @@ let rec shuffle xs = match xs with
 
 (* message handling *)
 
-let handler json = let open CCOpt in match JSON.Parse.(find string "type" json) with
+let handler json = let open CCOpt in match JSON.Parse.(find "type" string json) with
     | Some "parse-source-request" ->
-        let* source = JSON.Parse.(find string "source" json) in
+        let* source = JSON.Parse.(find "source" string json) in
         let lines = source |> Sherlog.IO.parse in
         let response = `Assoc [
             ("type", `String "parse-source-response");
-            ("program", lines |> Sherlog.IO.program_of_lines |> Sherlog.Program.to_json);
+            ("program", lines |> Sherlog.IO.program_of_lines |> Sherlog.Program.JSON.encode);
             ("evidence", lines
                 |> Sherlog.IO.evidence_of_lines
-                |> CCList.map Sherlog.Evidence.to_json
-                |> JSON.Make.list
+                |> JSON.Encode.list Sherlog.Evidence.JSON.encode
             );
         ] in
         return response
 
     | Some "query-request" ->
         (* core programmatic info *)
-        let* program = JSON.Parse.(find Sherlog.Program.of_json "program" json) in
-        let* posterior = JSON.Parse.(find Sherlog.Posterior.of_json "posterior" json) in
-        let* query = JSON.Parse.(find Sherlog.Evidence.of_json "evidence" json) in
-        (* parameters for the search *)
-        let search_width = JSON.Parse.(find int "search-width" json)
-            |> CCOpt.get_or ~default:CCInt.max_int in
-        (* get explanations *)
-        let explanations = query
-            |> Sherlog.Evidence.to_atoms
-            |> Sherlog.Program.explanations ~width:search_width program posterior
-            |> CCList.map (Sherlog.Explanation.to_json Sherlog.Explanation.Term.to_json)
-            |> shuffle in
+        let* program = JSON.Parse.(find "program" Sherlog.Program.JSON.decode json) in
+        let* evidence = JSON.Parse.(find "evidence" Sherlog.Evidence.JSON.decode json) in
+
+        (* get explanation *)
+        let query = Sherlog.Evidence.to_atoms evidence in
+        let search = Search.Algorithms.complete_search
+            (Sherlog.Program.space program)
+            (Watson.Proof.Obligation.of_conjunct query) in
+        let path, history = Search.Algorithms.run search in
+        let explanation = Sherlog.Explanation.of_path path history in
         let response = `Assoc [
             ("type", `String "query-response");
-            ("explanations", `List explanations)
+            ("explanation", Sherlog.Explanation.JSON.encode explanation)
         ] in
         return response
 

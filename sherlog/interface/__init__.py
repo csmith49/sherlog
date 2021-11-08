@@ -1,30 +1,50 @@
 """Contains infrastructure facilitating communication with the OCaml Sherlog server."""
 
-from .socket import connect
-from .server import initialize_server
-from ..config import PORT
-from time import sleep
-from . import server
-from rich.console import Console
+from . import socket, server
+from .console import print
+
+from minotaur import Minotaur
+from typing import Optional
+
+# GLOBALS
 
 _SOCKET = None
+minotaur = Minotaur()
 
-def initialize(port=PORT):
-    """Initialize the Sherlog server. A necessary prerequisite before executing functions in `sherlog.interface`.
+# INITIALIZATION
 
+def initialize(port : int, instrumentation : Optional[str] = None) -> Minotaur:
+    """Initialize Sherlog.
+    
+    This function must be called before executing functions in `sherlog.interface`.
+    
     Parameters
     ----------
-    port : int (default=PORT in `config.py`)
+    port : int
+        The Sherlog query server will serve requests on this port.
+
+    instrumentation : str, optional
+        If given, instrumentation will be saved to the given file.        
     """
+
+    # if given instrumentation, configure minotaur appropriately
+    global minotaur
+
+    if instrumentation:
+        minotaur.add_filepath_handler(instrumentation)
+
+    # initialize the query server on the appropriate socket
     global _SOCKET
-    initialize_server(port=port)
+
+    server.initialize_server(port)
+    
     while not _SOCKET:
         try:
-            _SOCKET = connect(port)
+            _SOCKET = socket.connect(port)
         except Exception as e:
             pass
 
-console = Console(markup=False)
+# EXCEPTIONS
 
 class CommunicationError(Exception):
     def __init__(self, message):
@@ -32,6 +52,8 @@ class CommunicationError(Exception):
 
     def __str__(self):
         return self.message
+
+# COMMUNICATION METHODS
 
 def parse_source(source : str):
     """Parse a Sherlog source file."""
@@ -50,18 +72,13 @@ def parse_source(source : str):
     else:
         return response["program"], response["evidence"]
 
-def query(rules, evidence, posterior, width = None):
+def query(program, evidence, width = None):
     """Query a Sherlog program to explain the provided evidence."""
 
     message = {
         "type" : "query-request",
-        "program" : {
-            "type" : "program",
-            "rules" : rules,
-            "parameters" : []
-        },
-        "evidence" : evidence,
-        "posterior" : posterior
+        "program" : program.to_json(),
+        "evidence" : evidence.to_json()
     }
 
     # add additional config stuff
@@ -76,4 +93,4 @@ def query(rules, evidence, posterior, width = None):
     elif response["type"] != "query-response":
         raise CommunicationError(f"Found invalid response type {response['type']}.")
     else:
-        return response["explanations"]
+        return response["explanation"]

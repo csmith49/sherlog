@@ -25,18 +25,6 @@ class Batch(Generic[T]):
     def identifier(self):
         return f"Batch:{self.index}:{self.epoch}"
 
-    def log_prob(self, program : Program, embedding : Embedding[T]) -> Objective:
-        """Compute the log-prob objective of the embedded batch in the context of the program."""
-
-        log_probs = []
-        for datum in self.data:
-            evidence, parameters = embedding(datum)
-            log_prob = program.log_prob(evidence, parameters=parameters)
-            log_probs.append(log_prob)
-
-        result = stack(log_probs).mean()
-        return Objective(self.identifier, result)
-
 def minibatch(data : List[T], batch_size : int, epochs : int = 1) -> Iterable[Batch[T]]:
     """Convert a list of data into batches of a given size."""
 

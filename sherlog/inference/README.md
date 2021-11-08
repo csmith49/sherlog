@@ -15,3 +15,9 @@ While Sherlog can be used to embed fairly arbitrary probabilistic relational dat
 `embedding.py` is the primary interface: they map data points to an objective object (see below).
 
 `objective.py` represents an unevaluated optimization objective. Optimizer objects consume objectives to update the parameters of their associated Sherlog program.
+
+## Notes
+
+Goal: optimizer consumes objectives, which describe the necessary information for producing an optimization target. They are declarative - the how is left to the optimizer.
+
+Embeddings should be the interface into objectives. Construct an embedding, use it in a loop to produce objectives that can be fed to an optimizer. Think of an embedding as a producer, an optimizer as a consumer, and an objective as the intermediate message between the two.

@@ -6,8 +6,6 @@ Deep, generative logic programming.
 
 Sherlog is a logic programming language with *value introductions* that supports differentiable functions and probability distributions (both discrete and continuous).
 
-We'll put a well-motivated example here.
-
 For further examples, see the `./examples` directory.
 
 ### Architecture

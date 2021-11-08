@@ -5,6 +5,9 @@ val make : Atom.t -> Atom.t list -> t
 val head : t -> Atom.t
 val body : t -> Atom.t list
 
+val compare : t -> t -> int
+val equal : t -> t -> bool
+
 val variables : t -> string list
 
 val apply : Substitution.t -> t -> t

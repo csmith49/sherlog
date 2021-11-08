@@ -1,119 +1,78 @@
-from ..explanation import Explanation
-
-from abc import ABC, abstractmethod
 from typing import List, Optional, Iterable
-from torch import ones, tensor, Tensor
+from torch import tensor, Tensor
 
-# OPERATORS
+class Operation:
+    """Thin wrapper around JSON representation of operations, which map proof branches to real-valued scores."""
 
-class Operator:
-    def __init__(self, defaults, context_clues):
-        self.defaults = defaults
-        self.context_clues = context_clues
-
-    @classmethod
-    def of_json(cls, json) -> "Operator":
-        """Construct an operator from a JSON-like encoding."""
-
-        assert json["type"] == "operator"
-
-        defaults = json["defaults"]
-        context_clues = json["context-clues"]
-        
-        return cls(defaults, context_clues)
-
-    def to_json(self):
-        """Construct a JSON-like encoding for an operator."""
-
-        return {
-            "type" : "operator",
-            "defaults" : self.defaults,
-            "context-clues" : self.context_clues
-        }
-
-# ENSEMBLES
-
-class Ensemble(ABC): pass
-
-class LinearEnsemble(Ensemble):
-    def __init__(self, weights):
-        self.weights = tensor(weights, requires_grad=True)
+    def __init__(self, json):
+        """Construct an operation from a JSON representation."""
+        self.source = json
 
     @classmethod
-    def of_json(cls, json) -> "LinearEnsemble":
-        """Construct a liner ensemble from a JSON-like encoding."""
+    def of_json(cls, json) -> "Operation":
+        assert json["type"] == "operation"
 
-        assert json["type"] == "ensemble"
-
-        weights = json["weights"]
-        
-        return cls(weights)
+        return cls(json)
 
     def to_json(self):
-        """Construct a JSON-like encoding for an operator."""
-        
+        """Return the JSON representation for `self`."""
+
+        return self.source
+
+class Feature:
+    """Features pair operations with a weight indicating the contribution of the operation."""
+
+    def __init__(self, weight : float, operation : Operation):
+        """Construct a feature from a weight and an operation."""
+    
+        self.weight = tensor(weight, requires_grad=True)
+        self.operation = operation
+
+    @classmethod
+    def of_json(cls, json) -> "Feature":
+        assert json["type"] == "feature"
+
+        weight = json["weight"]
+        operation = Operation.of_json(json["operation"])
+
+        return cls(weight, operation)
+
+    def to_json(self):
+        """Return a JSON representation for `self`."""
+
         return {
-            "type" : "ensemble",
-            "kind" : "linear",
-            "weights" : self.weights.tolist()
+            "type" : "feature",
+            "weight" : self.weight.item(),
+            "operation" : self.operation.to_json()
         }
 
     def parameters(self) -> Iterable[Tensor]:
-        yield self.weights
+        """Yield all optimizable parameters in the feature."""
 
-# MONKEY-PATCHIN ENSEMBLE CONSTRUCTORS
-
-@staticmethod
-def ensemble_of_json(json) -> Ensemble:
-    """Construct an ensemble from a JSON-like encoding."""
-
-    assert json["type"] == "ensemble"
-
-    if json["kind"] == "linear":
-        return LinearEnsemble.of_json(json)
-    else:
-        raise TypeError()
-
-Ensemble.of_json = ensemble_of_json
-
-# POSTERIORS
+        yield self.weight
 
 class Posterior:
-    def __init__(self, operator, ensemble):
-        self.operator = operator
-        self.ensemble = ensemble
+    """A posterior collects features."""
+
+    def __init__(self, features : List[Feature]):
+        """Construct a posterior from a list of features."""
+
+        self.features = features
 
     @classmethod
     def of_json(cls, json) -> "Posterior":
-        """Construct a posterior from a JSON-like encoding."""
-
         assert json["type"] == "posterior"
 
-        operator = Operator.of_json(json["operator"])
-        ensemble = Ensemble.of_json(json["ensemble"])
+        features = [Feature.of_json(feature) for feature in json["features"]]
 
-        return cls(operator, ensemble)
+        return cls(features)
 
     def to_json(self):
-        """Construct a JSON-like encoding of the posterior."""
-
         return {
             "type" : "posterior",
-            "operator" : self.operator.to_json(),
-            "ensemble" : self.ensemble.to_json()
+            "features" : [feature.to_json() for feature in self.features]
         }
 
     def parameters(self) -> Iterable[Tensor]:
-        yield from self.ensemble.parameters()
-
-    def log_prob(self, explanation : Explanation) -> Tensor:
-        """Compute the posterior log-likelihood of the explanation."""
-
-        return explanation.history.log_prob(self.ensemble.weights)
-
-class UniformPosterior(Posterior):
-    def __init__(self):
-        operator = Operator(False, [])
-        ensemble = LinearEnsemble([])
-
-        super().__init__(operator, ensemble) 
+        for feature in self.features:
+            yield from feature.parameters()

@@ -11,6 +11,13 @@ let make head body = {
 let head rule = rule.head
 let body rule = rule.body
 
+let compare left right =
+    (* compare heads *)
+    let head_compare = Atom.compare left.head right.head in
+    if head_compare != 0 then head_compare else
+    (CCList.compare Atom.compare) left.body right.body
+let equal left right = (compare left right) == 0
+
 let variables rule =
     let hvars = rule |> head |> Atom.variables in
     let bvars = rule |> body |> CCList.flat_map Atom.variables in
@@ -34,7 +41,7 @@ let avoiding_rename vars rule =
     let assoc = rule
         |> variables
         |> CCList.map (fun x -> (x, avoid x None)) in
-    let sub = Substitution.of_list assoc in
+    let sub = Substitution.of_assoc assoc in
         apply sub rule
 
 let pp ppf rule = let open Fmt in
@@ -52,7 +59,7 @@ module JSON = struct
     ]
 
     let decode json = let open CCOpt in
-        let* head = JSON.Parse.(find Atom.JSON.decode "head" json) in
-        let* body = JSON.Parse.(find (list Atom.JSON.decode) "body" json) in
+        let* head = JSON.Parse.(find "head" Atom.JSON.decode json) in
+        let* body = JSON.Parse.(find "body" (list Atom.JSON.decode) json) in
         return (make head body)
 end

@@ -61,5 +61,5 @@ class EqualityIndicator(Target):
     
     0/1-valued, and so not differentiable.
     """
-    def evaluate(self, left : Tensor, right : Tensor, *args, **kwargs) -> Tensor:
-        return tensor(1.0) if equal(left, right) else tensor(0.0)
+    def evaluate(self, left : Tensor, right : Tensor, *args, epsilon : float = 1e-10, **kwargs) -> Tensor:
+        return tensor(1.0) if dist(left.float(), right.float()) <= epsilon else tensor(0.0)

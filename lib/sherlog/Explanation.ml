@@ -1,151 +1,104 @@
-module Term = struct
-    type t =
-        | Integer of int
-        | Float of float
-        | Boolean of bool
-        | Function of string * t list
-        | Unit
-
-    let rec of_watson_term = function
-        | Watson.Term.Integer i -> Some (Integer i)
-        | Watson.Term.Float f -> Some (Float f)
-        | Watson.Term.Boolean b -> Some (Boolean b)
-        | Watson.Term.Unit -> Some Unit
-        | Watson.Term.Function (f, args) -> args
-                |> CCList.map of_watson_term
-                |> CCList.all_some
-                |> CCOpt.map (fun args -> Function (f, args))
-        | _ -> None
-
-    let rec to_json = function
-        | Integer i -> `Int i
-        | Float f -> `Float f
-        | Boolean b -> `Bool b
-        | Unit -> `Null
-        | Function (f, args) -> `Assoc [
-            ("type", `String "function");
-            ("function_id", `String f);
-            ("arguments", `List (args |> CCList.map to_json));
-        ]
-end
-
-module Observation = struct
-    type 'a t = (string * 'a Pipeline.Value.t) list
-
-    let to_json value_to_json obs = `Assoc [
-        ("type", `String "observation");
-        ("items", obs 
-            |> CCList.map (CCPair.map_snd (Pipeline.Value.to_json value_to_json))
-            |> JSON.Make.assoc);
-    ]
-end
-
-type 'a t = {
-    pipeline : 'a Pipeline.t;
-    observation : 'a Observation.t;
+type t = {
+    pipeline : Model.t;
+    observations : Observation.t list;
     history : Search.History.t;
 }
 
-let pipeline ex = ex.pipeline
-let observation ex = ex.observation
-let history ex = ex.history
+let pp ppf ex = Fmt.pf ppf "Pipeline:\n%a\nObservations:\n%a\n"
+    Model.pp ex.pipeline
+    (Fmt.list ~sep:Fmt.comma Observation.pp) ex.observations
 
-let to_json value_to_json ex = 
-    let pipeline = ex
-        |> pipeline
-        |> Pipeline.to_json value_to_json in
-    let observation = ex
-        |> observation
-        |> Observation.to_json value_to_json in
-    let history = ex
-        |> history
-        |> Search.History.JSON.encode in
-    
-    `Assoc [
-        ("type", `String "explanation");
-        ("pipeline", pipeline);
-        ("observation", observation);
-        ("history", history);
-    ]
+module Functional = struct
+    let pipeline ex = ex.pipeline
+    let observations ex = ex.observations
+    let history ex = ex.history
 
-module Compile = struct
-    type 'a tag = ('a * Introduction.t)
-    
-    type 'a t = 'a tag list
-
-    (* lift watson terms to pipeline values *)
-    let lift : Watson.Term.t -> Term.t Pipeline.Value.t option = function 
-        | Watson.Term.Variable id | Watson.Term.Symbol id -> Some (Pipeline.Value.Identifier id)
-        | (_ as term) -> term
-            |> Term.of_watson_term
-            |> CCOpt.map (fun term -> Pipeline.Value.Literal term)
-
-    module Target = struct
-        type target = (string * Term.t Pipeline.Statement.t)
-
-        let pipeline (intros : target t) : Term.t Pipeline.t = intros
-            |> CCList.map (fun ((_, statement), _) -> statement)
-
-        let observation (intros : target t) : Term.t Observation.t = 
-            let f ((_, statement), intro) = 
-                (* check if we've seen a value we must constrain *)
-                (* note the difference in treatment between variables and symbols *)
-                (* that's due to a semantic shift between Watson variables and Pipeline identifiers *)
-                (* TODO: convert to Introduction.is_constrained *)
-                let seen = match Introduction.target intro with
-                    | Watson.Term.Variable _ -> None
-                    | (_ as term) -> lift term in
-                (* take `seen` to `(target, seen)` *)
-                seen |> CCOpt.map (CCPair.make statement.Pipeline.Statement.target) in
-            CCList.filter_map f intros
-    end
-
-    let of_proof (proof : Watson.Proof.t) : unit t = proof
-        |> Watson.Proof.to_atoms
-        |> CCList.filter_map Introduction.of_atom
-        |> CCList.map (CCPair.make ())
-
-    let associate_names (intros : unit t) : string t = intros
-        |> CCList.map (function (_, intro) -> (Introduction.targetless_identifier intro, intro))
-
-    let target_renaming (intros : string t) : Watson.Substitution.t =
-        (* maps the target to the pre-computed name of the intro *)
-        let f (name, intro) = match Introduction.target intro with
-            | Watson.Term.Variable x ->
-                let target = Watson.Term.Variable name in
-                (Some (x, target), intro)
-            | _ -> (None, intro) in
-        (* collect the non-None tags and combine into sub *)
-        CCList.map f intros
-            |> CCList.map fst
-            |> CCList.keep_some
-            |> Watson.Substitution.of_list
-
-    let associate_statements (intros : string t) : Target.target t=
-        (* get the target renamings *)
-        let substitution = target_renaming intros in
-        (* and build statements by remapping arguments *)
-        let f (name, intro) = 
-            let pipeline = {
-                Pipeline.Statement.target = name;
-                function_id = Introduction.function_id intro;
-                arguments = Introduction.arguments intro
-                    |> CCList.map (Watson.Substitution.apply substitution)
-                    |> CCList.map lift
-                    |> CCList.all_some
-                    |> CCOpt.get_exn_or "Invalid Watson terms in introduction.";
-            } in ((name, pipeline), intro) 
-        in
-        CCList.map f intros
+    let make pipeline observations history = {
+        pipeline = pipeline;
+        observations = observations;
+        history = history;
+    }
 end
 
-let of_proof proof history =
-    let compilation = proof
-        |> Compile.of_proof
-        |> Compile.associate_names
-        |> Compile.associate_statements in
+module JSON = struct
+    let encode ex = `Assoc [
+        ("type", `String "explanation");
+        ("pipeline", ex |> Functional.pipeline |> Model.JSON.encode);
+        ("observations", ex |> Functional.observations |> JSON.Encode.list Observation.JSON.encode);
+        ("history", ex |> Functional.history |> Search.History.JSON.encode);
+    ]
+end
+
+module IR = struct
+    (* build a statement from a context and a witness *)
+    let statement context witness = let open CCOpt in
+        let* intro = witness
+            |> Watson.Proof.Witness.resolved_atom
+            |> Watson.Atom.apply context
+            |> Introduction.of_atom in
+        let target = Introduction.sample_site intro in
+        let function_id = Introduction.Functional.function_id intro in
+        let arguments = intro
+            |> Introduction.Functional.arguments
+            |> CCList.map (Watson.Substitution.apply context) in
+        Model.Statement.make target function_id arguments
+
+    (* get the full context from a witness *)
+    let full_context context witness =
+        let resolution_context = witness
+            |> Watson.Proof.Witness.substitution in
+        match witness |> Watson.Proof.Witness.resolved_atom |> Watson.Atom.apply context |> Introduction.of_atom with
+            | None -> resolution_context
+            | Some intro ->
+                let sample_site = Introduction.sample_site intro in
+                begin match Introduction.Functional.target intro |> Watson.Substitution.apply context with
+                    | Watson.Term.Variable id  ->
+                        let binding = Watson.Substitution.singleton id (Watson.Term.Variable sample_site) in
+                        Watson.Substitution.compose resolution_context binding
+                    | _ -> resolution_context
+                end
+
+    let observation context witness = match witness |> Watson.Proof.Witness.resolved_atom |> Watson.Atom.apply context |> Introduction.of_atom with
+        | None -> []
+        | Some intro ->
+            let sample_site = Introduction.sample_site intro in
+            begin match Introduction.Functional.target intro |> Watson.Substitution.apply context with
+                | Watson.Term.Variable _ -> []
+                | (_ as term) ->
+                    let value = term
+                        |> Model.Value.of_term
+                        |> CCOpt.get_exn_or "Invalid value construction" in
+                    [ (sample_site, value) ]
+            end
+    
+    let rec compile witnesses = witnesses |> CCList.rev |> compile_aux Watson.Substitution.empty
+    and compile_aux context = function
+        | [] -> [], []
+        | witness :: rest ->
+            (* update context *)
+            let context = context |> Watson.Substitution.compose (full_context context witness) in
+            (* recurse *)
+            let statements, observations = compile_aux context rest in
+            let observations = (observation context witness) @ observations in
+            match statement context witness with
+                | Some statement -> statement :: statements, observations
+                | _ -> statements, observations
+            (* convert intro to statement *)
+end
+
+(* CONSTRUCTION *)
+
+let of_path path history =
+    let intermediate_representation = path
+        |> Search.Tree.witnesses_along_path
+        |> IR.compile in
+    let statements = intermediate_representation
+        |> fst in
+    let observation = intermediate_representation
+        |> snd
+        |> Observation.eq_of_assoc in
     {
-        pipeline = compilation |> Compile.Target.pipeline;
-        observation = compilation |> Compile.Target.observation;
-        history = history
+        pipeline = Model.of_statements statements;
+        observations = [observation];
+        history = history;
     }

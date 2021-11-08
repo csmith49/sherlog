@@ -1,29 +1,13 @@
+(* Utility module for producing and consuming Yojson objects. *)
+
 type t = Yojson.Basic.t
-type 'a parser = Yojson.Basic.t -> 'a option
+
+type 'a parser = t -> 'a option
+type 'a encoder = 'a -> t
 
 module Parse = struct
-    let list parser json = match json with
-        | `List xs -> xs
-            |> CCList.map parser
-            |> CCList.all_some
-        | _ -> None
-
-    let assoc parser json = match json with
-        | `Assoc xs -> xs
-            |> CCList.map (fun (k, v) -> match parser v with
-                | Some v -> Some (k, v)
-                | _ -> None)
-            |> CCList.all_some
-        | _ -> None
-
-    let find parser key json = match json with
-        | `Assoc xs -> xs
-            |> CCList.assoc_opt ~eq:CCString.equal key
-            |> CCOpt.flat_map parser
-        | _ -> None
-
-    let identity = CCOpt.return
-
+    (* basic types *)
+    
     let string = function
         | `String s -> Some s
         | _ -> None
@@ -39,14 +23,60 @@ module Parse = struct
     let bool = function
         | `Bool b -> Some b
         | _ -> None
+
+    let null = function
+        | `Null -> Some ()
+        | _ -> None
+
+    (* combinators *)
+
+    let list parser json = match json with
+        | `List xs -> xs
+            |> CCList.map parser
+            |> CCList.all_some
+        | _ -> None
+
+    let assoc parser json = match json with
+        | `Assoc xs -> xs
+            |> CCList.map (fun (k, v) -> match parser v with
+                | Some v -> Some (k, v)
+                | _ -> None)
+            |> CCList.all_some
+        | _ -> None
+
+    (* utility *)
+
+    let find key parser json = match json with
+        | `Assoc xs -> xs
+            |> CCList.assoc_opt ~eq:CCString.equal key
+            |> CCOpt.flat_map parser
+        | _ -> None
 end
 
-module Make = struct
+module Encode = struct
+    (* basic types *)
+
     let string s = `String s
+
     let int i = `Int i
+
     let float f = `Float f
+
     let bool b = `Bool b
-    let list xs = `List xs
-    let assoc xs = `Assoc xs
-    let null = `Null
+
+    let null () = `Null
+
+    (* combinators *)
+
+    let list encoder ls = `List (CCList.map encoder ls)
+
+    let assoc encoder ls = `Assoc (CCList.map (CCPair.map_snd encoder) ls)
+end
+
+(* Interface signature *)
+module type JSONable = sig
+    type value
+
+    val encode : value -> t
+    val decode : t -> value option
 end

@@ -22,7 +22,7 @@ let program_of_lines lines =
         | `Parameter p -> parameters := p :: !parameters
         | _ -> () in
     let _ = CCList.iter process lines in
-    Program.make !rules !parameters
+    Program.Functional.make !rules !parameters Posterior.default
 
 let evidence_of_lines lines =
     let process line = match line with
