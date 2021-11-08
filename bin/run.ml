@@ -60,16 +60,13 @@ let operate filename =
         let _ = Fmt.pr "%a Proving %a...\n"
             marker ()
             (Fmt.list ~sep:Fmt.comma Watson.Atom.pp) fact in
-        let search = Search.Algorithms.beam_search
+        let search = Search.Algorithms.complete_search
             (Sherlog.Program.space program)
-            !search_width 
-            (Sherlog.Branch.of_conjunct fact) in
-        let branch, history = Search.Algorithms.run search in
-        let _ = Fmt.pr "%a Deriving explanation...\n"
-            marker () in
-        let ex = Sherlog.Explanation.of_branch branch history in
-        let _ = Fmt.pr "%a" Sherlog.Explanation.pp ex in
-        () in
+            (Watson.Proof.Obligation.of_conjunct fact) in
+        let path, history = Search.Algorithms.run search in
+        let explanation = Sherlog.Explanation.of_path path history in
+        let _ = Fmt.pr "%a\n" Sherlog.Explanation.pp explanation in
+            () in
     
     CCList.iter handle_fact facts
 

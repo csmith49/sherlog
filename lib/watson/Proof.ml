@@ -42,6 +42,8 @@ module Obligation = struct
         goal = atoms;
         cache = [];
     }
+
+    let to_string ob = "{" ^ (ob.goal |> CCList.map Atom.to_string |> CCString.concat ", ") ^ "}"
 end
 
 module Witness = struct

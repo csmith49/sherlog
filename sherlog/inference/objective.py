@@ -1,6 +1,6 @@
 from ..program import Evidence
 
-from typing import Optional, Mapping, Callable
+from typing import Optional, Mapping
 from torch import Tensor
 from dataclasses import dataclass
 

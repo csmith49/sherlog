@@ -52,16 +52,15 @@ end
 
 (* APPLICATION *)
 
-let space : t -> (module Search.Algorithms.Space with type candidate = Branch.t) = fun program -> (module struct
-    type candidate = Branch.t
+let space : t -> (module Search.Algorithms.Space with type state = Watson.Proof.Obligation.t and type witness = Watson.Proof.Witness.t) = fun program -> (module struct
+    (* nodes are obligations, with edges annotated by witnesses *)
+    type state = Watson.Proof.Obligation.t
+    type witness = Watson.Proof.Witness.t
 
-    let compare = Branch.compare
-
-    let is_solution branch = match Branch.success branch with
-        | Some true -> true
-        | _ -> false
-
-    let successors branch = Branch.extend program.rules branch
-
-    let embed = Posterior.apply program.posterior
+    (* goal is to find empty obligations *)
+    let is_goal state = Watson.Proof.Obligation.is_empty state
+    let next state = program
+            |> Functional.rules
+            |> CCList.filter_map (Watson.Proof.resolve state)
+    let embed = Posterior.apply (Functional.posterior program)
 end)

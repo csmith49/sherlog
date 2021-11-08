@@ -5,10 +5,10 @@ import click
 
 from sherlog.program import loads
 from sherlog.inference import minibatch, Optimizer, FunctionalEmbedding
-from sherlog.interface import print, initialize
+from sherlog.interface import print, initialize, minotaur
 
 from random import choices
-from torch import tensor, softmax
+from torch import tensor
 from collections import Counter
 
 SOURCE = \
@@ -37,12 +37,23 @@ def sample(weights):
 @click.option("-e", "--epochs", default=10, type=int, help="Training epochs.")
 @click.option("-l", "--learning-rate", default=1e-4, type=float, help="Learning rate.")
 @click.option("-s", "--samples", default=100, type=int, help="Number of per-datum samples.")
-def cli(train, batch_size, epochs, learning_rate, samples):
+@click.option("-i", "--instrumentation", type=str, help="Instrumentation log filepath.")
+@click.option("-f", "--forcing", is_flag=True, help="Enable evaluation execution forcing.")
+@click.option("-c", "--caching", is_flag=True, help="Enable explanation sampling caching.")
+def cli(train, batch_size, epochs, learning_rate, samples, instrumentation, forcing, caching):
     """Learn the parameters for a simple ternary digit adder."""
 
     # initialize!
     print("Initializing...")
-    initialize(port=8007)
+    initialize(port=8007, instrumentation=instrumentation)
+
+    minotaur.enter("ternary-addition")
+
+    minotaur["train"] = train
+    minotaur["batch-size"] = batch_size
+    minotaur["epochs"] = epochs
+    minotaur["learning-rate"] = learning_rate
+    minotaur["samples"] = samples
 
     # load the program
     print("Loading the program...")
@@ -56,8 +67,7 @@ def cli(train, batch_size, epochs, learning_rate, samples):
     data = [sample(weights) for _ in range(train)]
 
     embedder = FunctionalEmbedding(
-        evidence=lambda s: f"observe({s['left'] + s['right']})",
-        parameters=lambda s: s
+        evidence=lambda s: f"observe({s['left'] + s['right']})"
     )
 
     # build the optimizer
@@ -65,41 +75,51 @@ def cli(train, batch_size, epochs, learning_rate, samples):
     optimizer = Optimizer(
         program=program,
         samples=samples,
-        learning_rate=learning_rate
+        learning_rate=learning_rate,
+        force=forcing,
+        cache=caching
     )
 
     # iterate over the data and optimize
     old_batch_loss = tensor(0.0)
 
     for batch in minibatch(data, batch_size, epochs=epochs):
-        # we print out a frame for each batch for debugging purposes...
-        print(f"\n③ Batch {batch.index:03d} in Epoch {batch.epoch:03d} ③")
+        with minotaur("batch"):
+            # we print out a frame for each batch for debugging purposes...
+            print(f"\n③ Batch {batch.index:03d} in Epoch {batch.epoch:03d} ③")
 
-        # lets see what's going on in the ground truth
-        print("Batch GT:")
+            minotaur["batch"] = batch.index
+            minotaur["epoch"] = batch.epoch
 
-        total = len(batch.data) * 2
-        
-        values = Counter([datum["left"] for datum in batch.data] + [datum["right"] for datum in batch.data])
-        print(f"w=[{values[-1] / total:.3f}, {values[0] / total:.3f}, {values[1] / total:.3f}]")
+            # lets see what's going on in the ground truth
+            print("Batch GT:")
 
-        # okay, now let's optimize
-        optimizer.maximize(*embedder.embed_all(batch.data))
-        batch_loss = optimizer.optimize()
+            total = len(batch.data) * 2
+            values = Counter([datum["left"] for datum in batch.data] + [datum["right"] for datum in batch.data])
+            print(f"w=[{values[-1] / total:.3f}, {values[0] / total:.3f}, {values[1] / total:.3f}]")
 
-        # what is the batch loss?
-        print(f"Batch loss: {batch_loss:.3f} (Δ={old_batch_loss - batch_loss:.3f})")
+            minotaur["w-gt"] = [values[-1] / total, values[0] / total, values[1] / total]
 
-        # what are the learned parameters doing right now?
-        print("Parameter Summary:")
+            # okay, now let's optimize
+            optimizer.maximize(*embedder.embed_all(batch.data))
+            batch_loss = optimizer.optimize()
 
-        w = program.parameter("w")
-        # weights, grad = softmax(w, dim=0).tolist(), w.grad.tolist()
-        weights = (w / w.sum()).tolist()
-        grad = w.grad.tolist()
-        print(f"w=[{weights[0]:.3f}, {weights[1]:.3f}, {weights[2]:.3f}], ∇(left_weights)=[{grad[0]:.3f}, {grad[1]:.3f}, {grad[2]:.3f}]")
+            # what is the batch loss?
+            print(f"Batch loss: {batch_loss:.3f} (Δ={old_batch_loss - batch_loss:.3f})")
+
+            # what are the learned parameters doing right now?
+            print("Parameter Summary:")
+
+            w = program.parameter("w")
+            weights = (w / w.sum()).tolist()
+            grad = w.grad.tolist()
+            print(f"w=[{weights[0]:.3f}, {weights[1]:.3f}, {weights[2]:.3f}], ∇(left_weights)=[{grad[0]:.3f}, {grad[1]:.3f}, {grad[2]:.3f}]")
+            minotaur["w"] = weights
+            minotaur["w-grad"] = grad
 
         old_batch_loss = batch_loss
+
+    minotaur.exit()
 
 if __name__ == "__main__":
     cli()

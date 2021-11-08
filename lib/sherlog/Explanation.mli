@@ -11,8 +11,7 @@ end
 
 (* Construction *)
 
-val of_branch : Branch.t -> Search.History.t -> t
-val of_branches : Branch.t list -> Search.History.t -> t
+val of_path : (Watson.Proof.Witness.t, Watson.Proof.Obligation.t) Search.Tree.path -> Search.History.t -> t
 
 (* IO *)
 

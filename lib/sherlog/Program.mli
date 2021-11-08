@@ -16,4 +16,4 @@ module JSON : sig
     val decode : JSON.t -> t option
 end
 
-val space : t -> (module Search.Algorithms.Space with type candidate = Branch.t)
+val space : t -> (module Search.Algorithms.Space with type state = Watson.Proof.Obligation.t and type witness = Watson.Proof.Witness.t)

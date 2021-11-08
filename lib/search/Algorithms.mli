@@ -1,30 +1,41 @@
 (* SEARCH SIGNATURES *)
 
 module type Space = sig
-    (** type representing candidate solutions *)
-    type candidate
+    (* underlying state space *)
+    type state
 
-    (** Required search interface *)
+    (* witness of choices taken in search *)
+    type witness
 
-    (** [compare left right] returns a negative value if [left > right], a positive value if [left < right], and 0 on equality *)
-    val compare : candidate -> candidate -> int
+    (* check if a state is "complete", in some sense *)
+    val is_goal : state -> bool
 
-    (** [is_solution candidate] is true iff [candidate] is an acceptable solution from the search *)
-    val is_solution : candidate -> bool
+    (* get candidate choices and results from a state *)
+    val next : state -> (witness * state) list
+    
+    (* rank each choice *)
+    val embed : (witness * state) -> Embedding.t
+end
 
-    (** [successors candidate] provides a list of follow-up candidates to explore *)
-    val successors : candidate -> candidate list
+module ExtendedSpace (S : Space) : sig
+    (* wraps space with histories *)
+    type state = S.state * History.t
+    type witness = S.witness
 
-    (** [embed candidate] produces a score embedding for [candidate] - used to break ties in searches *)
-    val embed : candidate -> Embedding.t
+    (* produces a full search space *)
+    val is_goal : state -> bool
+    val next : state -> (witness * state) list
+    val embed : (witness * state) -> Embedding.t
+
+    (* and a few utilities *)
+    val of_state : S.state -> state
 end
 
 (** ['a search] represents a lazy search for an object of type ['a] *)
-type 'a search
+type ('a, 'b) search
 
 (** [run search] evaluates [search] to produce a concrete solution and derivation history *)
-val run : 'a search -> 'a * History.t
+val run : ('a, 'b) search -> ('a, 'b) Tree.path * History.t
 
 (* ALGORITHMS *)
-
-val beam_search : (module Space with type candidate = 'a) -> int -> 'a -> 'a search
+val complete_search : (module Space with type witness = 'a and type state = 'b) -> 'b -> ('a, 'b) search

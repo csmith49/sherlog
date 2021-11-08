@@ -1,24 +1,21 @@
 module Operation = struct
     type t =
-        | Size
+        | Constant
 
-    let apply operation branch = match operation with
-        | Size -> branch
-            |> Branch.witnesses
-            |> CCList.length
-            |> CCFloat.of_int
+    let apply operation _ = match operation with
+        | Constant -> 1.0
 
     module JSON = struct
         let encode = function
-            | Size -> `Assoc [
+            | Constant -> `Assoc [
                     ("type", `String "operation");
-                    ("kind", `String "size");
+                    ("kind", `String "constant");
                 ]
 
         let decode json = let open CCOpt in
             let* kind = JSON.Parse.(find "kind" string json) in
             match kind with
-                | "size" -> Some Size
+                | "constant" -> Some Constant
                 | _ -> None
     end
 end
@@ -29,7 +26,7 @@ module Feature = struct
         operation : Operation.t;
     }
 
-    let apply feature branch = Operation.apply feature.operation branch
+    let apply feature state = Operation.apply feature.operation state
     let weight feature = feature.weight
 
     let tuple feature = (weight feature, apply feature)
@@ -57,12 +54,12 @@ let embedding posterior = posterior
     |> CCList.map Feature.tuple
     |> Search.Embedding.of_features
 
-let apply posterior branch = embedding posterior branch
+let apply posterior state = embedding posterior state
 
 let of_operations assoc = assoc
     |> CCList.map (fun (w, op) -> {Feature.weight = w; operation = op})
 
-let default = of_operations [(1.0, Operation.Size)]
+let default = of_operations [(1.0, Operation.Constant)]
 
 
 module JSON = struct

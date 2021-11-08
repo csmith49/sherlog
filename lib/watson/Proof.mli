@@ -15,6 +15,8 @@ module Obligation : sig
     val variables : t -> string list
 
     val of_conjunct : Atom.t list -> t
+
+    val to_string : t -> string
 end
 
 module Witness : sig

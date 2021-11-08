@@ -1,6 +1,20 @@
 from torch import tensor, Tensor
 from typing import List
 
+class Embedding:
+    def __init__(self, features : Tensor, weights : Tensor):
+        self.features = features
+        self.weights = weights
+
+    @classmethod
+    def of_json(cls, json) -> "Embedding":
+        assert json["type"] == "embedding"
+
+        features = tensor(json["features"])
+        weights = tensor(json["weights"])
+
+        return cls(features, weights)
+
 class Choice:
     def __init__(self, features : Tensor, context : List[Tensor]):
         self.features, self.context = features, context
@@ -9,8 +23,8 @@ class Choice:
     def of_json(cls, json) -> "Choice":
         assert json["type"] == "choice"
 
-        features = tensor(json["embedding"])
-        context = [tensor(ctx) for ctx in json["context"]]
+        features = Embedding.of_json(json["embedding"])
+        context = [Embedding.of_json(ctx) for ctx in json["context"]]
         return cls(features, context)
 
 class History:

@@ -11,6 +11,13 @@ let make embedding context = {
     context = context;
 }
 
+let score choice =
+    let numerator = Embedding.score choice.embedding in
+    let denominator = choice.context
+        |> CCList.map Embedding.score
+        |> CCList.fold_left ( +. ) 0.0 in
+    numerator /. denominator
+
 module JSON = struct
     let encode choice = `Assoc [
         ("type", `String "choice");
@@ -27,28 +34,20 @@ module JSON = struct
         }
 end
 
-module Random = struct
-    let gumbel_trick w = let open CCRandom in
-    let scale u = u |> log |> log |> fun x -> 0.0 -. x in
-        (float_range 0.0 1.0) >|= scale >|= CCFloat.add (log w)
-
-    let categorical weights = fun state ->
-        let scores = weights
-            |> CCList.map gumbel_trick
-            |> CCList.map (CCRandom.run ~st:state)
-            |> CCList.mapi CCPair.make in
-        let sort_key (li, ls) (ri, rs) = if ls >= rs then (li, ls) else (ri, rs) in
-        let argmax = scores |> CCList.fold_left sort_key (0, -1.0) in
-            fst argmax
-
-    let prop_to values scores = fun state ->
-        let index = CCRandom.run ~st:state (categorical scores) in
-        values |> CCList.get_at_idx index |> CCOpt.get_exn_or "Invalid sampling."
-end
-
 let choose (values : 'a list) (embed : 'a -> Embedding.t) : ('a * t) CCRandom.t = fun state ->
     let embeddings = CCList.map embed values in
     let scores = CCList.map Embedding.score embeddings in
-    let value, embedding = Random.prop_to (CCList.map2 CCPair.make values embeddings) scores
+    let value, embedding = Utility.prop_to (CCList.map2 CCPair.make values embeddings) scores
         |> CCRandom.run ~st:state in
     value, make embedding embeddings
+
+let choose_k (samples : int) (values : 'a list) (embed : 'a -> Embedding.t) : ('a * t) list CCRandom.t = fun state ->
+    let embeddings = CCList.map embed values in
+    let scores = CCList.map Embedding.score embeddings in
+    let indices = CCRandom.sample_without_duplicates ~cmp:CCInt.compare samples (Utility.categorical scores) state in
+    let sample index =
+        let value = CCList.get_at_idx_exn index values in
+        let embedding = CCList.get_at_idx_exn index embeddings in
+        let choice = make embedding embeddings in
+        value, choice in
+    CCList.map sample indices

@@ -88,20 +88,17 @@ end
 
 (* CONSTRUCTION *)
 
-let rec of_branch branch history =
-    of_branches [branch] history
-and of_branches branches history =
-    let ir = branches
-        |> CCList.map Branch.witnesses
-        |> CCList.map IR.compile in
-    let statements = ir
-        |> CCList.flat_map fst
-        |> CCList.uniq ~eq:Model.Statement.equal in
-    let observations = ir
-        |> CCList.map snd
-        |> CCList.map Observation.eq_of_assoc in
+let of_path path history =
+    let intermediate_representation = path
+        |> Search.Tree.witnesses_along_path
+        |> IR.compile in
+    let statements = intermediate_representation
+        |> fst in
+    let observation = intermediate_representation
+        |> snd
+        |> Observation.eq_of_assoc in
     {
         pipeline = Model.of_statements statements;
-        observations = observations;
+        observations = [observation];
         history = history;
     }

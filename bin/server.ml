@@ -47,12 +47,11 @@ let handler json = let open CCOpt in match JSON.Parse.(find "type" string json) 
 
         (* get explanation *)
         let query = Sherlog.Evidence.to_atoms evidence in
-        let search = Search.Algorithms.beam_search
+        let search = Search.Algorithms.complete_search
             (Sherlog.Program.space program)
-            10
-            (Sherlog.Branch.of_conjunct query) in
-        let branch, history = Search.Algorithms.run search in
-        let explanation = Sherlog.Explanation.of_branch branch history in
+            (Watson.Proof.Obligation.of_conjunct query) in
+        let path, history = Search.Algorithms.run search in
+        let explanation = Sherlog.Explanation.of_path path history in
         let response = `Assoc [
             ("type", `String "query-response");
             ("explanation", Sherlog.Explanation.JSON.encode explanation)

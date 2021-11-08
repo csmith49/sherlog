@@ -84,7 +84,6 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
 
             # what is the batch loss?
             print(f"Batch loss: {batch_loss:.3f} (Δ={old_batch_loss - batch_loss:.3f})")
-            minotaur["batch-loss"] = (old_batch_loss - batch_loss).item()
 
             # and what is the program parameter doing?
             print("Parameter summary:")
@@ -92,7 +91,7 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
             p = program.parameter("p")
             print(f"p={p.item():.3f}, ∇p={p.grad.item():.3f}, error=±{abs(p.item() - probability):.3f}")
             minotaur["p"] = p.item()
-            minotaur["p-gradient"] = p.grad.item()
+            minotaur["p-grad"] = p.grad.item()
 
             old_batch_loss = batch_loss
 
