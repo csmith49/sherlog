@@ -5,7 +5,7 @@ import click
 
 from sherlog.program import loads
 from sherlog.inference import minibatch, Optimizer, FunctionalEmbedding
-from sherlog.interface import print, initialize
+from sherlog.interface import print, initialize, minotaur
 
 from random import choices, random
 from enum import Enum
@@ -79,12 +79,24 @@ def outcome(coin : Coin, ball1 : Color, ball2 : Color) -> bool:
 @click.option("-b", "--batch-size", default=10, type=int, help="Training minibatch size.")
 @click.option("-e", "--epochs", default=10, type=int, help="Training epochs.")
 @click.option("-l", "--learning-rate", default=1e-4, type=float, help="Learning rate.")
-def cli(train, batch_size, epochs, learning_rate):
+@click.option("-i", "--instrumentation", type=str, help="Filepath to save instrumentation logs to.")
+@click.option("-s", "--samples", type=int, default=1, help="Number of samples for each explanation log-prob approximation.")
+@click.option("-f", "--forcing", is_flag=True, help="Forcing explanation executions.")
+@click.option("-c", "--caching", is_flag=True, help="Caching explanation sampling.")
+
+def cli(train, batch_size, epochs, learning_rate, instrumentation, samples, forcing, caching):
     """Learn the parameters of a simple coin-ball problem."""
 
     # initialize!
     print("Initializing...")
-    initialize(port=8007)
+    initialize(port=8007, instrumentation=instrumentation)
+
+    minotaur.enter("simple-coin-ball")
+
+    minotaur["train"] = train
+    minotaur["batch-size"] = batch_size
+    minotaur["epochs"] = epochs
+    minotaur["learning-rate"] = learning_rate
 
     # load the program
     print("Loading the program...")
@@ -114,50 +126,67 @@ def cli(train, batch_size, epochs, learning_rate):
     print(f"Initializing the optimizer with a learning rate of {learning_rate}...")
     optimizer = Optimizer(
         program=program,
-        learning_rate=learning_rate
+        learning_rate=learning_rate,
+        samples=samples,
+        force=forcing,
+        cache=caching
     )
 
     # iterate over the data and optimize
     old_batch_loss = tensor(0.0)
 
     for batch in minibatch(data, batch_size, epochs=epochs):
-        # we print out a frame for each batch for debugging purposes...
-        print(f"\n🪙 Batch {batch.index:03d} in Epoch {batch.epoch:03d} 🪙")
+        with minotaur("batch"):
+            # we print out a frame for each batch for debugging purposes...
+            print(f"\n🪙 Batch {batch.index:03d} in Epoch {batch.epoch:03d} 🪙")
+            minotaur["batch"] = batch.index
+            minotaur["epoch"] = batch.epoch
 
-        # what is the parameterization implied by the batch?
-        print("Batch GT:")
+            # what is the parameterization implied by the batch?
+            print("Batch GT:")
 
-        coins = Counter([datum["coin"] for datum in batch.data])
-        print(f"weight={coins[Coin.HEADS] / len(batch.data):.3f}")
+            coins = Counter([datum["coin"] for datum in batch.data])
+            print(f"weight={coins[Coin.HEADS] / len(batch.data):.3f}")
+            minotaur["weight-gt"] = coins[Coin.HEADS] / len(batch.data)
 
-        color1s = Counter([datum["color1"] for datum in batch.data])
-        print(f"urn_one_weights=[{color1s[Color.RED] / len(batch.data):.3f}, {color1s[Color.BLUE] / len(batch.data):.3f}]")
-        
-        color2s = Counter([datum["color2"] for datum in batch.data])
-        print(f"urn_two_weights=[{color2s[Color.RED] / len(batch.data):.3f}, {color2s[Color.BLUE] / len(batch.data):.3f}, {color2s[Color.GREEN] / len(batch.data):.3f}]")
+            color1s = Counter([datum["color1"] for datum in batch.data])
+            print(f"urn_one_weights=[{color1s[Color.RED] / len(batch.data):.3f}, {color1s[Color.BLUE] / len(batch.data):.3f}]")
+            minotaur["urn_one_weights-gt"] = [color1s[Color.RED] / len(batch.data), color1s[Color.BLUE] / len(batch.data)]
 
-        # okay, now let's optimize
-        optimizer.maximize(*embedder.embed_all(batch.data))
-        batch_loss = optimizer.optimize()
+            color2s = Counter([datum["color2"] for datum in batch.data])
+            print(f"urn_two_weights=[{color2s[Color.RED] / len(batch.data):.3f}, {color2s[Color.BLUE] / len(batch.data):.3f}, {color2s[Color.GREEN] / len(batch.data):.3f}]")
+            minotaur["urn_two_weights-gt"] = [color2s[Color.RED] / len(batch.data), color2s[Color.BLUE] / len(batch.data), color2s[Color.GREEN] / len(batch.data)]
 
-        # what is the batch loss?
-        print(f"Batch loss: {batch_loss:.3f} (Δ={old_batch_loss - batch_loss:.3f})")
+            # okay, now let's optimize
+            optimizer.maximize(*embedder.embed_all(batch.data))
+            batch_loss = optimizer.optimize()
 
-        # and what are the program parameters doing?
-        print("Parameter summary:")
+            # what is the batch loss?
+            print(f"Batch loss: {batch_loss:.3f} (Δ={old_batch_loss - batch_loss:.3f})")
 
-        weight = program.parameter("weight")
-        print(f"weight={weight.item():.3f}, ∇(weight)={weight.grad.item():.3f}")
+            # and what are the program parameters doing?
+            print("Parameter summary:")
 
-        urn_one_weights = program.parameter("urn_one_weights")
-        weights, grad = softmax(urn_one_weights, dim=0).tolist(), urn_one_weights.grad.tolist()
-        print(f"urn_one_weights=[{weights[0]:.3f}, {weights[1]:.3f}], ∇(urn_one_weights)=[{grad[0]:.3f}, {grad[1]:.3f}]")
+            weight = program.parameter("weight")
+            print(f"weight={weight.item():.3f}, ∇(weight)={weight.grad.item():.3f}")
+            minotaur["weight"] = weight.item()
+            minotaur["weight-grad"] = weight.grad.item()
 
-        urn_two_weights = program.parameter("urn_two_weights")
-        weights, grad = softmax(urn_two_weights, dim=0).tolist(), urn_two_weights.grad.tolist()
-        print(f"urn_two_weights=[{weights[0]:.3f}, {weights[1]:.3f}, {weights[2]:.3f}], ∇(urn_two_weights)=[{grad[0]:.3f}, {grad[1]:.3f}, {grad[2]:.3f}]")
+            urn_one_weights = program.parameter("urn_one_weights")
+            weights, grad = softmax(urn_one_weights, dim=0).tolist(), urn_one_weights.grad.tolist()
+            print(f"urn_one_weights=[{weights[0]:.3f}, {weights[1]:.3f}], ∇(urn_one_weights)=[{grad[0]:.3f}, {grad[1]:.3f}]")
+            minotaur["urn_one_weights"] = weights
+            minotaur["urn_one_weights-grad"] = grad
 
-        old_batch_loss = batch_loss
+            urn_two_weights = program.parameter("urn_two_weights")
+            weights, grad = softmax(urn_two_weights, dim=0).tolist(), urn_two_weights.grad.tolist()
+            print(f"urn_two_weights=[{weights[0]:.3f}, {weights[1]:.3f}, {weights[2]:.3f}], ∇(urn_two_weights)=[{grad[0]:.3f}, {grad[1]:.3f}, {grad[2]:.3f}]")
+            minotaur["urn_two_weights"] = weights
+            minotaur["urn_two_weights-grad"] = grad
+
+            old_batch_loss = batch_loss
+    
+    minotaur.exit()
 
 if __name__ == "__main__":
     cli()

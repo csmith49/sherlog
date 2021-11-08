@@ -39,10 +39,9 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
 
     minotaur["probability"] = probability
     minotaur["train"] = train
-    minotaur["batch size"] = batch_size
+    minotaur["batch-size"] = batch_size
     minotaur["epochs"] = epochs
-    minotaur["learning rate"] = learning_rate
-
+    minotaur["learning-rate"] = learning_rate
 
     # load the program
     print("Loading the program...")
