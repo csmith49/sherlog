@@ -1,13 +1,13 @@
 """
 """
 
+from enum import Flag
 import click
 
 from random import random
 from sherlog.program import loads
 from sherlog.inference import minibatch, PartitionEmbedding, Optimizer
-from sherlog.interface import print, initialize
-from sherlog.interface.instrumentation import minotaur
+from sherlog.interface import print, initialize, minotaur
 from torch import tensor
 
 SOURCE = \
@@ -25,14 +25,17 @@ result(F) <- flip(coin, F).
 @click.option("-l", "--learning-rate", default=1e-4, type=float, help="Learning rate.")
 @click.option("-i", "--instrumentation", type=str, help="Filepath to save instrumentation logs to.")
 @click.option("-s", "--samples", type=int, default=1, help="Number of samples for each explanation log-prob approximation.")
-def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, samples):
+@click.option("-f", "--forcing", is_flag=True, help="Forcing explanation executions.")
+@click.option("-c", "--caching", is_flag=True, help="Caching explanation sampling.")
+def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, samples, forcing, caching):
     """Train a simple coin flip program."""
 
-    # do this first, or we lose some initial messages
-    if instrumentation:
-        minotaur.add_filepath_handler(instrumentation)
+    # initialize!
+    print("Initializing...")
 
-    minotaur.enter("coin flip")
+    initialize(port=8007, instrumentation=instrumentation)
+
+    minotaur.enter("coin-flip")
 
     minotaur["probability"] = probability
     minotaur["train"] = train
@@ -40,10 +43,6 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
     minotaur["epochs"] = epochs
     minotaur["learning rate"] = learning_rate
 
-    # initialize!
-    print("Initializing...")
-    
-    initialize(port=8007)
 
     # load the program
     print("Loading the program...")
@@ -62,7 +61,7 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
     # build the optimizer
     print(f"Initializing the optimizer with a learning rate of {learning_rate}...")
 
-    optimizer = Optimizer(program, learning_rate=learning_rate, samples=samples)
+    optimizer = Optimizer(program, learning_rate=learning_rate, samples=samples, force=forcing, cache=caching)
 
     old_batch_loss = tensor(0.0)
 
@@ -71,10 +70,13 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
         with minotaur("batch"):
             # we print out a "frame" for each batch for debugging purposes...
             print(f"\n🪙 Batch {batch.index:03d} in Epoch {batch.epoch:03d} 🪙")
+            minotaur["batch"] = batch.index
+            minotaur["epoch"] = batch.epoch
 
             # what is the true probability suggested by the batch?
             head_count = len(list(filter(None, batch.data)))
             print(f"Batch GT: p={head_count / len(batch.data):.2f}")
+            minotaur["p-gt"] = head_count / len(batch.data)
 
             # okay, now let's optimize
             optimizer.maximize(*embedder.embed_all(batch.data))
@@ -82,15 +84,15 @@ def cli(probability, train, batch_size, epochs, learning_rate, instrumentation, 
 
             # what is the batch loss?
             print(f"Batch loss: {batch_loss:.3f} (Δ={old_batch_loss - batch_loss:.3f})")
+            minotaur["batch-loss"] = (old_batch_loss - batch_loss).item()
 
             # and what is the program parameter doing?
             print("Parameter summary:")
 
             p = program.parameter("p")
             print(f"p={p.item():.3f}, ∇p={p.grad.item():.3f}, error=±{abs(p.item() - probability):.3f}")
-
-            minotaur["batch"] = batch.index
-            minotaur["epoch"] = batch.epoch
+            minotaur["p"] = p.item()
+            minotaur["p-gradient"] = p.grad.item()
 
             old_batch_loss = batch_loss
 

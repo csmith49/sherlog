@@ -74,14 +74,14 @@ class Program:
         return explanation
 
     @minotaur("program/log-prob", kwargs=("attempts", "samples", "cache"))
-    def log_prob(self, evidence : Evidence, attempts : int = 100, samples : int = 1, parameters : Optional[Mapping[str, Tensor]] = None, cache : bool = False) -> Tensor:
+    def log_prob(self, evidence : Evidence, samples : int = 1, parameters : Optional[Mapping[str, Tensor]] = None, force : bool = False, cache : bool = False) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence."""
 
         # build -> sample -> evaluate
         store = self.store(**(parameters if parameters else {}))
 
         explanation = self.explanation(evidence, cache=cache)
-        result = explanation.log_prob(store, samples=samples)
+        result = explanation.log_prob(store, samples=samples, force=force)
 
         minotaur["result"] = result.item()
         return result
