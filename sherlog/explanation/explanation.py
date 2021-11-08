@@ -1,7 +1,7 @@
 """Explanations are the central explanatory element in Sherlog. They capture sufficient generative constraints to ensure a particular outcome."""
 
 from ..pipe import Pipeline, Statement
-from ..interface.instrumentation import minotaur
+from ..interface import minotaur
 from .semantics.core.semiring import PreciseSemiring, DisjointSumSemiring
 from .semantics import spyglass
 from .observation import Observation
@@ -42,27 +42,26 @@ class Explanation:
         # the target
         yield from self.stub()
 
-    def forcing(self) -> Mapping[str, Tensor]:
+    @minotaur("explanation/forcing", kwargs=("force"))
+    def forcing(self, force : bool = True) -> Mapping[str, Tensor]:
         """Construct the most-specific forcing possible for the explanation."""
 
-        if len(self.observations) == 1:
+        if len(self.observations) == 1 and force:
             observation = self.observations[0]
             return {key : tensor(value.value) for key, value in observation.equality.items()}
         else:
             return {}
 
-    @minotaur("explanation log-prob")
-    def log_prob(self, parameters : Mapping[str, Tensor], samples : int = 1) -> Tensor:
+    @minotaur("explanation/log-prob", kwargs=("samples", "force"))
+    def log_prob(self, parameters : Mapping[str, Tensor], samples : int = 1, force : bool = True) -> Tensor:
         """Compute the log-probability of the explanation generating the observations."""
 
         # step 1: form the semantics
         semantics = spyglass.semantics_factory(
-            forcing = self.forcing(),
+            forcing = self.forcing(force=force),
             semiring = DisjointSumSemiring(),
             locals  = self.locals
         )
-
-        print(self.forcing())
 
         # step 2: evaluate the explanation as many times as requested
         results = []

@@ -1,11 +1,11 @@
-from ..explanation import Explanation
-
-from abc import ABC, abstractmethod
 from typing import List, Optional, Iterable
-from torch import ones, tensor, Tensor
+from torch import tensor, Tensor
 
 class Operation:
+    """Thin wrapper around JSON representation of operations, which map proof branches to real-valued scores."""
+
     def __init__(self, json):
+        """Construct an operation from a JSON representation."""
         self.source = json
 
     @classmethod
@@ -15,11 +15,17 @@ class Operation:
         return cls(json)
 
     def to_json(self):
+        """Return the JSON representation for `self`."""
+
         return self.source
 
 class Feature:
-    def __init__(self, weight, operation : Operation):
-        self.weight = weight
+    """Features pair operations with a weight indicating the contribution of the operation."""
+
+    def __init__(self, weight : float, operation : Operation):
+        """Construct a feature from a weight and an operation."""
+    
+        self.weight = tensor(weight, requires_grad=True)
         self.operation = operation
 
     @classmethod
@@ -32,17 +38,25 @@ class Feature:
         return cls(weight, operation)
 
     def to_json(self):
+        """Return a JSON representation for `self`."""
+
         return {
             "type" : "feature",
-            "weight" : self.weight,
+            "weight" : self.weight.item(),
             "operation" : self.operation.to_json()
         }
 
     def parameters(self) -> Iterable[Tensor]:
+        """Yield all optimizable parameters in the feature."""
+
         yield self.weight
 
 class Posterior:
+    """A posterior collects features."""
+
     def __init__(self, features : List[Feature]):
+        """Construct a posterior from a list of features."""
+
         self.features = features
 
     @classmethod

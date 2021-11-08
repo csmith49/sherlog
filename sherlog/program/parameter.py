@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from torch import Tensor, ones, tensor, softmax
+from torch import Tensor, ones, tensor
 
 # ABSTRACT PARAMETER CLASS
 
@@ -20,7 +20,9 @@ class Parameter(ABC):
         # make sure the value will accumulate gradients
         if not self.value.requires_grad:
             self.value.requires_grad = True
-    
+
+    # ABSTRACT METHODS
+
     @abstractmethod
     def clamp(self):
         """Clamp value of the parameter to the relevant domain.

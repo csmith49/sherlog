@@ -12,7 +12,7 @@ class Evidence:
         """Construct evidence from a JSON-like representation."""
         return cls(json)
 
-    def dump(self):
+    def to_json(self):
         """Construct a JSON-like encoding of the evidence."""
         return self.json
 
