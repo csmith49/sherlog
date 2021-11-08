@@ -1,6 +1,6 @@
 from .objective import Objective
 from ..program import Program
-from ..interface.instrumentation import minotaur
+from ..interface import minotaur
 
 from torch import Tensor, tensor, stack
 from enum import Enum, auto
@@ -143,7 +143,7 @@ class Optimizer:
 
     # OPTIMIZATION
 
-    @minotaur("optimize batch")
+    @minotaur("optimizer/optimize")
     def optimize(self) -> Tensor:
         """Update the program parameters to satisfy the collective intent of the provided objectives.
         
@@ -169,7 +169,7 @@ class Optimizer:
             logger.warning("Optimization triggered with an empty optimization queue.")
             loss = tensor(0.0)
 
-        minotaur["batch loss"] = loss.item()
+        minotaur["batch-loss"] = loss.item()
         return loss
 
     # CONTEXT MANAGER SEMANTICS

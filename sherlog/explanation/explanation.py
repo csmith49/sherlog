@@ -43,7 +43,7 @@ class Explanation:
         yield from self.stub()
 
     @minotaur("explanation/forcing", kwargs=("force"))
-    def forcing(self, force : bool = True) -> Mapping[str, Tensor]:
+    def forcing(self, force : bool = True, **kwargs) -> Mapping[str, Tensor]:
         """Construct the most-specific forcing possible for the explanation."""
 
         if len(self.observations) == 1 and force:
@@ -52,13 +52,13 @@ class Explanation:
         else:
             return {}
 
-    @minotaur("explanation/log-prob", kwargs=("samples", "force"))
-    def log_prob(self, parameters : Mapping[str, Tensor], samples : int = 1, force : bool = True) -> Tensor:
+    @minotaur("explanation/log-prob", kwargs=("samples"))
+    def log_prob(self, parameters : Mapping[str, Tensor], samples : int = 1, **kwargs) -> Tensor:
         """Compute the log-probability of the explanation generating the observations."""
 
         # step 1: form the semantics
         semantics = spyglass.semantics_factory(
-            forcing = self.forcing(force=force),
+            forcing = self.forcing(**kwargs),
             semiring = DisjointSumSemiring(),
             locals  = self.locals
         )

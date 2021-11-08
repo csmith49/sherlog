@@ -57,7 +57,7 @@ class Program:
         return {**kwargs, **{parameter.name : parameter.value for parameter in self._parameters}}
 
     @minotaur("program/explanation", kwargs=("cache"))
-    def explanation(self, evidence : Evidence, cache : bool = False) -> Explanation:
+    def explanation(self, evidence : Evidence, cache : bool = False, **kwargs) -> Explanation:
         """Sample explanations for the provided evidence."""
         
         # check if the evidence is cached
@@ -73,39 +73,30 @@ class Program:
 
         return explanation
 
-    @minotaur("program/log-prob", kwargs=("attempts", "samples", "cache"))
-    def log_prob(self, evidence : Evidence, samples : int = 1, parameters : Optional[Mapping[str, Tensor]] = None, force : bool = False, cache : bool = False) -> Tensor:
+    @minotaur("program/log-prob")
+    def log_prob(self, evidence : Evidence, parameters : Optional[Mapping[str, Tensor]] = None, **kwargs) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence."""
 
         # build -> sample -> evaluate
         store = self.store(**(parameters if parameters else {}))
 
-        explanation = self.explanation(evidence, cache=cache)
-        result = explanation.log_prob(store, samples=samples, force=force)
+        explanation = self.explanation(evidence, **kwargs)
+        result = explanation.log_prob(store, **kwargs)
 
         minotaur["result"] = result.item()
         return result
 
-    @minotaur("program/conditional-log-prob", kwargs=("attempts", "cache"))
+    @minotaur("program/conditional-log-prob")
     def conditional_log_prob(self,
         evidence : Evidence, condition : Evidence,
-        attempts = 100,
         parameters : Optional[Mapping[str, Tensor]] = None,
-        cache : bool = False
+        **kwargs
     ) -> Tensor:
         """Compute the log-likelihood of the provided evidenced conditioned on another piece of evidence."""
 
-        numerator = self.log_prob(evidence.join(condition),
-            attempts=attempts,
-            parameters=parameters,
-            cache=cache
-        )
+        numerator = self.log_prob(evidence.join(condition), parameters=parameters, **kwargs)
 
-        denominator = self.log_prob(condition,
-            attempts=attempts,
-            parameters=parameters,
-            cache=cache
-        )
+        denominator = self.log_prob(condition, parameters=parameters, **kwargs)
 
         minotaur["numerator"] = numerator.item()
         minotaur["denominator"] = denominator.item()
