@@ -8,6 +8,7 @@ from typing import Tuple, List, Optional, Mapping, Any
 def loads(source : str, locals : Optional[Mapping[str, Any]] = None) -> Tuple[Program, List[Evidence]]:
     """Load a program/evidence pair from a string."""
 
+    print(f"LOADING\n{source}")
     program, evidence = parse_source(source)
     return Program.of_json(program, locals=locals), [Evidence.of_json(evidence) for evidence in evidence]
 

@@ -1,0 +1,1 @@
+pay(S; normal[M, 10000.0]) <- payscale(C, D, M), employee(S, C, D).
