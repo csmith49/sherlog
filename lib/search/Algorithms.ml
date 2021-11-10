@@ -11,14 +11,13 @@ end
 
 type ('a, 'b) search = ('a, 'b * History.t) Tree.t CCRandom.t
 let run search =
-    let successes = search
-        |> CCRandom.run
+    let successes = (CCRandom.run search)
         |> Tree.paths_to_success
         |> CCList.map (function Tree.Path (witnesses, (state, history)) -> Tree.Path (witnesses, state), history) in
     let scores = successes
         |> CCList.map snd
         |> CCList.map History.score in
-    Utility.prop_to successes scores |> CCRandom.run
+    CCRandom.run (Utility.prop_to successes scores)
 
 module ExtendedSpace (S : Space) = struct
     (* wrap S.state with histories *)

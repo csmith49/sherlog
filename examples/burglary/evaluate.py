@@ -5,7 +5,7 @@ import click
 
 from sherlog.program import loads
 from sherlog.interface import print, initialize, minotaur
-from sherlog.inference import minibatch, Optimizer, ConjunctiveEmbedding
+from sherlog.inference import minibatch, Optimizer, FunctionalEmbedding
 
 from torch import tensor
 from random import random
@@ -95,7 +95,7 @@ def table(name : str, rows):
     """Convert a table into a string representation amenable to parsing via Sherlog."""
     def line_gen():
         for row in rows:
-            yield f"{name}({', '.join(str(item) for item in     row)})."
+            yield f"{name}({', '.join(str(item) for item in row)})."
     return "\n" + "\n".join(line_gen())
 
 # GROUND TRUTH SEMANTICS
@@ -130,6 +130,13 @@ def sample(city, house, business, earthquake_rate : float = 0.1, earthquake_sens
         "alarm" : alarms
     }
 
+def evidence_of_alarm(unit : str, alarm : bool) -> str:
+    return f"alarm({unit}, {'on' if alarm else 'off'})"
+
+def embed(alarms) -> str:
+    result = ", ".join(evidence_of_alarm(unit, alarm) for unit, alarm in alarms.items())
+    return result
+
 @click.command()
 @click.option("-t", "--train", default=100, type=int, help="Number of i.i.d. training samples.")
 @click.option("-b", "--batch-size", default=10, type=int, help="Training minibatch size.")
@@ -162,10 +169,7 @@ def cli(**kwargs):
         earthquake_sensitivity=0.6,
         burglary_sensitivity=0.9
     ) for _ in range(kwargs["train"])]
-    print(data[0])
-    embedder = ConjunctiveEmbedding(
-        lambda sample: (f"alarm({unit}, on)" if alarm else f"alarm({unit}, off)" for unit, alarm in sample["alarm"].items())
-    )
+    embedder = FunctionalEmbedding(evidence=lambda sample: embed(sample["alarm"]))
 
     # build the optimizer
     print(f"Initializing the optimizer with a learning rate of {kwargs['learning_rate']}...")
