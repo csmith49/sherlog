@@ -1,9 +1,11 @@
-from torch.distributions import Distribution
-from torch import Tensor
-from typing import List
+from torch import Tensor, softmax, ones
 import torch.distributions as dists
 
 from typing import Set
+
+def discrete_constructor(dimension : Tensor):
+    parameters = softmax(ones(dimension), dim=0)
+    return dists.Categorical(parameters)
 
 # DISTRIBUTION UTILITIES
 
@@ -11,7 +13,8 @@ _DISTRIBUTION_MAP = {
     "bernoulli" : dists.Bernoulli,
     "categorical" : dists.Categorical,
     "normal" : dists.Normal,
-    "beta" : dists.Beta
+    "beta" : dists.Beta,
+    "discrete" : discrete_constructor
 }
 
 def supported_distributions() -> Set[str]:
