@@ -36,8 +36,8 @@ let parse source =
     let lexbuf = Lexing.from_string source in
     try Parser.lines Lexer.read lexbuf with
         | Parser.Error ->
-            let message = Fmt.str "Cannot parse %s @ %s" (Lexing.lexeme lexbuf) (position_to_string lexbuf) in
-                raise (Sherlog_IO message)
+            let _ = Fmt.str "Cannot parse %s @ %s" (Lexing.lexeme lexbuf) (position_to_string lexbuf) in
+                raise (Sherlog_IO source)
         | Lexer.Error m ->
             let message = Fmt.str "Cannot lex @ %s: %s" (position_to_string lexbuf) m in
                 raise (Sherlog_IO message)
