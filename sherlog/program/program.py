@@ -6,7 +6,7 @@ from ..explanation import Explanation
 from ..interface import query, minotaur
 
 from typing import Optional, Iterable, Mapping, Any, Callable
-from torch import Tensor, no_grad
+from torch import Tensor, no_grad, stack
 from random import random
 
 import logging
@@ -74,14 +74,19 @@ class Program:
         return explanation
 
     @minotaur("program/log-prob")
-    def log_prob(self, evidence : Evidence, parameters : Optional[Mapping[str, Tensor]] = None, **kwargs) -> Tensor:
+    def log_prob(self, evidence : Evidence, parameters : Optional[Mapping[str, Tensor]] = None, explanations : int = 1, **kwargs) -> Tensor:
         """Compute the marginal log-likelihood of the provided evidence."""
 
         # build -> sample -> evaluate
         store = self.store(**(parameters if parameters else {}))
 
-        explanation = self.explanation(evidence, **kwargs)
-        result = explanation.log_prob(store, **kwargs)
+        results = []
+        for _ in range(explanations):
+            explanation = self.explanation(evidence, **kwargs)
+            result = explanation.log_prob(store, **kwargs)
+            results.append(result)
+
+        result = stack(results).mean()
 
         minotaur["result"] = result.item()
         return result
