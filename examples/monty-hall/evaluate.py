@@ -62,5 +62,7 @@ def cli(**kwargs):
     print(f"Keep win-rate: {marginal:.03f}")
     minotaur["keep"] = marginal
 
+    minotaur.exit()
+
 if __name__ == "__main__":
     cli()
