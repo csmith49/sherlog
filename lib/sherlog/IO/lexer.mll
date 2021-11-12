@@ -37,6 +37,9 @@ rule read = parse
     | "]" { RBRACKET }
     | "{" { LBRACE }
     | "}" { RBRACE }
+    | "<" { LANGLE }
+    | ">" { RANGLE }
+    | "/" { SLASH }
     (* symbols *)
     | underscore { BLANK }
     | ";" { SEMICOLON }

@@ -26,6 +26,10 @@
 %token RBRACKET
 %token LBRACE
 %token RBRACE
+%token LANGLE
+%token RANGLE
+%token SLASH
+
 
 // and semicolons for separating the generative part from the logical
 %token SEMICOLON
@@ -50,6 +54,11 @@ value :
     | TRUE; { Term.Boolean true }
     | FALSE; { Term.Boolean false }
     | f = FLOAT; { Term.Float f }
+    | n = INTEGER; SLASH; d = INTEGER; {
+        let numerator = CCFloat.of_int n in
+        let denominator = CCFloat.of_int d in
+        Term.Float (numerator /. denominator)
+    }
     | i = INTEGER; { Term.Integer i }
     | s = SYMBOL; { Term.Symbol s }
     | x = VARIABLE; { Term.Variable x }
@@ -63,6 +72,7 @@ term :
         let cons x y = Term.Function ("cons", [x ; y]) in
         CCList.fold_right cons vs Term.Unit
     }
+    | LANGLE; vs = separated_nonempty_list(COMMA, value); RANGLE; { Term.Function ("vector", vs) }
     | BLANK; { Term.Make.Variable.wildcard () }
     | t = delimited(LPARENS, term, RPARENS); { t }
     ;
