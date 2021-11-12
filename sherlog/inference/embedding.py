@@ -43,6 +43,13 @@ class DirectEmbedding(Embedding[Evidence]):
 
         return Objective(evidence=datum)
 
+class StringEmbedding(Embedding[str]):
+    """Embedding that operates directly over string representations of evidence."""
+
+    def embed(self, datum : str, **kwargs) -> Objective:
+        evidence = parse_evidence(datum)
+        return Objective(evidence=evidence)
+
 class UniformEmbedding(Embedding[T]):
     """Embedding that uniformly maps T to an objective.
     
@@ -92,16 +99,4 @@ class FunctionalEmbedding(Embedding[T]):
             evidence=parse_evidence(self._evidence(datum)),
             conditional=parse_evidence(self._conditional(datum)) if self._conditional else None,
             parameters=self._parameters(datum) if self._parameters else None
-        )
-
-class ConjunctiveEmbedding(Embedding[T]):
-    def __init__(self, evidence : Callable[[T], Iterable[str]], conditional : Optional[Callable[[T], str]] = None):
-        self._evidence = evidence
-        self._conditional = conditional
-
-    def embed(self, datum : T, **kwargs) -> Objective:
-        print(", ".join(self._evidence(datum)))
-        return Objective(
-            evidence=parse_evidence(", ".join(self._evidence(datum))),
-            conditional=parse_evidence(", ".join(self._conditional(datum)) if self._conditional else None)
         )
