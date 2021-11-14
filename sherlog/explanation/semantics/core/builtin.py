@@ -1,4 +1,5 @@
 from torch import tensor, Tensor, stack, dist
+import torch.distributions as tdist
 from typing import Callable
 
 # DETERMINISTIC BUILTINS
@@ -23,6 +24,9 @@ def add(left : Tensor, right : Tensor) -> Tensor:
 
 def max(*args):
     return stack(args).max()
+
+def gaussian_survival(a, mu, sigma):
+    return tdist.Normal(mu, sigma).cdf(a)
 
 # FOR EVALUATING LITERALS
 
@@ -56,6 +60,7 @@ _BUILTIN_MAP = {
     "gt" : gt,
     "add" : add,
     "max" : max,
+    "gaussian_survival" : gaussian_survival,
     # LITERALS
     "equal" : _literal_equal,
     "not equal" : _literal_not_equal,
