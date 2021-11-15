@@ -1,26 +1,29 @@
 from torch import Tensor, tensor
-from collections import defaultdict
 from typing import Iterable
 
 from .point import Point
 
 class Delta:
     def __init__(self, initial : Tensor):
-        self.initial = initial
+        self._initial = initial
+        self._values = {}
 
-        self.values = defaultdict(lambda: tensor(self.initial, requires_grad=True))
+    def fresh_tensor(self) -> Tensor:
+        return self._initial.clone().detach().requires_grad_(True)
+
+    def parameter(self, point: Point):
+        try:
+            result = self._values[point.key]
+        except KeyError:
+            result = self.fresh_tensor()
+
+        self._values[point.key] = result
+        return result
 
     # MAGIC METHODS
 
     def __getitem__(self, point : Point):
-        try:
-            return self.values[point.key]
-
-        except KeyError:
-            result = tensor(self.initial, requires_grad=True)
-            self.values[point.key] = result
-
-            return result
+        return self.parameter(point)
 
     # CONVERSION OF POINTS
 
