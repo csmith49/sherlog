@@ -1,11 +1,12 @@
 from .objective import Objective
+from .bayes import Point, Delta
 from ..program import Program
 from ..interface import minotaur
 
 from torch import Tensor, tensor, stack
 from enum import Enum, auto
 from torch.optim import SGD, Adam, Adagrad
-from typing import Iterable
+from typing import Iterable, Mapping, Optional
 
 import logging
 
@@ -66,7 +67,14 @@ class Optimizer:
 
     # CONSTRUCTION
 
-    def __init__(self, program : Program, strategy : Strategy = Strategy.SGD, learning_rate : float = 1e-4, **kwargs):
+    def __init__(self,
+        program : Program,
+        strategy : Strategy = Strategy.SGD,
+        learning_rate : float = 1e-4,
+        delta : Optional[Mapping[str, Delta]] = None,
+        points : Iterable[Point] = (),
+        **kwargs
+    ):
         """Construct an optimizer.
         
         Parameters
@@ -86,11 +94,31 @@ class Optimizer:
 
         self.program_kwargs = kwargs
 
+        self.delta = {} if delta is None else delta
+
         # construct the store optimizer
-        self._optimizer = self.strategy.initialize(self.program.parameters(), learning_rate=learning_rate)
+        self._optimizer = self.strategy.initialize(self.parameters(points=points), learning_rate=learning_rate)
 
         # the optimization queue
         self._queue = []
+
+    # PARAMETERS
+
+    def parameters(self, points : Iterable[Point] = ()) -> Iterable[Tensor]:
+        for delta in self.delta.values():
+            yield from delta.parameters(points)
+        yield from self.program.parameters()
+
+    # POINTS
+
+    def lookup_points(self, points : Iterable[Point]) -> Mapping[str, Tensor]:
+        result = {}
+        
+        for point in points:
+            delta = self.delta[point.relation]
+            result[point.symbol] = delta[point.indices]
+
+        return result
 
     # HANDLING OBJECTIVES
 
@@ -99,18 +127,11 @@ class Optimizer:
         
         # convert objective parameters and namespace and self.program_kwargs into the arguments for log_prob
         kwargs = {
-            "parameters" : objective.parameters,
+            "parameters" : self.lookup_points(objective.points),
             **self.program_kwargs
         }
 
-        # if they've provided a conditional, we need two calls to self.program.log_prob
-        if objective.conditional:
-            numerator = self.program.log_prob(objective.evidence + objective.conditional, **kwargs)
-            denominator = self.program.log_prob(objective.conditional, **kwargs)
-            # and, because we're in log-space...
-            return numerator - denominator
-        else:
-            return self.program.log_prob(objective.evidence, **kwargs)
+        return self.program.log_prob(objective.evidence, **kwargs)
 
     # MANAGING THE QUEUE
 

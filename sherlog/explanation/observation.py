@@ -84,3 +84,8 @@ class Observation:
         
         literals = [Literal.of_json(lit) for lit in json["literals"]]
         return cls(literals)
+
+    @classmethod
+    def of_dict(cls, dict) -> 'Observation':
+        literals = [Equal(key, value) for key, value in dict.items()]
+        return cls(literals)

@@ -1,102 +1,51 @@
-from typing import TypeVar, Generic, Iterable, Mapping, Callable, Optional
-from abc import ABC, abstractmethod
-from torch import Tensor
-
-from .objective import Objective
 from ..program import Evidence
 from ..interface import parse_source
 
+from .bayes import Point
+from .objective import Objective
+
+from typing import Generic, TypeVar, Callable, Iterable, Optional, Mapping
+
 T = TypeVar('T')
 
-class Embedding(ABC, Generic[T]):
-    """doc string goes here"""
-    
-    @abstractmethod
+# UTILITY
+
+def evidence_of_string(*evidence : str):
+    _, evidence = parse_source(f"!evidence {', '.join(evidence)}.")
+    return Evidence.of_json(evidence[0])
+
+# EMBEDDING
+
+class Embedding(Generic[T]):
+    def __init__(self, evidence : Callable[[T], Iterable[str]], points : Optional[Callable[[T], Iterable[Point]]] = None):
+        self._evidence = evidence
+        self._points = points
+
     def embed(self, datum : T, **kwargs) -> Objective:
-        """doc string goes here"""
-        
-        raise NotImplementedError()
+        evidence = evidence_of_string(*self._evidence(datum))
+        points = self._points(datum) if self._points else ()
+
+        return Objective(evidence=evidence, points=points)
 
     def embed_all(self, data : Iterable[T], **kwargs) -> Iterable[Objective]:
-        """Iterates over the embedded data."""
-
         for datum in data:
             yield self.embed(datum, **kwargs)
 
-    def __call__(self, datum : T, **kwargs) -> Objective:
-        """Dunder method wrapping `self.embed`. Embeds a datum."""
+    # MAGIC METHODS
 
+    def __call__(self, datum : T, **kwargs) -> Objective:
         return self.embed(datum, **kwargs)
 
-# Specialty embeddings
-
-# utility for converting strings to evidence objects
-def parse_evidence(evidence : str):
-    _, evidence = parse_source(f"!evidence {evidence}.")
-    return Evidence.of_json(evidence[0])
-
-class DirectEmbedding(Embedding[Evidence]):
-    """Embedding that operates naively over evidence."""
-
-    def embed(self, datum : Evidence, **kwargs) -> Objective:
-        """Embed a piece of evidence into an objective."""
-
-        return Objective(evidence=datum)
-
-class StringEmbedding(Embedding[str]):
-    """Embedding that operates directly over string representations of evidence."""
-
-    def embed(self, datum : str, **kwargs) -> Objective:
-        evidence = parse_evidence(datum)
-        return Objective(evidence=evidence)
-
-class UniformEmbedding(Embedding[T]):
-    """Embedding that uniformly maps T to an objective.
-    
-    Each datum is distinguished solely by the output of a callable that produces a parameterization.
-    """
-
-    def __init__(self, evidence : str, conditional : str, callable : Callable[[T], Mapping[str, Tensor]]):
-        self._evidence = parse_evidence(evidence)
-        self._conditional = parse_evidence(conditional) if conditional else None
-        self._callable = callable
-
-    def embed(self, datum : T, **kwargs) -> Objective:
-        return Objective(
-            evidence=self.evidence,
-            conditional=self._conditional,
-            parameters=self._callable(datum)
-        )
+# SPECIAL EMBEDDINGS
 
 class PartitionEmbedding(Embedding[T]):
-    """Embedding that maps datum to a finite set of evidence."""
+    def __init__(self, evidence : Mapping[T, str], points : Optional[Mapping[T, Iterable[Point]]] = None):
+        super().__init__(lambda x : [evidence[x]], points)
 
-    def __init__(self, partition : Mapping[T, str]):
-        self._partition = {key : parse_evidence(value) for key, value in partition.items()}
-        
-    def embed(self, datum : T, **kwargs) -> Objective:
-        return Objective(
-            evidence=self._partition[datum]
-        )
+class StringEmbedding(Embedding[str]):
+    def __init__(self, points : Optional[Callable[[str], Iterable[Point]]] = None):
+        super().__init__(lambda x : [evidence_of_string(x)], points)
 
-class FunctionalEmbedding(Embedding[T]):
-    """Embedding that relies on external callables to convert data to objectives.
-    
-    Each callable acts independently.
-    """
-
-    def __init__(self,
-        evidence : Callable[[T], str],
-        conditional : Optional[Callable[[T], str]] = None,
-        parameters : Optional[Callable[[T], Mapping[str, Tensor]]] = None
-    ):
-        self._evidence = evidence
-        self._conditional = conditional
-        self._parameters = parameters
-
-    def embed(self, datum : T, **kwargs) -> Objective:
-        return Objective(
-            evidence=parse_evidence(self._evidence(datum)),
-            conditional=parse_evidence(self._conditional(datum)) if self._conditional else None,
-            parameters=self._parameters(datum) if self._parameters else None
-        )
+class DirectEmbedding(Embedding[Evidence]):
+    def __init__(self, points : Optional[Callable[[Evidence], Iterable[Point]]] = None):
+        super().__init__(lambda x: [x], points)
