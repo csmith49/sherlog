@@ -1,13 +1,14 @@
 import click
-from sherlog.inference.embedding import StringEmbedding
 
 from sherlog.interface import initialize, print, minotaur
-from sherlog.inference import Optimizer, StringEmbedding
+from sherlog.inference import Optimizer, Embedding, minibatch
+from sherlog.inference.bayes import Point, Delta
 from sherlog.program import loads
 
 from typing import List, Mapping, Iterable
 from itertools import chain
 from random import random
+from torch import ones, softmax
 
 SCHEMA = {
     "topics" : ["nature", "technology"],
@@ -43,23 +44,54 @@ class Schema:
         yield from self.topics()
         yield from self.documents()
 
+    @property
+    def number_of_topics(self) -> int:
+        return len(self._topics)
+    
+    @property
+    def number_of_words(self) -> int:
+        return len(self._words)
+
+    # POINTS FOR BAYESIAN ESTIMATES
+
+    def topics_points(self, *documents) -> Iterable[Point]:
+        if documents:
+            for document in documents:
+                yield Point("topics", (document,))
+        else:
+            for document in self._documents.keys():
+                yield Point("topics", (document,))
+
+    def words_points(self) -> Iterable[Point]:
+        for topic in self._topics:
+            yield Point("words", (topic,))
+
+    def points(self, *documents) -> Iterable[Point]:
+        yield from self.topics_points(*documents)
+        yield from self.words_points()
+
     # DEFINING THE IDB
 
-    def words(self) -> Iterable[str]:
-        for document, tokens in self._documents.items():
-            for index, token in enumerate(tokens):
-                yield f"word({document}, {index}, {token})"
+    def words(self, document = None) -> Iterable[str]:
+        for doc, tokens in self._documents.items():
+            if document is None or doc == document:
+                for index, token in enumerate(tokens):
+                    yield f"word({doc}, {index}, {token})"
     
-    def idb(self) -> Iterable[str]:
-        yield from self.words()
+    def idb(self, *documents : str) -> Iterable[str]:
+        if documents:
+            for document in documents:
+                yield from self.words(document)
+        else:
+            yield from self.words()
 
     # PARAMETERS
 
     def alpha(self) -> Iterable[str]:
-        yield f"!parameter alpha : positive[{len(self._topics)}]"
+        yield f"!parameter alpha : positive[{self.number_of_topics}]"
 
     def beta(self) -> Iterable[str]:
-        yield f"!parameter beta : positive[{len(self._words)}]"
+        yield f"!parameter beta : positive[{self.number_of_words}]"
 
     def parameters(self) -> Iterable[str]:
         yield from self.alpha()
@@ -95,8 +127,8 @@ class Schema:
 
     # EVIDENCE
 
-    def evidence(self, subsample : float = 1.0) -> str:
-        observations = [atom for atom in self.idb() if random() <= subsample]
+    def evidence(self, documents = None, subsample : float = 1.0) -> str:
+        observations = [atom for atom in self.idb(documents) if random() <= subsample]
         return ", ".join(observations)
 
 @click.command()
@@ -129,20 +161,35 @@ def cli(**kwargs):
     # then load the program source
     print("Loading the program and documents...")
     program, _ = loads(schema.source())
-    embedder = StringEmbedding()
+    
+    data = [doc for doc in schema._documents.keys()]
+
+    embedder = Embedding(
+        evidence=lambda doc: schema.idb(doc),
+        points=lambda doc: schema.points(doc)
+    )
+    
     optimizer = Optimizer(
         program=program,
         learning_rate=kwargs["learning_rate"],
-        samples=kwargs["samples"]
+        samples=kwargs["samples"],
+        delta={
+            "topics" : Delta(softmax(ones(schema.number_of_topics), dim=0)),
+            "words" : Delta(softmax(ones(schema.number_of_words), dim=0))
+        },
+        points=schema.points()
     )
 
     # and optimize!
-    for epoch in range(kwargs["epochs"]):
-        optimizer.maximize(embedder.embed(schema.evidence()))
+    for batch in minibatch(data, batch_size=len(data), epochs=kwargs["epochs"]):
+        optimizer.maximize(*embedder.embed_all(batch.data))
         loss = optimizer.optimize()
 
-        print(epoch, loss)
+        print(f"Epoch {batch.epoch}")
+        print(f"Loss: {loss.item():.3f}")
 
+        for point in schema.words_points():
+            print(f"{point} - {optimizer.lookup_points((point,))}")
     minotaur.exit()
 
 if __name__ == "__main__":

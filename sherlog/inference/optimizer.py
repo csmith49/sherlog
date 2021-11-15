@@ -116,7 +116,7 @@ class Optimizer:
         
         for point in points:
             delta = self.delta[point.relation]
-            result[point.symbol] = delta[point.indices]
+            result[point.symbol] = delta[point]
 
         return result
 

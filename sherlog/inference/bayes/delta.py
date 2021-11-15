@@ -13,7 +13,14 @@ class Delta:
     # MAGIC METHODS
 
     def __getitem__(self, point : Point):
-        return self.values[point.key]
+        try:
+            return self.values[point.key]
+
+        except KeyError:
+            result = tensor(self.initial, requires_grad=True)
+            self.values[point.key] = result
+
+            return result
 
     # CONVERSION OF POINTS
 

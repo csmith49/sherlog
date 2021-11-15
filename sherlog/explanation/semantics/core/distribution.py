@@ -14,6 +14,7 @@ _DISTRIBUTION_MAP = {
     "categorical" : dists.Categorical,
     "normal" : dists.Normal,
     "beta" : dists.Beta,
+    "dirichlet" : dists.Dirichlet,
     "discrete" : discrete_constructor
 }
 
