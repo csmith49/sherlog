@@ -1,8 +1,8 @@
 """Explanations are the central explanatory element in Sherlog. They capture sufficient generative constraints to ensure a particular outcome."""
 
-from ..pipe import Pipeline, Statement
+from ..pipe import Pipeline, Statement, Value, Literal, Identifier
 from ..interface import minotaur
-from .semantics.core.semiring import PreciseSemiring, DisjointSumSemiring
+from .semantics.core.semiring import DisjointSumSemiring
 from .semantics import spyglass
 from .observation import Observation
 from .history import History
@@ -43,12 +43,20 @@ class Explanation:
         yield from self.stub()
 
     @minotaur("explanation/forcing", kwargs=("force"))
-    def forcing(self, force : bool = True, **kwargs) -> Mapping[str, Tensor]:
+    def forcing(self, parameters : Mapping[str, Tensor], force : bool = True, **kwargs) -> Mapping[str, Value]:
         """Construct the most-specific forcing possible for the explanation."""
 
         if len(self.observations) == 1 and force:
             observation = self.observations[0]
-            return {key : tensor(value.value) for key, value in observation.equality.items()}
+            result = {}
+            for key, value in observation.equality.items():
+                if isinstance(value, Literal):
+                    result[key] = spyglass.to_tensor(value.value)
+                elif isinstance(value, Identifier):
+                    result[key] = parameters[value.value]
+                else:
+                    raise TypeError(f"Observation produced non-evaluable target. [target={value}]")
+            return result
         else:
             return {}
 
@@ -58,7 +66,7 @@ class Explanation:
 
         # step 1: form the semantics
         semantics = spyglass.semantics_factory(
-            forcing = self.forcing(**kwargs),
+            forcing = self.forcing(parameters, **kwargs),
             semiring = DisjointSumSemiring(),
             locals  = self.locals
         )

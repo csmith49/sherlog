@@ -155,9 +155,6 @@ def cli(**kwargs):
         }
     )
 
-    print(schema.source())
-    print(schema.evidence())
-
     # then load the program source
     print("Loading the program and documents...")
     program, _ = loads(schema.source())
@@ -190,6 +187,10 @@ def cli(**kwargs):
 
         for point in schema.words_points():
             print(f"{point} - {optimizer.lookup_points((point,))}")
+    
+        for point in schema.topics_points():
+            print(f"{point} - {optimizer.lookup_points((point,))}")
+
     minotaur.exit()
 
 if __name__ == "__main__":

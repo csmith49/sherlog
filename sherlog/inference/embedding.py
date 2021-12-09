@@ -11,7 +11,8 @@ T = TypeVar('T')
 # UTILITY
 
 def evidence_of_string(*evidence : str):
-    _, evidence = parse_source(f"!evidence {', '.join(evidence)}.")
+    string_repr = f"!evidence {', '.join(evidence)}."
+    _, evidence = parse_source(string_repr)
     return Evidence.of_json(evidence[0])
 
 # EMBEDDING
@@ -22,7 +23,7 @@ class Embedding(Generic[T]):
         self._points = points
 
     def embed(self, datum : T, **kwargs) -> Objective:
-        evidence = evidence_of_string(*self._evidence(datum))
+        evidence = evidence_of_string(*self._evidence(datum), *(point.evidence for point in self._points(datum)))
         points = self._points(datum) if self._points else ()
 
         return Objective(evidence=evidence, points=points)

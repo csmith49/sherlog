@@ -1,12 +1,11 @@
 from torch.distributions import Distribution
 from sherlog.explanation.semantics.core.distribution import supported_distributions
-from typing import Callable, List, Mapping, Iterable, Optional, Any
+from typing import Callable, List, Mapping, Iterable, Optional, Any, Type
 from torch import Tensor, tensor, stack
 from functools import partial, wraps
 from itertools import filterfalse, chain
 
-from ...pipe import DynamicNamespace, Semantics, Pipe, Statement, Literal
-from ..observation import Observation
+from ...pipe import DynamicNamespace, Semantics, Pipe, Statement, Value, Literal, Identifier
 
 from .core.semiring import Semiring
 from . import core
@@ -155,7 +154,7 @@ def lift_distribution(distribution_constructor, forcing : Optional[Tensor] = Non
 
     return wrapped
 
-def spyglass_lookup(statement : Statement, forcing : Mapping[str, Tensor], semiring : Semiring, locals : Mapping[str, Callable[..., Tensor]]) -> Callable[..., List[Clue]]:
+def spyglass_lookup(statement : Statement, forcing : Mapping[str, Value], semiring : Semiring, locals : Mapping[str, Callable[..., Tensor]]) -> Callable[..., List[Clue]]:
     """Look up the appropriate callable for a statement."""
 
     # case 1: function is a distribution

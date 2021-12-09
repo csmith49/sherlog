@@ -1,5 +1,9 @@
 pick(; {0, 1, 2} <~ discrete[3]).
 
+reveal(0; {1, 2} <~ discrete[2]).
+reveal(1, 2).
+reveal(2, 1).
+
 swap(0; {1, 2} <~ discrete[2]).
 swap(1; {0, 2} <~ discrete[2]).
 swap(2; {0, 1} <~ discrete[2]).

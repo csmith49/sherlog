@@ -7,7 +7,7 @@ class Point:
 
     @property
     def symbol(self) -> str:
-        return "p:" + ":".join(self.indices)
+        return "p_" + "_".join(self.indices)
 
     @property
     def key(self) -> Tuple[str]:
@@ -15,4 +15,4 @@ class Point:
 
     @property
     def evidence(self) -> str:
-        return f"{self.relation}({', '.join(self.key)}, {self.symbol})"
+        return f"{self.relation}({', '.join(self.indices)}, {self.symbol})"
